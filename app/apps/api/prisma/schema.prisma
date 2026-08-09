@@ -1,0 +1,404 @@
+// Esquema inicial — ver DOCUMENTO TECNICO.md en la raíz del proyecto para las decisiones
+// que explican cada convención usada acá (borrado lógico, auditoría, roles combinables, etc.)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Convenciones aplicadas en (casi) todos los modelos:
+//
+// - Borrado lógico: `eliminadoEn` (null = activo). Ningún modelo hace delete físico.
+// - Auditoría de quién hizo qué: `creadoPorId` / `actualizadoPorId` / `eliminadoPorId`
+//   se guardan como el id de Usuario en texto plano, SIN relación Prisma explícita.
+//   Es intencional: declarar la relación en ambos sentidos (Usuario <-> cada modelo)
+//   multiplicaría decenas de relaciones nombradas sin aportar nada — la trazabilidad
+//   completa (quién, cuándo, valor anterior/nuevo) vive en RegistroAuditoria, que es
+//   la fuente de verdad real. Estos campos son un atajo de lectura rápida.
+// - `version` (bloqueo optimista) solo se agrega donde hay riesgo real de edición
+//   concurrente. Se empieza por Pedido (Operaciones y Logística lo tocan a la vez).
+// ---------------------------------------------------------------------------
+
+enum Rol {
+  OPERACIONES
+  LOGISTICA
+  ADMINISTRACION
+  FACTURACION
+}
+
+enum TipoServicio {
+  PANAL
+  MEDICAMENTO
+}
+
+enum CabaProvincia {
+  CABA
+  PROVINCIA
+}
+
+// DOCUMENTO FUNCIONAL.md §19
+enum EstadoPedido {
+  SIN_ASIGNAR
+  COORDINADO
+  EN_TRANSITO
+  ENTREGADO
+  ENTREGA_FALLIDA
+  CANCELADO
+}
+
+enum EstadoValidacion {
+  PENDIENTE
+  VALIDO
+  CON_ERRORES
+}
+
+enum EstadoSimpliroute {
+  NO_ENVIADO
+  ENVIADO
+  NO_ENCONTRADO
+  ERROR
+}
+
+enum EstadoImportacion {
+  PROCESANDO
+  COMPLETADA
+  COMPLETADA_CON_ERRORES
+  FALLIDA
+}
+
+enum EstadoGrupoFacturacion {
+  BORRADOR
+  CONFIRMADO
+}
+
+enum AccionAuditoria {
+  CREAR
+  ACTUALIZAR
+  BORRAR
+  RESTAURAR
+}
+
+// ---------------------------------------------------------------------------
+// Usuarios, roles y permisos por cliente
+// ---------------------------------------------------------------------------
+
+model Usuario {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  nombre        String
+  passwordHash  String? // null si el usuario solo usa Google OAuth
+  googleId      String?   @unique
+  roles         Rol[] // combinables — ver DOCUMENTO TECNICO.md sección 2
+  activo        Boolean   @default(true)
+
+  creadoEn      DateTime  @default(now())
+  actualizadoEn DateTime  @updatedAt
+  eliminadoEn   DateTime?
+
+  clientesPermitidos UsuarioCliente[]
+
+  @@map("usuarios")
+}
+
+// Permisos por cliente (§ Permisos por cliente en DOCUMENTO TECNICO.md):
+// si un usuario no tiene ninguna fila acá, se asume que ve todos los clientes.
+// Si tiene al menos una, queda restringido a esos.
+model UsuarioCliente {
+  usuarioId String
+  clienteId String
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@id([usuarioId, clienteId])
+  @@map("usuarios_clientes")
+}
+
+// ---------------------------------------------------------------------------
+// Cliente (farmacia que contrata el servicio) — nunca confundir con Destinatario.
+// DOCUMENTO FUNCIONAL.md §2, §20
+// ---------------------------------------------------------------------------
+
+model Cliente {
+  id                     String   @id @default(uuid())
+  nombre                 String
+  // patrones de texto para detectar el cliente en el nombre del archivo Excel
+  // (§5 funcional, ej. "BIOSINTESIS", "BELLA VISTA", "FARMAPAL")
+  patronesDeteccion      String[]
+  porcentajeSegundoServicioActual Decimal? @db.Decimal(5, 2) // ver PorcentajeSegundoServicio para historial
+  activo                 Boolean  @default(true)
+
+  creadoEn      DateTime  @default(now())
+  actualizadoEn DateTime  @updatedAt
+  creadoPorId   String?
+  actualizadoPorId String?
+  eliminadoEn   DateTime?
+  eliminadoPorId String?
+
+  tarifas               TarifaCliente[]
+  destinatarios         Destinatario[]
+  pedidos               Pedido[]
+  gruposFacturacion     GrupoFacturacion[]
+  importaciones         ImportacionExcel[]
+  usuariosPermitidos    UsuarioCliente[]
+
+  @@map("clientes")
+}
+
+// Tarifas CABA/Provincia por cliente, con vigencia para mantener histórico (§23 funcional)
+model TarifaCliente {
+  id             String        @id @default(uuid())
+  clienteId      String
+  tipo           CabaProvincia
+  monto          Decimal       @db.Decimal(12, 2)
+  vigenciaDesde  DateTime
+  vigenciaHasta  DateTime?
+
+  creadoEn       DateTime      @default(now())
+  creadoPorId    String?
+  eliminadoEn    DateTime?
+  eliminadoPorId String?
+
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@index([clienteId, tipo, vigenciaDesde])
+  @@map("tarifas_cliente")
+}
+
+// ---------------------------------------------------------------------------
+// Destinatario (padrón) — persona final que recibe el pedido. §2, §8 funcional
+// ---------------------------------------------------------------------------
+
+model Destinatario {
+  id                   String    @id @default(uuid())
+  clienteId            String
+  numeroAfiliado       String
+  nombre               String
+  direccion            String
+  direccionNormalizada String?
+  localidad            String
+  telefono             String?
+  simplirouteId        String?
+  latitud              Decimal?  @db.Decimal(9, 6)
+  longitud             Decimal?  @db.Decimal(9, 6)
+
+  creadoEn      DateTime  @default(now())
+  actualizadoEn DateTime  @updatedAt
+  creadoPorId   String?
+  actualizadoPorId String?
+  eliminadoEn   DateTime?
+  eliminadoPorId String?
+
+  cliente Cliente  @relation(fields: [clienteId], references: [id])
+  pedidos Pedido[]
+
+  @@unique([clienteId, numeroAfiliado])
+  @@map("destinatarios")
+}
+
+// ---------------------------------------------------------------------------
+// Zonas y choferes — §12, §13 funcional
+// ---------------------------------------------------------------------------
+
+model Zona {
+  id     String @id @default(uuid())
+  nombre String @unique
+
+  eliminadoEn DateTime?
+
+  choferes ZonaChofer[]
+  pedidos  Pedido[]
+
+  @@map("zonas")
+}
+
+model Chofer {
+  id     String  @id @default(uuid())
+  nombre String
+  activo Boolean @default(true)
+
+  eliminadoEn DateTime?
+
+  zonas   ZonaChofer[]
+  pedidos Pedido[]
+
+  @@map("choferes")
+}
+
+model ZonaChofer {
+  id       String @id @default(uuid())
+  zonaId   String
+  choferId String
+  activo   Boolean @default(true)
+
+  zona   Zona   @relation(fields: [zonaId], references: [id])
+  chofer Chofer @relation(fields: [choferId], references: [id])
+
+  @@unique([zonaId, choferId])
+  @@map("zonas_choferes")
+}
+
+// ---------------------------------------------------------------------------
+// Importación de Excel — §4, §5, §6 funcional
+// ---------------------------------------------------------------------------
+
+model ImportacionExcel {
+  id             String            @id @default(uuid())
+  clienteId      String? // null = "Cliente sin identificar" hasta que el usuario lo confirme
+  nombreArchivo  String
+  urlArchivo     String // key/ruta en el bucket (Cloudflare R2)
+  estado         EstadoImportacion @default(PROCESANDO)
+  totalFilas     Int?
+  filasConError  Int?
+  usuarioId      String
+
+  creadoEn DateTime @default(now())
+
+  cliente Cliente? @relation(fields: [clienteId], references: [id])
+  pedidos Pedido[]
+
+  @@map("importaciones_excel")
+}
+
+// ---------------------------------------------------------------------------
+// Pedido — unidad central de trabajo. §7, §14-§19 funcional
+// ---------------------------------------------------------------------------
+
+model Pedido {
+  id                   String            @id @default(uuid())
+  clienteId            String
+  destinatarioId       String
+  importacionId        String?
+
+  numeroAfiliado       String // snapshot al momento de importar
+  direccionOriginal    String // tal cual vino en el Excel
+  direccionUsada       String // la que efectivamente se usa para zona/planificación (§11 funcional)
+  direccionNormalizada String?
+  localidad            String
+  cabaProvincia        CabaProvincia?
+
+  fechaProgramada      DateTime
+  fechaEntregaEfectiva DateTime?
+
+  tipoServicio         TipoServicio
+  estado               EstadoPedido      @default(SIN_ASIGNAR)
+  estadoValidacion     EstadoValidacion  @default(PENDIENTE)
+  estadoSimpliroute    EstadoSimpliroute @default(NO_ENVIADO)
+
+  zonaId               String?
+  choferId             String?
+  bultos               Int?
+  remito               String?
+  ticket               String? // opcional — Farmapal (§4 funcional)
+  simplirouteId        String?
+  observaciones        String?
+
+  grupoFacturacionId   String?
+  reglaAplicada        String? // "2x1" | "UNIFICADA" | "INDIVIDUAL" — informativo, el detalle vive en GrupoFacturacion
+
+  version              Int               @default(0) // bloqueo optimista — ver nota de convenciones arriba
+
+  creadoEn      DateTime  @default(now())
+  actualizadoEn DateTime  @updatedAt
+  creadoPorId   String?
+  actualizadoPorId String?
+  eliminadoEn   DateTime?
+  eliminadoPorId String?
+
+  cliente          Cliente           @relation(fields: [clienteId], references: [id])
+  destinatario     Destinatario      @relation(fields: [destinatarioId], references: [id])
+  importacion      ImportacionExcel? @relation(fields: [importacionId], references: [id])
+  zona             Zona?             @relation(fields: [zonaId], references: [id])
+  chofer           Chofer?           @relation(fields: [choferId], references: [id])
+  grupoFacturacion GrupoFacturacion? @relation(fields: [grupoFacturacionId], references: [id])
+  productos        Producto[]
+
+  @@index([clienteId, estado, fechaProgramada])
+  @@index([destinatarioId])
+  @@map("pedidos")
+}
+
+// Una línea del Excel = un producto. Varios productos + mismo afiliado/dirección/fecha
+// se agrupan en un mismo Pedido (§7 funcional).
+model Producto {
+  id          String @id @default(uuid())
+  pedidoId    String
+  codigo      String? // EAN
+  descripcion String
+  cantidad    Int
+
+  eliminadoEn DateTime?
+
+  pedido Pedido @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+
+  @@map("productos")
+}
+
+// ---------------------------------------------------------------------------
+// Facturación — §21-§32 funcional
+// ---------------------------------------------------------------------------
+
+// Historial de porcentaje aplicado a entregas unificadas, con vigencia (mismo criterio que TarifaCliente)
+model PorcentajeSegundoServicio {
+  id            String   @id @default(uuid())
+  clienteId     String
+  porcentaje    Decimal  @db.Decimal(5, 2)
+  vigenciaDesde DateTime
+  vigenciaHasta DateTime?
+
+  creadoEn    DateTime @default(now())
+  creadoPorId String?
+  eliminadoEn DateTime?
+
+  @@map("porcentajes_segundo_servicio")
+}
+
+// Agrupa los pedidos que comparten un viaje facturable (2x1, unificación, o individual).
+// Los pedidos NUNCA se fusionan ni se borran — solo se relacionan acá (§32 funcional).
+model GrupoFacturacion {
+  id               String                 @id @default(uuid())
+  clienteId        String
+  mes              Int
+  anio             Int
+  estado           EstadoGrupoFacturacion @default(BORRADOR) // vista previa hasta confirmar
+
+  reglaAplicada    String // "2x1" | "UNIFICADA" | "INDIVIDUAL"
+  tarifaUtilizada  Decimal?               @db.Decimal(12, 2)
+  porcentajeAplicado Decimal?             @db.Decimal(5, 2)
+  importeCalculado Decimal                @db.Decimal(12, 2)
+
+  confirmadoEn     DateTime?
+  confirmadoPorId  String?
+
+  creadoEn DateTime @default(now())
+
+  cliente Cliente  @relation(fields: [clienteId], references: [id])
+  pedidos Pedido[]
+
+  @@index([clienteId, anio, mes, estado])
+  @@map("grupos_facturacion")
+}
+
+// ---------------------------------------------------------------------------
+// Auditoría universal — DOCUMENTO TECNICO.md sección 2. Append-only, nunca se edita/borra.
+// ---------------------------------------------------------------------------
+
+model RegistroAuditoria {
+  id            String          @id @default(uuid())
+  entidad       String // nombre del modelo, ej. "Pedido"
+  entidadId     String
+  accion        AccionAuditoria
+  usuarioId     String?
+  valorAnterior Json?
+  valorNuevo    Json?
+  creadoEn      DateTime        @default(now())
+
+  @@index([entidad, entidadId])
+  @@index([usuarioId])
+  @@map("registros_auditoria")
+}
