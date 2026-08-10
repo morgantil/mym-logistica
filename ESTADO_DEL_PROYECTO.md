@@ -53,12 +53,12 @@ esta línea — si retomás vos mismo, `git status` y pedile un commit si sigue 
 | Destinatarios | 🟢 completo | padrón, detección de diferencia de dirección, sync con SimpliRoute |
 | Pedidos | 🟢 completo | grilla paginada, bultos, revisión antes de enviar, envío a SimpliRoute, bloqueo optimista |
 | Importadores | 🟢 completo | mapeo de columnas **genérico** (no un parser por cliente — ver DOCUMENTO TECNICO.md), agrupación, creación de pedidos. Probado con los 3 Excel reales de pañales: 207 pedidos, 0 errores (2026-08-10) |
-| Zonas/choferes | 🟢 completo | configurado a mano por el cliente, no atado a divisiones oficiales |
+| Zonas/choferes | 🟢 completo | configurado a mano por el cliente, no atado a divisiones oficiales. CRUD completo + asignación zona↔chofer (2026-08-10) |
 | SimpliRoute | 🟡 mock | adapter real pendiente — falta gestionar acceso a la API (§36 funcional) |
 | Geografía (CABA/Provincia) | 🟢 completo | resuelto con API oficial gratuita `apis.datos.gob.ar/georef`, sin depender del cliente |
 | Dashboard | 🟡 mínimo | un endpoint (pedidos por estado) — ya conectado en el frontend, resto de KPIs pendiente |
 | **Facturación** | 🔴 **bloqueada** | ver abajo |
-| Frontend | 🟡 en construcción | `apps/web` (React+Vite+Tailwind+shadcn/ui). Login (local + Google), shell, **Inicio/Dashboard**, **Pedidos** (grilla §14, detalle §15, bultos §16, revisión y envío §17-18), **Importar Excel** (§4-8, §11) y **Clientes** (listar, crear, editar, activar/desactivar) funcionando end-to-end contra el backend real. Solo Zonas y Facturación siguen como placeholder — Zonas/choferes porque el backend hoy es de solo lectura (sin alta/edición todavía), Facturación porque sigue bloqueada. Ver DOCUMENTO TECNICO.md sección 6. |
+| Frontend | 🟡 en construcción | `apps/web` (React+Vite+Tailwind+shadcn/ui). Login (local + Google), shell, **Inicio/Dashboard**, **Pedidos** (grilla §14, detalle §15, bultos §16, revisión y envío §17-18), **Importar Excel** (§4-8, §11), **Clientes** y **Zonas/choferes** (listar, crear, editar, activar/desactivar, asignación zona↔chofer) funcionando end-to-end contra el backend real. Solo **Facturación** sigue como placeholder, bloqueada por la pregunta de negocio pendiente — es la última pantalla del nav sin construir. Ver DOCUMENTO TECNICO.md sección 6. |
 
 21 tests unitarios sobre la lógica de dominio más riesgosa (agrupación,
 mapeo de columnas, validación de envío). Todo probado end-to-end contra una base

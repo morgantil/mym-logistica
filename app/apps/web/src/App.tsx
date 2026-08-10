@@ -7,6 +7,7 @@ import { GoogleCallbackPage } from "@/features/auth/google-callback-page";
 import { LoginPage } from "@/features/auth/login-page";
 import { ImportarPage } from "@/features/importar/importar-page";
 import { ClientesPage } from "@/features/clientes/clientes-page";
+import { ZonasChoferesPage } from "@/features/zonas-choferes/zonas-choferes-page";
 import { PedidosPage } from "@/features/pedidos/pedidos-page";
 
 function App() {
@@ -21,10 +22,7 @@ function App() {
           <Route path="/pedidos" element={<PedidosPage />} />
           <Route path="/importar" element={<ImportarPage />} />
           <Route path="/clientes" element={<ClientesPage />} />
-          <Route
-            path="/zonas-choferes"
-            element={<ProximamentePage titulo="Zonas y choferes" />}
-          />
+          <Route path="/zonas-choferes" element={<ZonasChoferesPage />} />
           <Route path="/facturacion" element={<ProximamentePage titulo="Facturación" />} />
         </Route>
       </Route>
