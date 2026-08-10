@@ -7,3 +7,13 @@ export async function obtenerPedidosPorEstado(): Promise<Partial<Record<EstadoPe
   );
   return data;
 }
+
+export interface RevisionResumen {
+  listos: number;
+  bloqueados: number;
+}
+
+export async function obtenerRevisionResumen(): Promise<RevisionResumen> {
+  const { data } = await apiClient.get<RevisionResumen>("/dashboard/revision-resumen");
+  return data;
+}

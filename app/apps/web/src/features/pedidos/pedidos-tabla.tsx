@@ -44,7 +44,14 @@ export function PedidosTabla() {
       : "TODOS";
 
   function cambiarEstado(valor: EstadoPedido | "TODOS") {
-    setSearchParams(valor === "TODOS" ? {} : { estado: valor });
+    // Merge, no reemplazo: no pisar otros params de la URL (ej. ?vista=... de
+    // PedidosPage) que no tienen nada que ver con este filtro.
+    setSearchParams((actual) => {
+      const siguiente = new URLSearchParams(actual);
+      if (valor === "TODOS") siguiente.delete("estado");
+      else siguiente.set("estado", valor);
+      return siguiente;
+    });
     setPagina(1);
   }
 
