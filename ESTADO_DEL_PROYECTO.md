@@ -58,7 +58,7 @@ esta línea — si retomás vos mismo, `git status` y pedile un commit si sigue 
 | Geografía (CABA/Provincia) | 🟢 completo | resuelto con API oficial gratuita `apis.datos.gob.ar/georef`, sin depender del cliente |
 | Dashboard | 🟡 mínimo | un endpoint (pedidos por estado), resto pendiente |
 | **Facturación** | 🔴 **bloqueada** | ver abajo |
-| Frontend | 🟡 en construcción | `apps/web` (React+Vite+Tailwind+shadcn/ui). Login (local + Google), shell de la app y **pantalla de Pedidos completa** (grilla §14, detalle §15, carga de bultos §16, revisión y envío a SimpliRoute §17-18) funcionando end-to-end contra el backend real. Importar, Clientes, Zonas y Facturación siguen como placeholder "Esta pantalla todavía no está construida" — ver DOCUMENTO TECNICO.md sección 6. |
+| Frontend | 🟡 en construcción | `apps/web` (React+Vite+Tailwind+shadcn/ui). Login (local + Google), shell, **Pedidos** (grilla §14, detalle §15, bultos §16, revisión y envío §17-18) e **Importar Excel** (§4-8, §11) funcionando end-to-end contra el backend real. Clientes, Zonas y Facturación siguen como placeholder "Esta pantalla todavía no está construida" — ver DOCUMENTO TECNICO.md sección 6. |
 
 21 tests unitarios sobre la lógica de dominio más riesgosa (agrupación,
 mapeo de columnas, validación de envío). Todo probado end-to-end contra una base
@@ -118,11 +118,11 @@ segundos en despertar — probar de nuevo.
 
 Usuario de prueba ya creado en Neon: `prueba@mym.test`, rol Administración
 (la contraseña la sabe quien la generó — no queda en texto plano en ningún lado,
-ni debería). También hay 2 pedidos de prueba (cliente "Biosintesis") para poder
-ver la pantalla de Pedidos con datos reales: uno completo (zona, chofer, bultos)
-y uno con datos faltantes a propósito, para ver la pestaña de Revisión con
-motivos bloqueantes. Es data de prueba, no de un cliente real — se puede borrar
-desde `pnpm --filter @mym/api prisma:studio` sin problema.
+ni debería). También hay clientes y pedidos de prueba ("Biosintesis", "Farmapal")
+para poder ver Pedidos e Importar Excel con datos reales, incluyendo uno con
+datos faltantes a propósito para ver la pestaña de Revisión con motivos
+bloqueantes. Es data de prueba, no de un cliente real — se puede borrar desde
+`pnpm --filter @mym/api prisma:studio` sin problema.
 
 Detalle completo, con cómo crear la base en Neon desde cero si hiciera falta, en
 `app/README.md`.
