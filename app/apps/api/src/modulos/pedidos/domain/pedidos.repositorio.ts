@@ -1,5 +1,5 @@
 import { CabaProvincia, EstadoPedido, EstadoSimpliroute, EstadoValidacion, TipoServicio } from "@mym/shared-types";
-import { Pedido } from "./pedido";
+import { Pedido, PedidoListado } from "./pedido";
 
 export interface DatosCrearPedido {
   clienteId: string;
@@ -28,7 +28,7 @@ export interface FiltroPedidos {
 }
 
 export interface PaginaPedidos {
-  datos: Pedido[];
+  datos: PedidoListado[];
   total: number;
 }
 
@@ -40,7 +40,7 @@ export interface PedidosRepositorio {
 
   // §17 funcional: candidatos a "Revisión antes de enviar" — los que todavía
   // no se mandaron a SimpliRoute.
-  listarPendientesDeEnvio(clienteIds?: string[]): Promise<Pedido[]>;
+  listarPendientesDeEnvio(clienteIds?: string[]): Promise<PedidoListado[]>;
 
   // Ambos con bloqueo optimista: lanzan ConflictoVersionError (ver ese archivo)
   // si `version` no coincide con la fila actual — alguien más lo modificó primero.

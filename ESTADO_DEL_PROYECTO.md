@@ -2,7 +2,7 @@
 
 Última actualización: **2026-08-10**. Este documento es una **foto del momento**, se
 reescribe cada vez que cambia el estado — no es un historial (eso vive en
-`DOCUMENTO TECNICO.md` sección 6). Si algo acá contradice el código o
+`DOCUMENTO TECNICO.md` sección 7). Si algo acá contradice el código o
 `DOCUMENTO TECNICO.md`, confiá en esos dos, no en esto — puede haber quedado viejo.
 
 ---
@@ -40,10 +40,9 @@ MYM/
 ```
 
 Repo Git inicializado en la raíz de `MYM/`, rama **`develop`** (no hay
-`main`/`master` todavía, es intencional). Último commit: `ef07400`. **Hay cambios
-sin commitear** desde ahí (auth con cookie httpOnly + rotación + revocación de
-sesiones) — si retomás vos mismo, puede convenir pedir un commit antes
-de seguir.
+`main`/`master` todavía, es intencional). Último commit: `d8247f4` (arranque del
+frontend). Hay trabajo de Pedidos sin commitear todavía al momento de escribir
+esta línea — si retomás vos mismo, `git status` y pedile un commit si sigue así.
 
 ## Qué está construido (backend)
 
@@ -59,7 +58,7 @@ de seguir.
 | Geografía (CABA/Provincia) | 🟢 completo | resuelto con API oficial gratuita `apis.datos.gob.ar/georef`, sin depender del cliente |
 | Dashboard | 🟡 mínimo | un endpoint (pedidos por estado), resto pendiente |
 | **Facturación** | 🔴 **bloqueada** | ver abajo |
-| Frontend | 🟡 arrancado | `apps/web` (React+Vite+Tailwind+shadcn/ui). Login (local + Google) y shell de la app (nav, rutas protegidas, logout) funcionando end-to-end contra el backend real. El resto de las pantallas (Pedidos, Importar, Clientes, Zonas, Facturación) están en el nav pero muestran un placeholder "Esta pantalla todavía no está construida" — ver DOCUMENTO TECNICO.md sección 6. |
+| Frontend | 🟡 en construcción | `apps/web` (React+Vite+Tailwind+shadcn/ui). Login (local + Google), shell de la app y **pantalla de Pedidos completa** (grilla §14, detalle §15, carga de bultos §16, revisión y envío a SimpliRoute §17-18) funcionando end-to-end contra el backend real. Importar, Clientes, Zonas y Facturación siguen como placeholder "Esta pantalla todavía no está construida" — ver DOCUMENTO TECNICO.md sección 6. |
 
 21 tests unitarios sobre la lógica de dominio más riesgosa (agrupación,
 mapeo de columnas, validación de envío). Todo probado end-to-end contra una base
@@ -119,7 +118,11 @@ segundos en despertar — probar de nuevo.
 
 Usuario de prueba ya creado en Neon: `prueba@mym.test`, rol Administración
 (la contraseña la sabe quien la generó — no queda en texto plano en ningún lado,
-ni debería).
+ni debería). También hay 2 pedidos de prueba (cliente "Biosintesis") para poder
+ver la pantalla de Pedidos con datos reales: uno completo (zona, chofer, bultos)
+y uno con datos faltantes a propósito, para ver la pestaña de Revisión con
+motivos bloqueantes. Es data de prueba, no de un cliente real — se puede borrar
+desde `pnpm --filter @mym/api prisma:studio` sin problema.
 
 Detalle completo, con cómo crear la base en Neon desde cero si hiciera falta, en
 `app/README.md`.

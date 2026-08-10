@@ -16,7 +16,23 @@ export interface Pedido {
   zonaId: string | null;
   choferId: string | null;
   bultos: number | null;
+  observaciones: string | null;
   version: number;
+}
+
+// Proyección de Pedido para la grilla principal (§14 funcional) y la revisión
+// antes de enviar (§17): agrega los nombres que la grilla necesita mostrar
+// (Cliente, Destinatario, Zona, Chofer son IDs en el Pedido base) y el detalle
+// de productos para "cantidad de productos"/"cantidad total de unidades".
+// Solo lo devuelven PedidosRepositorio#listar y #listarPendientesDeEnvio — el
+// resto de las operaciones (crear, actualizarBultos, etc.) siguen trabajando
+// con el Pedido base, sin acoplarse a qué necesita mostrar la UI.
+export interface PedidoListado extends Pedido {
+  clienteNombre: string;
+  destinatarioNombre: string;
+  zonaNombre: string | null;
+  choferNombre: string | null;
+  productos: { codigo: string | null; descripcion: string; cantidad: number }[];
 }
 
 export interface LineaExcelPanales {

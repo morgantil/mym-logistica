@@ -1,0 +1,153 @@
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useAuth } from "@/features/auth/auth-context";
+import { enviarASimpliRoute, revisarPendientesDeEnvio } from "./api";
+
+// §17-18 funcional: candidatos a envío con sus motivos bloqueantes, selección
+// y envío masivo a SimpliRoute (un pedido inválido no frena a los demás).
+export function RevisionPanel() {
+  const { usuario } = useAuth();
+  const puedeEnviar = Boolean(
+    usuario?.roles.some((rol) => rol === "OPERACIONES" || rol === "ADMINISTRACION"),
+  );
+
+  const queryClient = useQueryClient();
+  const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["pedidos", "revision"],
+    queryFn: revisarPendientesDeEnvio,
+  });
+
+  const mutacion = useMutation({
+    mutationFn: enviarASimpliRoute,
+    onSuccess: (resultado) => {
+      if (resultado.enviados.length > 0) {
+        toast.success(`${resultado.enviados.length} pedido(s) enviado(s) a SimpliRoute.`);
+      }
+      if (resultado.errores.length > 0) {
+        toast.error(`${resultado.errores.length} pedido(s) no se pudieron enviar. Revisá el detalle abajo.`);
+      }
+      setSeleccionados(new Set());
+      queryClient.invalidateQueries({ queryKey: ["pedidos"] });
+    },
+    onError: () => {
+      toast.error("No se pudo enviar. Probá de nuevo en unos segundos.");
+    },
+  });
+
+  function alternarSeleccion(pedidoId: string) {
+    setSeleccionados((actual) => {
+      const nuevo = new Set(actual);
+      if (nuevo.has(pedidoId)) nuevo.delete(pedidoId);
+      else nuevo.add(pedidoId);
+      return nuevo;
+    });
+  }
+
+  const listos = data?.filter((item) => item.erroresBloqueantes.length === 0) ?? [];
+
+  if (isError) {
+    return (
+      <p role="alert" className="text-sm text-destructive">
+        No se pudo cargar la revisión. Probá de nuevo en unos segundos.
+      </p>
+    );
+  }
+
+  if (isLoading) {
+    return <p className="text-sm text-muted-foreground">Cargando…</p>;
+  }
+
+  if (!data || data.length === 0) {
+    return <p className="text-sm text-muted-foreground">No hay pedidos pendientes de enviar.</p>;
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setSeleccionados(new Set(listos.map((item) => item.pedido.id)))}
+          >
+            Seleccionar los {listos.length} listos
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => setSeleccionados(new Set())}>
+            Limpiar selección
+          </Button>
+        </div>
+        {puedeEnviar && (
+          <Button
+            type="button"
+            disabled={seleccionados.size === 0 || mutacion.isPending}
+            onClick={() => mutacion.mutate(Array.from(seleccionados))}
+          >
+            {mutacion.isPending
+              ? "Enviando…"
+              : `Enviar seleccionados (${seleccionados.size})`}
+          </Button>
+        )}
+      </div>
+
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-10" />
+            <TableHead>Cliente</TableHead>
+            <TableHead>Destinatario</TableHead>
+            <TableHead>Dirección</TableHead>
+            <TableHead>Fecha</TableHead>
+            <TableHead>Motivos bloqueantes</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {data.map(({ pedido, erroresBloqueantes }) => {
+            const bloqueado = erroresBloqueantes.length > 0;
+            return (
+              <TableRow key={pedido.id}>
+                <TableCell>
+                  <Checkbox
+                    checked={seleccionados.has(pedido.id)}
+                    onCheckedChange={() => alternarSeleccion(pedido.id)}
+                    disabled={!puedeEnviar || bloqueado}
+                    aria-label={`Seleccionar pedido de ${pedido.destinatarioNombre}`}
+                  />
+                </TableCell>
+                <TableCell>{pedido.clienteNombre}</TableCell>
+                <TableCell>{pedido.destinatarioNombre}</TableCell>
+                <TableCell>{pedido.direccionUsada}</TableCell>
+                <TableCell>{new Date(pedido.fechaProgramada).toLocaleDateString("es-AR")}</TableCell>
+                <TableCell>
+                  {bloqueado ? (
+                    <div className="flex flex-wrap gap-1">
+                      {erroresBloqueantes.map((error) => (
+                        <Badge key={error} variant="destructive">
+                          {error}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <Badge
+                      variant="outline"
+                      className="border-transparent bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-400"
+                    >
+                      Listo para enviar
+                    </Badge>
+                  )}
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}

@@ -19,6 +19,7 @@ function pedidoListoParaEnviar(overrides: Partial<Pedido> = {}): Pedido {
     zonaId: "z1",
     choferId: "ch1",
     bultos: 2,
+    observaciones: null,
     version: 0,
     ...overrides,
   };

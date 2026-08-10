@@ -14,6 +14,14 @@ export default defineConfig({
       "@": path.resolve(dirname, "./src"),
     },
   },
+  optimizeDeps: {
+    // @mym/shared-types se compila en CommonJS (apps/api, que también lo
+    // consume, es Nest/CommonJS) — es un paquete "linkeado" del monorepo, así
+    // que Vite no lo pre-empaqueta a ESM por defecto en dev como sí hace con
+    // las dependencias de npm normales. Sin esto, el navegador falla al
+    // importarlo directamente en modo dev (en build sí funciona solo).
+    include: ["@mym/shared-types"],
+  },
   server: {
     port: 5173,
     strictPort: true,

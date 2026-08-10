@@ -5,6 +5,7 @@ import { ProximamentePage } from "@/components/shell/proximamente-page";
 import { DashboardPage } from "@/features/dashboard/dashboard-page";
 import { GoogleCallbackPage } from "@/features/auth/google-callback-page";
 import { LoginPage } from "@/features/auth/login-page";
+import { PedidosPage } from "@/features/pedidos/pedidos-page";
 
 function App() {
   return (
@@ -15,7 +16,7 @@ function App() {
       <Route element={<ProtectedRoute />}>
         <Route element={<AppShell />}>
           <Route path="/" element={<DashboardPage />} />
-          <Route path="/pedidos" element={<ProximamentePage titulo="Pedidos" />} />
+          <Route path="/pedidos" element={<PedidosPage />} />
           <Route path="/importar" element={<ProximamentePage titulo="Importar Excel" />} />
           <Route path="/clientes" element={<ProximamentePage titulo="Clientes" />} />
           <Route

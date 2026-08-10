@@ -2,13 +2,38 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../../common/prisma/prisma.service";
 import { ConflictoVersionError } from "../domain/conflicto-version.error";
-import { Pedido } from "../domain/pedido";
+import { Pedido, PedidoListado } from "../domain/pedido";
 import {
   DatosCrearPedido,
   FiltroPedidos,
   PaginaPedidos,
   PedidosRepositorio,
 } from "../domain/pedidos.repositorio";
+
+// Include compartido por listar() y listarPendientesDeEnvio(): son los únicos
+// dos métodos que devuelven PedidoListado (ver domain/pedido.ts) en vez del
+// Pedido base.
+const INCLUDE_LISTADO = {
+  cliente: { select: { nombre: true } },
+  destinatario: { select: { nombre: true } },
+  zona: { select: { nombre: true } },
+  chofer: { select: { nombre: true } },
+  productos: { select: { codigo: true, descripcion: true, cantidad: true } },
+} satisfies Prisma.PedidoInclude;
+
+type FilaPedidoListado = Prisma.PedidoGetPayload<{ include: typeof INCLUDE_LISTADO }>;
+
+function mapearListado(fila: FilaPedidoListado): PedidoListado {
+  const { cliente, destinatario, zona, chofer, ...resto } = fila;
+  return {
+    ...(resto as unknown as Pedido),
+    clienteNombre: cliente.nombre,
+    destinatarioNombre: destinatario.nombre,
+    zonaNombre: zona?.nombre ?? null,
+    choferNombre: chofer?.nombre ?? null,
+    productos: fila.productos,
+  };
+}
 
 @Injectable()
 export class PedidosRepositorioPrisma implements PedidosRepositorio {
@@ -40,14 +65,11 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
         orderBy: { fechaProgramada: "desc" },
         skip: (pagina - 1) * porPagina,
         take: porPagina,
+        include: INCLUDE_LISTADO,
       }),
       this.prisma.pedido.count({ where }),
     ]);
-    // Los enums generados por Prisma y los de @mym/shared-types tienen los mismos
-    // valores string pero son tipos nominalmente distintos — cast intencional acá,
-    // en el borde infra/dominio, para que el resto de la app dependa del tipo
-    // agnóstico de framework (Pedido de domain/pedido.ts).
-    return { datos: datos as unknown as Pedido[], total };
+    return { datos: datos.map(mapearListado), total };
   }
 
   // Base de los endpoints de dashboard/KPIs (DOCUMENTO TECNICO.md, ítem confirmado
@@ -98,15 +120,16 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
     return encontrado as unknown as Pedido | null;
   }
 
-  async listarPendientesDeEnvio(clienteIds?: string[]): Promise<Pedido[]> {
+  async listarPendientesDeEnvio(clienteIds?: string[]): Promise<PedidoListado[]> {
     const pedidos = await this.prisma.pedido.findMany({
       where: {
         estado: "SIN_ASIGNAR",
         ...(clienteIds ? { clienteId: { in: clienteIds } } : {}),
       },
       orderBy: { fechaProgramada: "asc" },
+      include: INCLUDE_LISTADO,
     });
-    return pedidos as unknown as Pedido[];
+    return pedidos.map(mapearListado);
   }
 
   // count===0 en el updateMany puede significar "no existe" o "cambió la
