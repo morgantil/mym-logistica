@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
@@ -49,14 +50,25 @@ export class AuthService {
     const refreshExpiresIn = this.configService.get<string>("jwt.refreshExpiresIn")!;
 
     const [accessToken, refreshToken] = await Promise.all([
-      this.jwtService.signAsync(payload, {
-        secret: this.configService.get("jwt.secret"),
-        expiresIn: this.configService.get("jwt.expiresIn"),
-      }),
-      this.jwtService.signAsync(payload, {
-        secret: this.configService.get("jwt.refreshSecret"),
-        expiresIn: refreshExpiresIn,
-      }),
+      this.jwtService.signAsync(
+        // `jti` random por token: sin esto, dos tokens firmados para el mismo
+        // usuario dentro del mismo segundo (`iat` es en segundos) son
+        // byte-idénticos — el `tokenHash` con constraint UNIQUE de
+        // SesionRefreshToken rompía con un 500 real en ese caso (visto con
+        // React StrictMode disparando el refresh inicial dos veces seguidas).
+        { ...payload, jti: randomUUID() },
+        {
+          secret: this.configService.get("jwt.secret"),
+          expiresIn: this.configService.get("jwt.expiresIn"),
+        },
+      ),
+      this.jwtService.signAsync(
+        { ...payload, jti: randomUUID() },
+        {
+          secret: this.configService.get("jwt.refreshSecret"),
+          expiresIn: refreshExpiresIn,
+        },
+      ),
     ]);
 
     await this.sesionesService.crear(

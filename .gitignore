@@ -37,3 +37,7 @@ coverage/
 # Datos reales de clientes/pacientes (Excel de OSDE, capturas, etc.) — nunca
 # se commitean, solo se usan localmente para probar el importador.
 drive */
+
+# Artefactos de sesiones de QA con el plugin de Playwright (capturas, logs de
+# consola, snapshots) — nunca son entregables, solo evidencia de una corrida.
+.playwright-mcp/

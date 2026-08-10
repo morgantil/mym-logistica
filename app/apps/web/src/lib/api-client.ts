@@ -41,7 +41,15 @@ export function registrarHandlerSesionExpirada(handler: () => void) {
 
 let refrescandoPromise: Promise<string | null> | null = null;
 
-async function refrescarAccessToken(): Promise<string | null> {
+// Exportada (no solo de uso interno del interceptor): auth-context.tsx la usa
+// también para el refresh silencioso al arrancar la app. Es importante que
+// sea la MISMA promesa compartida — si React StrictMode (dev) monta el efecto
+// de AuthProvider dos veces, o el usuario tiene dos pestañas, dos llamadas
+// directas a POST /auth/refresh comparten la cookie pero rotan el token una
+// sola vez: la segunda en llegar al backend se encuentra la sesión ya
+// revocada y devuelve 401 — sin este dedup, esa 401 "de más" cerraba la
+// sesión en el front aunque la primera llamada sí hubiera tenido éxito.
+export async function refrescarAccessToken(): Promise<string | null> {
   // Si ya hay un refresh en curso (ej. varios requests en paralelo recibieron
   // 401 al mismo tiempo), todos esperan la misma promesa en vez de disparar
   // refreshes duplicados que rotarían el token entre sí.

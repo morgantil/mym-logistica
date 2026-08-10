@@ -97,7 +97,11 @@ export function AppShell() {
           ))}
         </nav>
 
-        <main className="flex-1 p-4 sm:p-6">
+        {/* min-w-0: sin esto, un flex item nunca se achica más allá del ancho
+            de su contenido (ej. una tabla ancha) — la página entera terminaba
+            scrolleando horizontal en vez de solo la tabla dentro de su propio
+            contenedor. */}
+        <main className="min-w-0 flex-1 p-4 sm:p-6">
           <Outlet />
         </main>
       </div>
