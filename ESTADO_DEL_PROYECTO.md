@@ -1,6 +1,6 @@
 # ESTADO DEL PROYECTO — leer esto primero si retomás después de una pausa
 
-Última actualización: **2026-08-09**. Este documento es una **foto del momento**, se
+Última actualización: **2026-08-10**. Este documento es una **foto del momento**, se
 reescribe cada vez que cambia el estado — no es un historial (eso vive en
 `DOCUMENTO TECNICO.md` sección 6). Si algo acá contradice el código o
 `DOCUMENTO TECNICO.md`, confiá en esos dos, no en esto — puede haber quedado viejo.
@@ -40,16 +40,16 @@ MYM/
 ```
 
 Repo Git inicializado en la raíz de `MYM/`, rama **`develop`** (no hay
-`main`/`master` todavía, es intencional). Último commit: `caf4220`. **Hay cambios
-sin commitear** desde ahí (todo lo de importadores, Etapa 3 de pedidos, y el
-módulo de geografía) — si retomás vos mismo, puede convenir pedir un commit antes
+`main`/`master` todavía, es intencional). Último commit: `ef07400`. **Hay cambios
+sin commitear** desde ahí (auth con cookie httpOnly + rotación + revocación de
+sesiones) — si retomás vos mismo, puede convenir pedir un commit antes
 de seguir.
 
 ## Qué está construido (backend)
 
 | Módulo | Estado | Qué hace |
 |---|---|---|
-| Auth (local + Google), roles, permisos por cliente | 🟢 completo | |
+| Auth (local + Google), roles, permisos por cliente | 🟢 completo | refresh token en cookie httpOnly con rotación + revocación real de sesiones (`SesionRefreshToken`) |
 | Clientes | 🟢 completo | detección automática por nombre de Excel |
 | Destinatarios | 🟢 completo | padrón, detección de diferencia de dirección, sync con SimpliRoute |
 | Pedidos | 🟢 completo | grilla paginada, bultos, revisión antes de enviar, envío a SimpliRoute, bloqueo optimista |

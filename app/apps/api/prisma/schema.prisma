@@ -101,8 +101,28 @@ model Usuario {
   eliminadoEn   DateTime?
 
   clientesPermitidos UsuarioCliente[]
+  sesiones           SesionRefreshToken[]
 
   @@map("usuarios")
+}
+
+// Permite revocar sesiones de verdad (no solo esperar a que el JWT expire solo)
+// — DOCUMENTO TECNICO.md sección 2, "Revocación de sesiones". Se guarda el HASH
+// del refresh token, nunca el token en texto plano (igual que una contraseña:
+// si alguien lee esta tabla, no puede reusar los tokens). Rotación en cada
+// refresh: el token usado queda revocado y se crea uno nuevo.
+model SesionRefreshToken {
+  id         String    @id @default(uuid())
+  usuarioId  String
+  tokenHash  String    @unique
+  creadoEn   DateTime  @default(now())
+  expiraEn   DateTime
+  revocadoEn DateTime?
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
+  @@map("sesiones_refresh_token")
 }
 
 // Permisos por cliente (§ Permisos por cliente en DOCUMENTO TECNICO.md):

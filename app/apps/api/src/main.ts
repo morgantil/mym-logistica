@@ -1,10 +1,14 @@
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
 import { ValidationPipe } from "@nestjs/common";
+import cookieParser from "cookie-parser";
 import { AppModule } from "./app.module";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // Necesario para leer la cookie httpOnly del refresh token — ver AuthController.
+  app.use(cookieParser());
 
   app.useGlobalPipes(
     new ValidationPipe({
