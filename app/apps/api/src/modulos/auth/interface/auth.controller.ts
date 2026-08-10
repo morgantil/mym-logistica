@@ -89,14 +89,16 @@ export class AuthController {
   @Publico()
   @UseGuards(GoogleAuthGuard)
   @Get("google/callback")
-  async callbackGoogle(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+  async callbackGoogle(@Req() req: Request, @Res() res: Response) {
     const perfil = req.user as { googleId: string; email: string; nombre: string };
     const { accessToken, refreshToken } = await this.authService.iniciarSesionConGoogle(perfil);
     this.setearCookieRefresh(res, refreshToken);
-    // TODO: cuando exista apps/web, acá conviene redirigir a una URL del front
-    // con el accessToken en vez de devolver JSON crudo (esto es un GET de
-    // navegador completo, no un fetch del front).
-    return { accessToken };
+    // Es un GET de navegador completo (Google redirige acá), no un fetch del
+    // front — por eso la sesión se completa con un redirect en vez de un JSON.
+    // El accessToken va en el fragment (#), no en el query string, para que
+    // no quede en logs de servidor ni en el historial de navegación.
+    const frontendUrl = this.configService.get<string>("frontendUrl")!;
+    res.redirect(`${frontendUrl}/auth/callback#accessToken=${accessToken}`);
   }
 
   @Get("perfil")

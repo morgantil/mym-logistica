@@ -7,8 +7,8 @@ Ver `../DOCUMENTO FUNCIONAL.md` (qué hace el sistema) y `../DOCUMENTO TECNICO.m
 
 ```
 apps/
-  api/    → backend NestJS (arrancado hoy)
-  web/    → frontend React (todavía no existe, "puede esperar")
+  api/    → backend NestJS
+  web/    → frontend React + Vite + Tailwind + shadcn/ui (Login + shell arrancados)
 packages/
   shared-types/  → enums de dominio compartidos entre api y web
 ```
@@ -95,10 +95,20 @@ Y desde ahí, crear una fila en `usuarios` con `roles: ["ADMINISTRACION"]` y un
 `passwordHash` generado con Argon2 (o pedime que te arme un script chico para
 esto cuando lo necesites).
 
+### 7. Correr el frontend
+
+```bash
+cp apps/web/.env.example apps/web/.env   # ya trae http://localhost:3000 por defecto
+pnpm --filter @mym/web dev
+```
+
+Levanta en `http://localhost:5173` (el `CORS_ORIGIN` del backend y el
+`FRONTEND_URL` que usa el redirect de Google ya apuntan ahí por defecto).
+
 ## Comandos útiles (desde la raíz del monorepo)
 
 ```bash
-pnpm dev         # corre todas las apps en modo desarrollo (turbo)
+pnpm dev         # corre todas las apps en modo desarrollo (turbo) — api + web juntos
 pnpm build       # build de todo
 pnpm typecheck   # typecheck de todo
 ```

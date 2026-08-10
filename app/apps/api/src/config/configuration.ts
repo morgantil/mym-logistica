@@ -1,5 +1,6 @@
 export default () => ({
   port: parseInt(process.env.PORT ?? "3000", 10),
+  frontendUrl: process.env.FRONTEND_URL ?? "http://localhost:5173",
   jwt: {
     secret: process.env.JWT_SECRET,
     expiresIn: process.env.JWT_EXPIRES_IN ?? "15m",

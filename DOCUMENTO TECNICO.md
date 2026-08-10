@@ -72,8 +72,8 @@ Para cada una, decime: **sí / no / después**.
 - Permisos por cliente → confirmado, sección 2.
 - Granularidad de permisos → confirmado (alcanza con roles combinables), sección 2.
 - Vista previa de facturación → confirmado, sección 2.
-- Panel para choferes → fuera del MVP, arquitectura debe dejarlo agregable sin rediseñar (sección 6).
-- Notificación al destinatario (SMS/WhatsApp) → confirmada como 2da etapa (sección 6), costo real ver sección 5.
+- Panel para choferes → fuera del MVP, arquitectura debe dejarlo agregable sin rediseñar (sección 7).
+- Notificación al destinatario (SMS/WhatsApp) → confirmada como 2da etapa (sección 7), costo real ver sección 5.
 
 **Quedan solo dos ítems abiertos**: almacenamiento de archivos (#5) y dashboard/KPIs (#6) — de menor riesgo, se pueden resolver más adelante sin bloquear nada. Multi-idioma (#7) queda descartado.
 
@@ -92,7 +92,7 @@ Estas siguen abiertas y bloquean el diseño final del módulo SimpliRoute — no
 7. Actualización de domicilios vía API.
 8. Estados disponibles y su equivalencia con los estados propios (§19 funcional).
 9. Webhook vs. polling para sincronización de estados.
-10. Si SimpliRoute ya devuelve coordenadas geocodificadas (afecta sección 6 — evitaría pagar un servicio de geocoding aparte).
+10. Si SimpliRoute ya devuelve coordenadas geocodificadas (afecta sección 7 — evitaría pagar un servicio de geocoding aparte).
 
 **Mientras esto no se resuelva**, el módulo `simpliroute/` se construye contra un mock que respeta el contrato esperado, para no bloquear el resto del desarrollo.
 
@@ -121,7 +121,53 @@ después es cambiar una variable de entorno, no rediseñar.
 
 ---
 
-# 6. Historial de decisiones
+# 6. Frontend — arquitectura y principios de diseño
+
+## 6.1 Stack y estructura
+
+| Ítem | Decisión | Estado | Notas |
+|---|---|---|---|
+| Framework | React + Vite + TypeScript | 🟢 | `apps/web` dentro del monorepo Turborepo, junto a `apps/api`. |
+| Estilos | Tailwind CSS | 🟢 | |
+| Componentes | shadcn/ui (Radix + Tailwind, componentes copiados al repo, no una librería cerrada en `node_modules`) | 🟢 | Se instala solo lo que se usa; queda como código propio, fácil de ajustar sin pelear contra overrides de una librería de terceros. |
+| Data fetching / cache | TanStack Query | 🟢 | Reemplaza estado manual de loading/error/cache para las llamadas a la API. |
+| Tablas | TanStack Table | 🟢 | Para la grilla de Pedidos (§16-18 funcional): paginación, orden y filtros sobre datos ya paginados por el backend. |
+| Ruteo | React Router | 🟢 | Rutas protegidas por sesión + rol donde aplique. |
+| Sesión (mitad frontend) | Access token en memoria (estado de React, nunca `localStorage`) + refresh automático contra `/auth/refresh` (manda la cookie httpOnly sola) al arrancar la app y ante un 401. | 🟢 | La mitad backend de esta decisión ya estaba implementada (sección 2) antes de arrancar el frontend. |
+
+## 6.2 Principios de diseño (pedido explícito del cliente, 2026-08-10)
+
+Público real de la app: personal administrativo de MyM, perfil no técnico, incluye usuarios de +50 años.
+Se prioriza claridad sobre impacto visual:
+
+- Nada oculto: sin menús que solo aparecen al hacer hover, sin iconos sin texto en acciones importantes,
+  sin tooltips como única explicación de algo.
+- Contraste y tamaño de texto altos por defecto (base 16-18px), espaciado generoso, foco de teclado
+  siempre visible, objetivos de click/tap grandes.
+- Paleta acotada (2-3 colores), profesional. Sin identidad de marca definida todavía → se arranca con la
+  base de shadcn/ui y se ajusta el día que haya logo/colores de MyM.
+- Minimalista pero nunca vacío de información: cada pantalla comunica su estado (vacío, error, cargando)
+  en texto simple, sin iconografía ambigua como único indicador.
+- Se usa como guía el plugin/skill `frontend-design` de Anthropic (habilitado en `.claude/settings.json`,
+  instalado 2026-08-10), pero adaptado a este público: acá se prioriza legibilidad y previsibilidad por
+  sobre el "riesgo estético deliberado" que ese skill sugiere para sitios de marca/marketing.
+
+## 6.3 Autenticación en el frontend
+
+- Al cargar la app: intento silencioso de `POST /auth/refresh` (la cookie va sola) para restaurar sesión
+  sin pedir login de nuevo si todavía es válida.
+- Login: `POST /auth/login` guarda el `accessToken` en memoria (contexto de React); la cookie la setea
+  el backend, el frontend nunca la toca directamente.
+- Cada request autenticado manda `Authorization: Bearer <accessToken>`. Un 401 dispara un refresh
+  automático y un reintento único; si el refresh también falla, se manda a Login.
+- Logout: `POST /auth/logout` + limpieza del estado en memoria.
+- Google OAuth: `/auth/google/callback` ahora redirige de vuelta al frontend con el `accessToken` en el
+  fragment de la URL (antes devolvía JSON crudo — era un TODO explícito en el código para "cuando exista
+  apps/web", ver historial).
+
+---
+
+# 7. Historial de decisiones
 
 | Fecha | Decisión | Motivo |
 |---|---|---|
@@ -156,3 +202,5 @@ después es cambiar una variable de entorno, no rediseñar.
 | 2026-08-09 | Etapa 3 implementada: `PATCH /pedidos/:id/bultos` (§16, con bloqueo optimista real — primer uso concreto de `version`), `GET /pedidos/revision` (§17, motivos bloqueantes por pedido) y `POST /pedidos/enviar-simpliroute` (§18, envío masivo donde un pedido fallido no frena a los demás). Se agregó un filtro global que traduce el conflicto de versión a HTTP 409. 6 tests nuevos sobre `validarPedidoParaEnvio`. Backend de las Etapas 1-3 del §38 funcional queda funcionalmente completo; falta Facturación (Etapa 4) y probar todo con datos/API reales. | Cerrar el ciclo operativo completo (importar → revisar → enviar) antes de pasar a facturación. |
 | 2026-08-10 | Sesión de pausa/charla sobre Frontend (sin código): confirmado que un front web y una app mobile son viables sobre la misma API sin cambios; PWA elegida como camino a mobile sin pasar por app stores; token de sesión: access en memoria + refresh en cookie `httpOnly`/`Secure`/`SameSite` (nunca `localStorage`); se suma revocación real de sesiones (tabla de refresh tokens, costo marginal ~cero); front y API deberían quedar bajo el mismo dominio raíz cuando se decida el despliegue; el service worker de la futura PWA solo cachea assets estáticos, nunca respuestas de API. Nada de esto implementado todavía — queda anotado para cuando arranque el frontend. | El cliente pidió explícitamente "dejemos todo anotado siempre" — decisiones de una charla de planeamiento no se pierden aunque no se hayan construido. |
 | 2026-08-10 | **Implementado** lo de la charla anterior: `SesionRefreshToken` (hash SHA-256 del refresh token, nunca en texto plano), `cookie-parser` conectado, `/auth/login`, `/auth/google/callback` y `/auth/refresh` ahora setean/leen el refresh token como cookie `httpOnly`+`Secure` (solo en prod)+`SameSite=Lax`, restringida al path `/auth`. El body de esas respuestas solo trae el `accessToken`. Rotación en cada refresh (el token usado queda revocado, se emite uno nuevo) y `POST /auth/logout` nuevo (público, revoca por cookie, no depende de que el access token siga vigente). Probado end-to-end contra Neon real con un usuario de prueba: login → cookie seteada → refresh rota → logout revoca → refresh posterior ya sin sesión válida. 2 tests nuevos (`parseDuracionAMs`). Bug encontrado y corregido en el camino: `/auth/logout` había quedado sin `@Publico()`, exigía un access token vigente para poder cerrar sesión. | Pedido explícito del cliente ("hagamos eso del back") después de la charla de la sesión anterior — se pasó de "anotado" a "construido". |
+| 2026-08-10 | Commit `d1caaf9` sobre el trabajo de rotación/revocación de sesiones (quedaba sin commitear desde la entrada anterior), antes de arrancar el frontend. Arranque del frontend confirmado con Leonardo: primer flujo a construir es **Login + shell de la app** (no la grilla de Pedidos ni el importador todavía). Stack y principios de diseño quedaron formalizados en la nueva sección 6 de este documento — ver ahí el detalle completo (incluye el pedido explícito de una UI clara/sin elementos ocultos, pensada para personal administrativo no técnico, con usuarios de +50 años). | El cliente pidió explícitamente que esto quedara documentado como "traza" antes de escribir código, no solo en el chat. |
+| 2026-08-10 | **Implementado** el arranque del frontend: `apps/web` (Vite + React 19 + TypeScript + Tailwind v4 + shadcn/ui preset Nova + TanStack Query/Table + React Router + Axios). Paleta ajustada del preset default (gris puro) a un azul profesional como color de acción (`--primary`/`--ring`), base tipográfica subida a 17px, foco de teclado siempre visible — ver sección 6.2. Cliente API con access token en memoria, interceptor de refresh automático ante 401 (con deduplicación de refreshes en paralelo) y limpieza de sesión si el refresh también falla. Pantalla de Login (email/password + Google, mostrar/ocultar contraseña) y shell de la app (nav lateral siempre visible sin hamburguesa, menú de usuario, logout) construidos y probados end-to-end contra el backend real: login → `/auth/perfil` → refresh silencioso al recargar → logout → refresh posterior ya rechazado. Corregido de paso el TODO pendiente en `auth.controller.ts`: `/auth/google/callback` ahora redirige a `FRONTEND_URL/auth/callback#accessToken=...` en vez de devolver JSON crudo (nueva config `frontendUrl`, default `http://localhost:5173`). Nav incluye placeholders "Esta pantalla todavía no está construida" para Pedidos/Importar/Clientes/Zonas/Facturación — nada roto ni oculto, cada ítem del menú comunica su estado real. **No probado en navegador real** (sin herramienta de automatización de browser disponible en esta sesión) — sí verificado: typecheck limpio, build de producción sin errores, y el flujo completo de auth contra la API real vía HTTP. | Seguir el plan acordado con Leonardo (pregunta de arranque de esta sesión) y dejar registro de cada decisión de diseño/arquitectura tomada en el camino, no solo el resultado final. |
