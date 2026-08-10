@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { flexRender } from "@tanstack/react-table";
 import { getCoreRowModel, useLegacyTable, type LegacyColumnDef } from "@tanstack/react-table/legacy";
@@ -30,8 +31,22 @@ export function PedidosTabla() {
   );
 
   const [pagina, setPagina] = useState(1);
-  const [estado, setEstado] = useState<EstadoPedido | "TODOS">("TODOS");
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState<PedidoListado | null>(null);
+
+  // El filtro de estado vive en la URL (?estado=...) para que el Dashboard
+  // pueda linkear directo a "Pedidos filtrados por X" — no solo mostrar un
+  // número, sino llevar a la lista real detrás de ese número.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const estadoParam = searchParams.get("estado");
+  const estado: EstadoPedido | "TODOS" =
+    estadoParam && (Object.values(EstadoPedido) as string[]).includes(estadoParam)
+      ? (estadoParam as EstadoPedido)
+      : "TODOS";
+
+  function cambiarEstado(valor: EstadoPedido | "TODOS") {
+    setSearchParams(valor === "TODOS" ? {} : { estado: valor });
+    setPagina(1);
+  }
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["pedidos", "listado", { pagina, porPagina: POR_PAGINA, estado }],
@@ -120,10 +135,7 @@ export function PedidosTabla() {
           <span className="text-sm font-medium">Estado:</span>
           <Select
             value={estado}
-            onValueChange={(valor) => {
-              setEstado(valor as EstadoPedido | "TODOS");
-              setPagina(1);
-            }}
+            onValueChange={(valor) => cambiarEstado(valor as EstadoPedido | "TODOS")}
           >
             <SelectTrigger className="w-48">
               <SelectValue />

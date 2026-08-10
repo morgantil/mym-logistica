@@ -56,3 +56,8 @@ export function BadgeEstadoSimpliroute({ estado }: { estado: EstadoSimpliroute }
 export const LABEL_ESTADO_PEDIDO: Record<EstadoPedido, string> = Object.fromEntries(
   Object.entries(LABELS_ESTADO_PEDIDO).map(([clave, valor]) => [clave, valor.texto]),
 ) as Record<EstadoPedido, string>;
+
+// Exportado para el Dashboard: mismo texto y tono de color que usa la grilla
+// de Pedidos para este estado, así los tiles de KPIs y la columna Estado se
+// leen como el mismo sistema en vez de dos paletas distintas.
+export { LABELS_ESTADO_PEDIDO, CLASES_TONO };
