@@ -51,9 +51,21 @@ POST /importaciones/confirmar-mapeo (mismo archivo + clienteId + mapeoManual)
   automáticamente "usar solo este pedido" y se deja una observación en el
   pedido. Falta el endpoint/pantalla para que un usuario elija de verdad —
   es trabajo de Etapa 2 (Revisión antes de enviar, §17).
-- **Sin probar contra los 3 Excel reales todavía** — el diccionario de
-  sinónimos es un punto de partida razonable, no una certeza. Cuando
-  aparezcan los archivos de Biosíntesis/Bella Vista/Farmapal, correrlos es la
-  prueba de fuego real.
+- ~~Sin probar contra los 3 Excel reales todavía~~ — **hecho 2026-08-10**. Los
+  3 archivos reales (Biosíntesis, Bella Vista, Farmapal — misma estructura de
+  columnas en los tres) se importaron contra Neon: 207 pedidos, **0 filas con
+  error**. Encontró dos cosas reales que no se habían anticipado, ya
+  corregidas: (1) 6 encabezados que no matcheaban ningún sinónimo — sumados a
+  `DICCIONARIO_SINONIMOS`; (2) la celda de fecha trae la fecha **y** una nota
+  de entrega pegadas en el mismo texto (ej. "2026-08-06 UF03 PIDE QUE
+  INGRESE") — `transformarFila` ahora separa la fecha de la nota, y la nota
+  se guarda en `Pedido.observaciones` en vez de perderse. Detalle completo en
+  DOCUMENTO TECNICO.md, historial 2026-08-10.
 - **Medicamentos** (§37): mismo motor, pero casi seguro va a necesitar sumar
-  sinónimos nuevos al diccionario — no debería requerir tocar la lógica.
+  sinónimos nuevos al diccionario — no debería requerir tocar la lógica. Los
+  2 Excel de medicamentos que llegaron junto con los de pañales (Bella Vista,
+  Farmaet) tienen una estructura de columnas bastante distinta a la de
+  pañales — y el de Farmaet además parece tener la fila de encabezados corrida
+  (el lector asume que la fila 1 siempre es el encabezado). Quedan sin tocar
+  hasta que arranque la Etapa 2, pero conviene mirarlos con calma antes de
+  reusar el mismo diccionario sin más.

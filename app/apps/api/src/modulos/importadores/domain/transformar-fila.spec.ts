@@ -74,6 +74,47 @@ describe("transformarFila", () => {
     expect(resultado.errores).toContain("Falta o es inválida la cantidad.");
   });
 
+  it("separa la fecha de una observación pegada en la misma celda (Biosíntesis/Bella Vista/Farmapal reales)", () => {
+    const resultado = transformarFila(
+      {
+        Afiliado: "12345",
+        Nombre: "Juan Pérez",
+        Domicilio: "Rivadavia 100",
+        Barrio: "Once",
+        Fecha: "2026-08-06 UF03 PIDE QUE INGRESE",
+        Producto: "Pañal A",
+        Cantidad: 4,
+      },
+      MAPEO,
+      "cliente-1",
+    );
+
+    expect(resultado.valida).toBe(true);
+    expect(resultado.linea).toMatchObject({
+      fechaEntrega: "2026-08-06",
+      notaFecha: "UF03 PIDE QUE INGRESE",
+    });
+  });
+
+  it("una fecha sin ningún patrón reconocible al inicio sigue siendo inválida", () => {
+    const resultado = transformarFila(
+      {
+        Afiliado: "12345",
+        Nombre: "Juan Pérez",
+        Domicilio: "Rivadavia 100",
+        Barrio: "Once",
+        Fecha: "sin fecha reconocible",
+        Producto: "Pañal A",
+        Cantidad: 4,
+      },
+      MAPEO,
+      "cliente-1",
+    );
+
+    expect(resultado.valida).toBe(false);
+    expect(resultado.errores).toContain("Falta o es inválida la fecha de entrega.");
+  });
+
   it("campo obligatorio sin mapeo (encabezado no confirmado) también cuenta como faltante", () => {
     const mapeoIncompleto: MapeoColumnas = { ...MAPEO };
     delete mapeoIncompleto.localidad;

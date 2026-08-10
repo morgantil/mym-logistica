@@ -14,12 +14,41 @@ function aTexto(valor: unknown): string | null {
   return texto === "" ? null : texto;
 }
 
-function aFechaIso(valor: unknown): string | null {
-  if (valor instanceof Date) return valor.toISOString().slice(0, 10);
+interface FechaConNota {
+  fechaIso: string;
+  // Biosíntesis/Bella Vista/Farmapal traen la fecha y una observación de
+  // entrega pegadas en la misma celda (ej. "2026-08-06 UF03 PIDE QUE
+  // INGRESE", "2026-08-06//FARMAPAL"). Se extrae la fecha del inicio del
+  // texto; lo que sobra son instrucciones de entrega reales, no basura — se
+  // guarda como nota en vez de descartarse (ver ImportarExcelService).
+  nota: string | null;
+}
+
+const FECHA_ISO_AL_INICIO = /^(\d{4}-\d{2}-\d{2})/;
+
+function aFechaConNota(valor: unknown): FechaConNota | null {
+  if (valor instanceof Date) return { fechaIso: valor.toISOString().slice(0, 10), nota: null };
+
   const texto = aTexto(valor);
   if (!texto) return null;
-  const fecha = new Date(texto);
-  return Number.isNaN(fecha.getTime()) ? null : fecha.toISOString().slice(0, 10);
+
+  const fechaCompleta = new Date(texto);
+  if (!Number.isNaN(fechaCompleta.getTime())) {
+    return { fechaIso: fechaCompleta.toISOString().slice(0, 10), nota: null };
+  }
+
+  const matchInicio = texto.match(FECHA_ISO_AL_INICIO);
+  if (!matchInicio) return null;
+
+  const fecha = new Date(matchInicio[1]);
+  if (Number.isNaN(fecha.getTime())) return null;
+
+  const nota = texto
+    .slice(matchInicio[0].length)
+    .replace(/^[\s/:.-]+/, "")
+    .trim();
+
+  return { fechaIso: fecha.toISOString().slice(0, 10), nota: nota || null };
 }
 
 function aCantidad(valor: unknown): number | null {
@@ -47,7 +76,7 @@ export function transformarFila(
   const destinatario = aTexto(leer("destinatario"));
   const direccion = aTexto(leer("direccion"));
   const localidad = aTexto(leer("localidad"));
-  const fechaEntrega = aFechaIso(leer("fechaEntrega"));
+  const fecha = aFechaConNota(leer("fechaEntrega"));
   const descripcionProducto = aTexto(leer("descripcionProducto"));
   const cantidad = aCantidad(leer("cantidad"));
   const codigoProducto = aTexto(leer("codigoProducto"));
@@ -57,7 +86,7 @@ export function transformarFila(
   if (!destinatario) errores.push("Falta destinatario.");
   if (!direccion) errores.push("Falta dirección.");
   if (!localidad) errores.push("Falta localidad.");
-  if (!fechaEntrega) errores.push("Falta o es inválida la fecha de entrega.");
+  if (!fecha) errores.push("Falta o es inválida la fecha de entrega.");
   if (!descripcionProducto) errores.push("Falta producto.");
   if (!cantidad) errores.push("Falta o es inválida la cantidad.");
 
@@ -75,7 +104,8 @@ export function transformarFila(
       direccion: direccion!,
       localidad: localidad!,
       telefono,
-      fechaEntrega: fechaEntrega!,
+      fechaEntrega: fecha!.fechaIso,
+      notaFecha: fecha!.nota,
       codigoProducto,
       descripcionProducto: descripcionProducto!,
       cantidad: cantidad!,

@@ -15,21 +15,36 @@ export const DICCIONARIO_SINONIMOS: Record<CampoCanonico, string[]> = {
     "COD AFILIADO",
     "CODIGO AFILIADO",
     "ID AFILIADO",
+    "NRO DE AFILIADO CSV", // Biosíntesis/Bella Vista/Farmapal (grilla OSDE real)
   ],
   destinatario: [
     "DESTINATARIO",
     "NOMBRE",
     "NOMBRE Y APELLIDO",
     "APELLIDO Y NOMBRE",
-    "PACIENTE",
+    "PACIENTE", // Biosíntesis/Bella Vista/Farmapal
     "BENEFICIARIO",
   ],
   direccion: ["DIRECCION", "DOMICILIO", "DIRECCION DE ENTREGA", "DOMICILIO DE ENTREGA"],
   localidad: ["LOCALIDAD", "BARRIO", "CIUDAD"],
-  fechaEntrega: ["FECHA", "FECHA DE ENTREGA", "FECHA ENTREGA", "FECHA PROGRAMADA"],
+  fechaEntrega: [
+    "FECHA",
+    "FECHA DE ENTREGA",
+    "FECHA ENTREGA",
+    "FECHA PROGRAMADA",
+    // Biosíntesis/Bella Vista/Farmapal: la celda trae fecha + observaciones de
+    // entrega en el mismo texto (ver transformarFila, que separa una de otra).
+    "FECHA DE ENTREGA + OBSERVAC",
+  ],
   codigoProducto: ["CODIGO", "COD PRODUCTO", "CODIGO PRODUCTO", "EAN"],
-  descripcionProducto: ["PRODUCTO", "DESCRIPCION", "DESCRIPCION PRODUCTO", "ARTICULO"],
+  descripcionProducto: [
+    "PRODUCTO",
+    "DESCRIPCION",
+    "DESCRIPCION PRODUCTO",
+    "ARTICULO",
+    "REFERENCIA", // Biosíntesis/Bella Vista/Farmapal
+  ],
   cantidad: ["CANTIDAD", "CANT", "UNIDADES"],
-  ticket: ["TICKET", "NRO TICKET", "NUMERO DE TICKET", "N TICKET"],
-  telefono: ["TELEFONO", "TEL", "CELULAR", "TELEFONO CONTACTO"],
+  ticket: ["TICKET", "NRO TICKET", "NUMERO DE TICKET", "N TICKET", "NRO DE TKT"], // Farmapal
+  telefono: ["TELEFONO", "TEL", "CELULAR", "TELEFONO CONTACTO", "NRO DE TELEFONO"],
 };

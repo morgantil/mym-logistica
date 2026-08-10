@@ -220,6 +220,16 @@ export class ImportarExcelService {
         grupo.localidad,
       );
 
+      // Dos fuentes posibles de observación, pueden darse juntas: la alerta de
+      // dirección (arriba) y la nota que venía pegada a la fecha en el Excel
+      // (grupo.notaFecha — ver LineaExcelPanales). Ninguna se pisa a la otra.
+      const observacionesPartes = [
+        alertaDireccion
+          ? `Dirección diferente a la registrada en el padrón (padrón: "${alertaDireccion.direccionPadron}"). Pendiente de revisión.`
+          : null,
+        grupo.notaFecha,
+      ].filter((parte): parte is string => Boolean(parte));
+
       await this.pedidosService.crear({
         clienteId,
         destinatarioId: destinatarioActual.id,
@@ -231,9 +241,7 @@ export class ImportarExcelService {
         cabaProvincia,
         fechaProgramada: new Date(grupo.fechaEntrega),
         tipoServicio: TipoServicio.PANAL,
-        observaciones: alertaDireccion
-          ? `Dirección diferente a la registrada en el padrón (padrón: "${alertaDireccion.direccionPadron}"). Pendiente de revisión.`
-          : null,
+        observaciones: observacionesPartes.length > 0 ? observacionesPartes.join(" · ") : null,
         zonaId,
         choferId,
         estadoSimpliroute: encontrado ? EstadoSimpliroute.NO_ENVIADO : EstadoSimpliroute.NO_ENCONTRADO,

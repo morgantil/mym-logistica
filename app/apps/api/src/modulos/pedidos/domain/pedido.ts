@@ -43,6 +43,11 @@ export interface LineaExcelPanales {
   localidad: string;
   telefono: string | null;
   fechaEntrega: string; // ISO date, ya parseada por el importador
+  // Texto que venía pegado a la fecha en la misma celda del Excel (ej.
+  // "UF03 PIDE QUE INGRESE") — algunos clientes reales meten instrucciones de
+  // entrega ahí. No es basura: transformarFila lo separa de la fecha, y acá
+  // viaja hasta el Pedido como observación (ver ImportarExcelService).
+  notaFecha: string | null;
   codigoProducto: string | null;
   descripcionProducto: string;
   cantidad: number;
@@ -56,6 +61,7 @@ export interface PedidoAgrupado {
   localidad: string;
   telefono: string | null;
   fechaEntrega: string;
+  notaFecha: string | null;
   productos: { codigo: string | null; descripcion: string; cantidad: number }[];
   totalUnidades: number;
 }
@@ -96,6 +102,7 @@ export function agruparLineasEnPedidos(lineas: LineaExcelPanales[]): PedidoAgrup
         localidad: linea.localidad,
         telefono: linea.telefono,
         fechaEntrega: linea.fechaEntrega,
+        notaFecha: linea.notaFecha,
         productos: [producto],
         totalUnidades: linea.cantidad,
       });

@@ -52,7 +52,7 @@ esta línea — si retomás vos mismo, `git status` y pedile un commit si sigue 
 | Clientes | 🟢 completo | detección automática por nombre de Excel |
 | Destinatarios | 🟢 completo | padrón, detección de diferencia de dirección, sync con SimpliRoute |
 | Pedidos | 🟢 completo | grilla paginada, bultos, revisión antes de enviar, envío a SimpliRoute, bloqueo optimista |
-| Importadores | 🟢 completo | mapeo de columnas **genérico** (no un parser por cliente — ver DOCUMENTO TECNICO.md), agrupación, creación de pedidos |
+| Importadores | 🟢 completo | mapeo de columnas **genérico** (no un parser por cliente — ver DOCUMENTO TECNICO.md), agrupación, creación de pedidos. Probado con los 3 Excel reales de pañales: 207 pedidos, 0 errores (2026-08-10) |
 | Zonas/choferes | 🟢 completo | configurado a mano por el cliente, no atado a divisiones oficiales |
 | SimpliRoute | 🟡 mock | adapter real pendiente — falta gestionar acceso a la API (§36 funcional) |
 | Geografía (CABA/Provincia) | 🟢 completo | resuelto con API oficial gratuita `apis.datos.gob.ar/georef`, sin depender del cliente |
@@ -69,19 +69,34 @@ Neon real, no contra mocks de base de datos.
 **Facturación (Etapa 4)** no arrancó todavía. La lógica de reglas (2×1,
 unificación pañales+medicamentos) está bien definida en el documento funcional
 (§21-§32, con 4 ejemplos numéricos exactos) — se puede construir en cualquier
-momento. Lo que falta son **2 decisiones de negocio** que le mandamos al cliente
-final en `PREGUNTAS_FACTURACION.pdf`:
+momento. De las 2 decisiones de negocio que le mandamos al cliente final en
+`PREGUNTAS_FACTURACION.pdf`, queda **1 sola pendiente**:
 
-1. En una entrega unificada (pañales + medicamentos mismo cliente/dirección/fecha),
-   ¿cuál de los dos servicios se cobra al 100% y cuál con el porcentaje reducido?
-2. Para agrupar pedidos de un mismo viaje, ¿se usa la fecha programada o la fecha
-   de entrega efectiva? (Propuesta nuestra si no contestan: fecha programada.)
+1. 🔴 **Sin responder.** En una entrega unificada (pañales + medicamentos mismo
+   cliente/dirección/fecha), ¿cuál de los dos servicios se cobra al 100% y cuál
+   con el porcentaje reducido?
+2. 🟢 **Respondida (2026-08-10).** Para agrupar pedidos de un mismo viaje se usa
+   `fechaProgramada`: el cliente arma los pedidos de un día para el otro, así que
+   esa fecha ya es la fecha de entrega real, no hace falta trackear una "fecha de
+   entrega efectiva" distinta — ver DOCUMENTO TECNICO.md sección 7 (historial,
+   2026-08-10).
 
-**Antes de retomar Facturación, preguntarle a Leonardo si el cliente ya
-contestó.** Si contestó, construir el motor de reglas como funciones puras de
-dominio (sin Nest/Prisma) testeadas contra los 4 ejemplos del §28 funcional, después
-conectar tarifas (`TarifaCliente`, ya existe en el schema pero sin datos ni
-pantalla de carga todavía).
+**Actualizado 2026-08-10: la carpeta de Drive con los 3 Excel reales apareció**
+localmente en `MYM/drive /` (gitignorada — tiene datos reales de pacientes/OSDE,
+nunca se commitea). Se corrieron los 3 contra Neon: **207 pedidos, 0 errores** —
+la "prueba de fuego" que el módulo importadores tenía pendiente desde que se
+construyó. Encontró 2 gaps reales, ya corregidos (detalle en DOCUMENTO
+TECNICO.md historial y en el README de `importadores/`): encabezados sin
+sinónimo conocido, y la celda de fecha con una nota de entrega pegada al
+texto (ahora se separa y la nota queda en `Pedido.observaciones`). También
+llegaron 2 Excel de medicamentos (Bella Vista, Farmaet) — quedan sin tocar,
+son Etapa 2.
+
+**Antes de arrancar Facturación, falta la respuesta a la pregunta 1.** Cuando
+llegue, construir el motor de reglas como funciones puras de dominio (sin
+Nest/Prisma) testeadas contra los 4 ejemplos del §28 funcional, después conectar
+tarifas (`TarifaCliente`, ya existe en el schema pero sin datos ni pantalla de
+carga todavía).
 
 ## Decisiones que ya están tomadas — no volver a discutir sin motivo nuevo
 

@@ -33,3 +33,7 @@ coverage/
 # Archivos temporales
 *.tmp
 *.temp
+
+# Datos reales de clientes/pacientes (Excel de OSDE, capturas, etc.) — nunca
+# se commitean, solo se usan localmente para probar el importador.
+drive */
