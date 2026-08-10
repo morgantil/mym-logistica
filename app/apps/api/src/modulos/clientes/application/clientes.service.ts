@@ -1,6 +1,10 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { Cliente, detectarClientePorNombreArchivo } from "../domain/cliente";
-import { CLIENTES_REPOSITORIO, ClientesRepositorio } from "../domain/clientes.repositorio";
+import {
+  CLIENTES_REPOSITORIO,
+  ClientesRepositorio,
+  DatosActualizarCliente,
+} from "../domain/clientes.repositorio";
 
 @Injectable()
 export class ClientesService {
@@ -10,6 +14,10 @@ export class ClientesService {
 
   listarActivos(): Promise<Cliente[]> {
     return this.repositorio.listarActivos();
+  }
+
+  listarTodos(): Promise<Cliente[]> {
+    return this.repositorio.listarTodos();
   }
 
   buscarPorId(id: string): Promise<Cliente | null> {
@@ -25,5 +33,9 @@ export class ClientesService {
 
   crear(datos: { nombre: string; patronesDeteccion: string[] }): Promise<Cliente> {
     return this.repositorio.crear(datos);
+  }
+
+  actualizar(id: string, datos: DatosActualizarCliente): Promise<Cliente> {
+    return this.repositorio.actualizar(id, datos);
   }
 }

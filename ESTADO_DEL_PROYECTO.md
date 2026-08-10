@@ -49,7 +49,7 @@ esta línea — si retomás vos mismo, `git status` y pedile un commit si sigue 
 | Módulo | Estado | Qué hace |
 |---|---|---|
 | Auth (local + Google), roles, permisos por cliente | 🟢 completo | refresh token en cookie httpOnly con rotación + revocación real de sesiones (`SesionRefreshToken`) |
-| Clientes | 🟢 completo | detección automática por nombre de Excel |
+| Clientes | 🟢 completo | detección automática por nombre de Excel, editar y activar/desactivar (2026-08-10) |
 | Destinatarios | 🟢 completo | padrón, detección de diferencia de dirección, sync con SimpliRoute |
 | Pedidos | 🟢 completo | grilla paginada, bultos, revisión antes de enviar, envío a SimpliRoute, bloqueo optimista |
 | Importadores | 🟢 completo | mapeo de columnas **genérico** (no un parser por cliente — ver DOCUMENTO TECNICO.md), agrupación, creación de pedidos. Probado con los 3 Excel reales de pañales: 207 pedidos, 0 errores (2026-08-10) |
@@ -58,7 +58,7 @@ esta línea — si retomás vos mismo, `git status` y pedile un commit si sigue 
 | Geografía (CABA/Provincia) | 🟢 completo | resuelto con API oficial gratuita `apis.datos.gob.ar/georef`, sin depender del cliente |
 | Dashboard | 🟡 mínimo | un endpoint (pedidos por estado) — ya conectado en el frontend, resto de KPIs pendiente |
 | **Facturación** | 🔴 **bloqueada** | ver abajo |
-| Frontend | 🟡 en construcción | `apps/web` (React+Vite+Tailwind+shadcn/ui). Login (local + Google), shell, **Inicio/Dashboard** (KPIs por estado, tiles clickeables a Pedidos filtrado), **Pedidos** (grilla §14, detalle §15, bultos §16, revisión y envío §17-18) e **Importar Excel** (§4-8, §11) funcionando end-to-end contra el backend real. Clientes, Zonas y Facturación siguen como placeholder "Esta pantalla todavía no está construida" — ver DOCUMENTO TECNICO.md sección 6. |
+| Frontend | 🟡 en construcción | `apps/web` (React+Vite+Tailwind+shadcn/ui). Login (local + Google), shell, **Inicio/Dashboard**, **Pedidos** (grilla §14, detalle §15, bultos §16, revisión y envío §17-18), **Importar Excel** (§4-8, §11) y **Clientes** (listar, crear, editar, activar/desactivar) funcionando end-to-end contra el backend real. Solo Zonas y Facturación siguen como placeholder — Zonas/choferes porque el backend hoy es de solo lectura (sin alta/edición todavía), Facturación porque sigue bloqueada. Ver DOCUMENTO TECNICO.md sección 6. |
 
 21 tests unitarios sobre la lógica de dominio más riesgosa (agrupación,
 mapeo de columnas, validación de envío). Todo probado end-to-end contra una base
