@@ -3,8 +3,8 @@ import { AxiosError } from "axios";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { FilaFormulario, TablaFormulario } from "@/components/shell/fila-formulario";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Sheet,
   SheetContent,
@@ -75,7 +75,7 @@ export function ClienteFormSheet({
 
   return (
     <Sheet open={abierto} onOpenChange={onOpenChange}>
-      <SheetContent>
+      <SheetContent className="w-full sm:max-w-md">
         <SheetHeader>
           <SheetTitle>{editando ? "Editar cliente" : "Nuevo cliente"}</SheetTitle>
           <SheetDescription>
@@ -85,32 +85,33 @@ export function ClienteFormSheet({
         </SheetHeader>
 
         <form onSubmit={manejarSubmit} className="flex flex-col gap-4 px-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="nombre-cliente">Nombre</Label>
-            <Input
-              id="nombre-cliente"
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-              required
-              disabled={mutacion.isPending}
-            />
-          </div>
+          <TablaFormulario>
+            <FilaFormulario label="Nombre" htmlFor="nombre-cliente" anchoEtiqueta="140px">
+              <Input
+                id="nombre-cliente"
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
+                required
+                disabled={mutacion.isPending}
+              />
+            </FilaFormulario>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="patrones-cliente">Patrones de detección (separados por coma)</Label>
-            <Input
-              id="patrones-cliente"
-              value={patrones}
-              onChange={(e) => setPatrones(e.target.value)}
-              placeholder="BIOSINTESIS, BIO SINTESIS"
-              required
-              disabled={mutacion.isPending}
-            />
-            <p className="text-sm text-muted-foreground">
-              Si el nombre del Excel contiene alguno de estos textos, se asigna a este
-              cliente automáticamente.
-            </p>
-          </div>
+            <FilaFormulario
+              label="Patrones de detección"
+              htmlFor="patrones-cliente"
+              anchoEtiqueta="140px"
+              descripcion="Separados por coma. Si el nombre del Excel contiene alguno de estos textos, se asigna a este cliente automáticamente."
+            >
+              <Input
+                id="patrones-cliente"
+                value={patrones}
+                onChange={(e) => setPatrones(e.target.value)}
+                placeholder="BIOSINTESIS, BIO SINTESIS"
+                required
+                disabled={mutacion.isPending}
+              />
+            </FilaFormulario>
+          </TablaFormulario>
 
           <SheetFooter className="px-0">
             <Button type="submit" disabled={mutacion.isPending}>

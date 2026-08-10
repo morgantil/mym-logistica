@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { FilaFormulario, TablaFormulario } from "@/components/shell/fila-formulario";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CAMPO_CANONICO_LABELS } from "./campo-labels";
 import type { MapeoColumnas, ResultadoRequiereMapeoManual } from "./tipos";
@@ -42,10 +42,9 @@ export function MapeoManualForm({
         </p>
       )}
 
-      <div className="flex flex-col gap-4">
+      <TablaFormulario>
         {resultado.camposObligatoriosFaltantes.map((campo) => (
-          <div key={campo} className="flex flex-col gap-2">
-            <Label htmlFor={`campo-${campo}`}>{CAMPO_CANONICO_LABELS[campo]}</Label>
+          <FilaFormulario key={campo} label={CAMPO_CANONICO_LABELS[campo]} htmlFor={`campo-${campo}`}>
             <Select
               value={selecciones[campo] ?? ""}
               onValueChange={(valor) => setSelecciones((actual) => ({ ...actual, [campo]: valor }))}
@@ -61,9 +60,9 @@ export function MapeoManualForm({
                 ))}
               </SelectContent>
             </Select>
-          </div>
+          </FilaFormulario>
         ))}
-      </div>
+      </TablaFormulario>
 
       <Button
         type="button"

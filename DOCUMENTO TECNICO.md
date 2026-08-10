@@ -151,6 +151,17 @@ Se prioriza claridad sobre impacto visual:
 - Se usa como guía el plugin/skill `frontend-design` de Anthropic (habilitado en `.claude/settings.json`,
   instalado 2026-08-10), pero adaptado a este público: acá se prioriza legibilidad y previsibilidad por
   sobre el "riesgo estético deliberado" que ese skill sugiere para sitios de marca/marketing.
+- **Formularios en layout de tabla clave-valor** (pedido explícito de Leonardo, 2026-08-10, confirmado
+  como criterio general y no solo para una pantalla puntual): etiqueta a la izquierda, control a la
+  derecha, filas separadas por línea — no etiqueta arriba y control abajo. Componente compartido
+  `components/shell/fila-formulario.tsx` (`TablaFormulario`/`FilaFormulario`), usado en Login, Importar
+  Excel y Clientes; aplicar también a los formularios que se agreguen de acá en adelante (Zonas/choferes,
+  Facturación). El ancho de la columna de etiqueta es configurable (`anchoEtiqueta`) porque no es lo
+  mismo una tarjeta angosta como Login (~90px) que un formulario de administración más ancho (180px por
+  defecto).
+- Selección de archivo con un botón chico (mismo estilo que cualquier otro botón de acción), no el input
+  nativo de `<input type="file">` estirado a lo ancho — `components/shell/selector-archivo.tsx`. El input
+  real queda oculto (`sr-only`) y un botón visible dispara el diálogo del sistema operativo por ref.
 
 ## 6.3 Autenticación en el frontend
 

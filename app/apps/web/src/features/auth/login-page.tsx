@@ -3,8 +3,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { AxiosError } from "axios";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { FilaFormulario, TablaFormulario } from "@/components/shell/fila-formulario";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "./auth-context";
 
@@ -44,7 +44,7 @@ export function LoginPage() {
 
   return (
     <div className="flex min-h-svh items-center justify-center bg-muted/40 px-4">
-      <Card className="w-full max-w-sm">
+      <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">MyM Logística</CardTitle>
           <CardDescription>Ingresá con tu cuenta para continuar.</CardDescription>
@@ -60,42 +60,42 @@ export function LoginPage() {
               </p>
             )}
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                autoComplete="username"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={enviando}
-              />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="password">Contraseña</Label>
-              <div className="flex gap-2">
+            <TablaFormulario>
+              <FilaFormulario label="Email" htmlFor="email" anchoEtiqueta="90px">
                 <Input
-                  id="password"
-                  type={mostrarPassword ? "text" : "password"}
-                  autoComplete="current-password"
+                  id="email"
+                  type="email"
+                  autoComplete="username"
                   required
-                  minLength={8}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   disabled={enviando}
                 />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setMostrarPassword((v) => !v)}
-                  disabled={enviando}
-                >
-                  {mostrarPassword ? "Ocultar" : "Mostrar"}
-                </Button>
-              </div>
-            </div>
+              </FilaFormulario>
+
+              <FilaFormulario label="Contraseña" htmlFor="password" anchoEtiqueta="90px">
+                <div className="flex gap-2">
+                  <Input
+                    id="password"
+                    type={mostrarPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    required
+                    minLength={8}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={enviando}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setMostrarPassword((v) => !v)}
+                    disabled={enviando}
+                  >
+                    {mostrarPassword ? "Ocultar" : "Mostrar"}
+                  </Button>
+                </div>
+              </FilaFormulario>
+            </TablaFormulario>
 
             <Button type="submit" disabled={enviando} className="mt-2">
               {enviando ? "Ingresando…" : "Iniciar sesión"}

@@ -4,8 +4,8 @@ import { AxiosError } from "axios";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { SelectorArchivo } from "@/components/shell/selector-archivo";
+import { FilaFormulario, TablaFormulario } from "@/components/shell/fila-formulario";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { listarClientesActivos } from "@/features/clientes/api";
 import { confirmarMapeo, subirExcel } from "./api";
@@ -82,33 +82,36 @@ export function ImportarPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={manejarSubmitInicial} className="flex flex-col gap-4">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="archivo">Archivo Excel</Label>
-                <Input
-                  id="archivo"
-                  type="file"
-                  accept=".xlsx,.xls"
-                  required
-                  disabled={enviando}
-                  onChange={(e) => setArchivo(e.target.files?.[0] ?? null)}
-                />
-              </div>
+              <TablaFormulario>
+                <FilaFormulario label="Archivo Excel" htmlFor="archivo">
+                  <SelectorArchivo
+                    id="archivo"
+                    accept=".xlsx,.xls"
+                    disabled={enviando}
+                    archivo={archivo}
+                    onChange={setArchivo}
+                  />
+                </FilaFormulario>
 
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="cliente">Cliente (opcional — se intenta detectar solo)</Label>
-                <Select value={clienteElegido} onValueChange={setClienteElegido} disabled={enviando}>
-                  <SelectTrigger id="cliente" className="w-full sm:w-80">
-                    <SelectValue placeholder="Detectar automáticamente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clientes?.map((cliente) => (
-                      <SelectItem key={cliente.id} value={cliente.id}>
-                        {cliente.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                <FilaFormulario
+                  label="Cliente"
+                  htmlFor="cliente"
+                  descripcion="Opcional — si no lo elegís, se intenta detectar solo a partir del nombre del archivo."
+                >
+                  <Select value={clienteElegido} onValueChange={setClienteElegido} disabled={enviando}>
+                    <SelectTrigger id="cliente" className="w-full sm:w-80">
+                      <SelectValue placeholder="Detectar automáticamente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clientes?.map((cliente) => (
+                        <SelectItem key={cliente.id} value={cliente.id}>
+                          {cliente.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FilaFormulario>
+              </TablaFormulario>
 
               <Button type="submit" disabled={!archivo || enviando} className="self-start">
                 {enviando ? "Importando…" : "Importar"}
@@ -128,18 +131,22 @@ export function ImportarPage() {
               No pudimos identificar el cliente a partir del nombre del archivo ({resultado.nombreArchivo}
               ). Elegilo para continuar.
             </p>
-            <Select value={clienteElegido} onValueChange={setClienteElegido} disabled={enviando}>
-              <SelectTrigger className="w-full sm:w-80">
-                <SelectValue placeholder="Elegí un cliente" />
-              </SelectTrigger>
-              <SelectContent>
-                {clientes?.map((cliente) => (
-                  <SelectItem key={cliente.id} value={cliente.id}>
-                    {cliente.nombre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <TablaFormulario>
+              <FilaFormulario label="Cliente" htmlFor="cliente-manual">
+                <Select value={clienteElegido} onValueChange={setClienteElegido} disabled={enviando}>
+                  <SelectTrigger id="cliente-manual" className="w-full sm:w-80">
+                    <SelectValue placeholder="Elegí un cliente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clientes?.map((cliente) => (
+                      <SelectItem key={cliente.id} value={cliente.id}>
+                        {cliente.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FilaFormulario>
+            </TablaFormulario>
             <Button
               type="button"
               disabled={!clienteElegido || !archivo || enviando}
