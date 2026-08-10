@@ -52,7 +52,12 @@ export function AppShell() {
         </DropdownMenu>
       </header>
 
-      <div className="flex flex-1">
+      {/* flex-col en mobile, flex-row desde md: en fila (row) el nav mobile
+          quedaba como hermano flex de <main> y se estiraba a la altura
+          completa de la página (el nav horizontal terminaba ocupando toda
+          la pantalla) — en columna, el nav apila arriba con su altura
+          natural y <main> abajo, como corresponde a una barra superior. */}
+      <div className="flex flex-1 flex-col md:flex-row">
         {/* Nav siempre visible, sin menú hamburguesa: son pocos ítems y el
             público de la app prefiere no tener que "descubrir" dónde está
             cada cosa (DOCUMENTO TECNICO.md sección 6.2). */}
