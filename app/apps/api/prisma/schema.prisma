@@ -146,8 +146,30 @@ model Cliente {
   gruposFacturacion     GrupoFacturacion[]
   importaciones         ImportacionExcel[]
   usuariosPermitidos    UsuarioCliente[]
+  perfilImportacion     PerfilImportacion?
 
   @@map("clientes")
+}
+
+// Mapeo de columnas de Excel confirmado para este cliente — DOCUMENTO TECNICO.md:
+// "Importador de Excel: mapeo de columnas genérico y data-driven". La primera
+// vez que se importa un archivo de un cliente, este mapeo no existe: se intenta
+// resolver automático (diccionario de sinónimos) y lo que falte lo confirma un
+// usuario una vez. A partir de ahí queda acá y las próximas importaciones de
+// ese mismo cliente no vuelven a preguntar nada.
+model PerfilImportacion {
+  id            String   @id @default(uuid())
+  clienteId     String   @unique
+  mapeoColumnas Json // Record<CampoCanonico, string> — ver modulos/importadores/domain/campo-canonico.ts
+
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+  creadoPorId   String?
+  actualizadoPorId String?
+
+  cliente Cliente @relation(fields: [clienteId], references: [id])
+
+  @@map("perfiles_importacion")
 }
 
 // Tarifas CABA/Provincia por cliente, con vigencia para mantener histórico (§23 funcional)
@@ -251,7 +273,7 @@ model ImportacionExcel {
   id             String            @id @default(uuid())
   clienteId      String? // null = "Cliente sin identificar" hasta que el usuario lo confirme
   nombreArchivo  String
-  urlArchivo     String // key/ruta en el bucket (Cloudflare R2)
+  urlArchivo     String? // key/ruta en el bucket (Cloudflare R2) — null hasta que se configuren credenciales R2 (ver .env.example)
   estado         EstadoImportacion @default(PROCESANDO)
   totalFilas     Int?
   filasConError  Int?

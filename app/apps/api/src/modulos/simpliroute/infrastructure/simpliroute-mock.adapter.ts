@@ -21,6 +21,13 @@ export class SimplirouteMockAdapter implements LogisticaProviderPort {
     return null; // por defecto simula "No encontrado en SimpliRoute" (§10 funcional)
   }
 
+  async obtenerZonaSugerida(destinatario: DestinatarioEnProveedor): Promise<string | null> {
+    this.logger.warn(
+      `[MOCK] obtenerZonaSugerida(${destinatario.idExterno}) — sin API real configurada.`,
+    );
+    return null;
+  }
+
   async enviarPedido(pedido: PedidoParaEnviar): Promise<ResultadoEnvio> {
     this.logger.warn(`[MOCK] enviarPedido(${pedido.pedidoId}) — sin API real configurada.`);
     return { idExterno: `mock-${pedido.pedidoId}` };

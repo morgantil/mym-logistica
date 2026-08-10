@@ -8,6 +8,8 @@ export interface Destinatario {
   localidad: string;
   telefono: string | null;
   simplirouteId: string | null;
+  latitud: number | null;
+  longitud: number | null;
 }
 
 export interface ResultadoComparacionDireccion {

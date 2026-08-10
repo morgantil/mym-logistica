@@ -1,5 +1,5 @@
 import { Type } from "class-transformer";
-import { IsEnum, IsInt, IsOptional, Min } from "class-validator";
+import { IsEnum, IsInt, IsOptional, Max, Min } from "class-validator";
 import { EstadoPedido } from "@mym/shared-types";
 
 // Filtro por cliente puntual queda para cuando haga falta: el filtrado por
@@ -20,5 +20,6 @@ export class ListarPedidosDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(200) // sin techo, un cliente del API podía pedir todo de una y anular la paginación
   porPagina: number = 50;
 }

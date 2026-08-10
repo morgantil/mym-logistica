@@ -26,4 +26,31 @@ export class ZonasChoferesService {
     });
     return relacion?.chofer ?? null;
   }
+
+  // §12-§13 funcional, orquestado: zona → chofer, en un solo paso para que lo
+  // use el importador al crear pedidos.
+  //
+  // Orden de prioridad para la zona: (1) lo que sugiera SimpliRoute — hoy
+  // siempre null, ver LogisticaProviderPort — (2) coincidencia por nombre
+  // contra la localidad del pedido, como fallback débil y configurable
+  // (cargando Zonas con el mismo nombre que las localidades reales). Si
+  // ninguna de las dos resuelve algo, "Zona sin identificar" / "Chofer sin
+  // asignar", tal cual pide el documento funcional — no se inventa una zona.
+  async resolverZonaChofer(
+    nombreZonaSugerida: string | null,
+    localidadFallback: string,
+  ): Promise<{ zonaId: string | null; choferId: string | null }> {
+    const nombreABuscar = nombreZonaSugerida ?? localidadFallback;
+
+    const zona = await this.prisma.zona.findFirst({
+      where: { nombre: { equals: nombreABuscar, mode: "insensitive" } },
+    });
+
+    if (!zona) {
+      return { zonaId: null, choferId: null };
+    }
+
+    const chofer = await this.choferPorZona(zona.id);
+    return { zonaId: zona.id, choferId: chofer?.id ?? null };
+  }
 }

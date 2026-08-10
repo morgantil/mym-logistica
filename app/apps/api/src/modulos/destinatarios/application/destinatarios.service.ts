@@ -1,5 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { ResolucionDireccion } from "@mym/shared-types";
+import { LOGISTICA_PROVIDER, LogisticaProviderPort } from "../../simpliroute/domain/logistica-provider.port";
 import { Destinatario, compararDireccion, ResultadoComparacionDireccion } from "../domain/destinatario";
 import {
   DESTINATARIOS_REPOSITORIO,
@@ -11,11 +12,22 @@ export interface ResultadoProcesarDestinatario {
   alertaDireccion: ResultadoComparacionDireccion | null;
 }
 
+export interface ResultadoSincronizarSimpliRoute {
+  encontrado: boolean;
+  destinatario: Destinatario;
+  zonaSugerida: string | null;
+}
+
 @Injectable()
 export class DestinatariosService {
   constructor(
     @Inject(DESTINATARIOS_REPOSITORIO) private readonly repositorio: DestinatariosRepositorio,
+    @Inject(LOGISTICA_PROVIDER) private readonly logisticaProvider: LogisticaProviderPort,
   ) {}
+
+  buscarPorId(id: string): Promise<Destinatario | null> {
+    return this.repositorio.buscarPorId(id);
+  }
 
   // Llamado por el módulo de importadores por cada fila agrupada del Excel — §8, §11 funcional.
   // No decide nada por sí solo: si hay diferencia de dirección, la deja marcada para
@@ -70,5 +82,32 @@ export class DestinatariosService {
       case ResolucionDireccion.MANTENER_EXISTENTE:
         return { direccionAUsar: direccionPadron };
     }
+  }
+
+  // §9, §10, §12 funcional: consulta si el destinatario existe en SimpliRoute.
+  // Si existe, guarda coordenadas/id externo (necesarios para determinar zona
+  // después) y devuelve la zona que sugiera el proveedor (hoy: siempre null,
+  // el mock no tiene con qué sugerir nada — ver LogisticaProviderPort).
+  async sincronizarConSimpliRoute(
+    destinatario: Destinatario,
+    numeroAfiliado: string,
+  ): Promise<ResultadoSincronizarSimpliRoute> {
+    const encontradoEnProveedor = await this.logisticaProvider.buscarDestinatarioPorAfiliado(
+      numeroAfiliado,
+    );
+
+    if (!encontradoEnProveedor) {
+      return { encontrado: false, destinatario, zonaSugerida: null };
+    }
+
+    const actualizado = await this.repositorio.actualizarDatosSimpliRoute(destinatario.id, {
+      simplirouteId: encontradoEnProveedor.idExterno,
+      latitud: encontradoEnProveedor.latitud,
+      longitud: encontradoEnProveedor.longitud,
+    });
+
+    const zonaSugerida = await this.logisticaProvider.obtenerZonaSugerida(encontradoEnProveedor);
+
+    return { encontrado: true, destinatario: actualizado, zonaSugerida };
   }
 }

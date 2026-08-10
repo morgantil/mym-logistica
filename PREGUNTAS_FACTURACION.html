@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Preguntas para terminar de definir la facturación</title>
+<style>
+  @page { size: A4; margin: 2.2cm 2.4cm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    color: #2b2b2b;
+    line-height: 1.55;
+    font-size: 14px;
+    max-width: 720px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-size: 22px;
+    color: #1a3c34;
+    margin-bottom: 4px;
+  }
+  .subtitulo {
+    color: #6b6b6b;
+    font-size: 13px;
+    margin-bottom: 28px;
+  }
+  p.intro {
+    font-size: 14.5px;
+  }
+  .pregunta {
+    margin-top: 30px;
+    padding: 18px 20px;
+    border-left: 4px solid #2f7a63;
+    background: #f6f9f8;
+    border-radius: 0 6px 6px 0;
+    page-break-inside: avoid;
+  }
+  .pregunta .numero {
+    display: inline-block;
+    background: #2f7a63;
+    color: white;
+    font-weight: 600;
+    font-size: 12px;
+    padding: 2px 9px;
+    border-radius: 10px;
+    margin-bottom: 8px;
+  }
+  .pregunta h2 {
+    font-size: 16px;
+    margin: 4px 0 10px 0;
+    color: #1a3c34;
+  }
+  .pregunta p {
+    margin: 8px 0;
+  }
+  .ejemplo {
+    background: white;
+    border: 1px solid #dbe6e2;
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-top: 10px;
+    font-size: 13px;
+    color: #444;
+  }
+  .ejemplo b { color: #1a3c34; }
+  .respuesta {
+    margin-top: 14px;
+    border-top: 1px dashed #b9cdc6;
+    padding-top: 10px;
+    font-size: 13px;
+    color: #555;
+  }
+  .respuesta .linea {
+    display: inline-block;
+    border-bottom: 1px solid #999;
+    min-width: 380px;
+    height: 18px;
+  }
+  .opcional {
+    margin-top: 30px;
+    padding: 18px 20px;
+    border-left: 4px solid #9a9a9a;
+    background: #f7f7f7;
+    border-radius: 0 6px 6px 0;
+    page-break-inside: avoid;
+  }
+  .opcional .numero {
+    background: #8a8a8a;
+  }
+  .cierre {
+    margin-top: 34px;
+    font-size: 14px;
+  }
+  .firma {
+    margin-top: 26px;
+    color: #6b6b6b;
+    font-size: 13px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Nos falta tu ayuda para terminar la parte de facturación</h1>
+<div class="subtitulo">MyM Logística — sistema nuevo de pedidos y facturación</div>
+
+<p class="intro">
+  Con todo lo que ya nos contaste (el documento funcional que armamos juntos) pudimos
+  dejar prácticamente todo definido: cómo se agrupan los pedidos, cómo funciona el 2×1,
+  cómo se unifican pañales y medicamentos, todo eso ya está clarísimo y hasta lo
+  probamos con los ejemplos que vos mismo diste.
+</p>
+<p class="intro">
+  Quedan solo <b>dos cositas puntuales</b> que necesitamos que nos confirmes antes de
+  que el sistema pueda calcular un importe real y correcto. Son preguntas concretas,
+  no hace falta que redactes mucho — con marcar la opción o escribir dos líneas alcanza.
+</p>
+<p class="intro">
+  (Lo de CABA vs. Provincia por dirección ya lo resolvimos nosotros con una base
+  oficial del Estado — no hacía falta molestarte con eso.)
+</p>
+
+<div class="pregunta">
+  <span class="numero">Pregunta 1</span>
+  <h2>En una entrega unificada, ¿cuál de los dos servicios se cobra completo?</h2>
+  <p>
+    Cuando en la misma fecha y dirección coinciden un pedido de pañales y uno de
+    medicamentos del mismo cliente, dijiste que se cobra <b>un servicio al 100%</b> y
+    el <b>otro con un porcentaje adicional</b> (a definir). Nos falta saber cuál de
+    los dos es cuál.
+  </p>
+  <div class="ejemplo">
+    <b>Ejemplo concreto:</b> mismo cliente, misma dirección, mismo día: 1 pedido de
+    pañales + 1 pedido de medicamentos. ¿Los pañales se cobran al 100% y los
+    medicamentos con el porcentaje reducido? ¿Es al revés? ¿Depende de cuál pesa más
+    en el viaje? ¿O varía según el cliente?
+  </div>
+  <div class="respuesta">
+    Tu respuesta: <span class="linea"></span>
+  </div>
+</div>
+
+<div class="opcional">
+  <span class="numero">Pregunta 2 (con propuesta nuestra)</span>
+  <h2>¿Con qué fecha agrupamos los pedidos de un mismo viaje?</h2>
+  <p>
+    Para juntar pedidos del mismo cliente/dirección en un viaje, ¿usamos la
+    <b>fecha en que se programó</b> la entrega, o la <b>fecha en que efectivamente se
+    entregó</b> (por si hubo demoras)?
+  </p>
+  <div class="ejemplo">
+    Si no nos decís nada, vamos a arrancar usando la <b>fecha programada</b> — es la
+    que tenemos disponible desde el primer momento. Si preferís que sea la fecha de
+    entrega efectiva, avisanos y lo ajustamos antes de calcular nada real.
+  </div>
+  <div class="respuesta">
+    Tu respuesta (opcional): <span class="linea"></span>
+  </div>
+</div>
+
+<p class="cierre">
+  Con estas dos respuestas ya podemos terminar de armar el motor de facturación
+  completo. Mientras tanto seguimos avanzando con el resto del sistema, así que esto
+  no frena nada — pero si nos lo podés contestar en los próximos días, mejor.
+</p>
+
+<div class="firma">Gracias!</div>
+
+</body>
+</html>

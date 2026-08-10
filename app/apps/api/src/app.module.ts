@@ -1,10 +1,11 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
-import { APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
 import configuration from "./config/configuration";
 import { PrismaModule } from "./common/prisma/prisma.module";
 import { PermisosModule } from "./common/permisos/permisos.module";
 import { ContextoInterceptor } from "./common/contexto/contexto.interceptor";
+import { ConflictoVersionFilter } from "./common/filters/conflicto-version.filter";
 import { JwtAuthGuard } from "./common/guards/jwt-auth.guard";
 import { RolesGuard } from "./common/guards/roles.guard";
 import { UsuariosModule } from "./modulos/usuarios/usuarios.module";
@@ -15,6 +16,7 @@ import { PedidosModule } from "./modulos/pedidos/pedidos.module";
 import { ZonasChoferesModule } from "./modulos/zonas-choferes/zonas-choferes.module";
 import { SimplirouteModule } from "./modulos/simpliroute/simpliroute.module";
 import { DashboardModule } from "./modulos/dashboard/dashboard.module";
+import { ImportadoresModule } from "./modulos/importadores/importadores.module";
 
 @Module({
   imports: [
@@ -29,13 +31,14 @@ import { DashboardModule } from "./modulos/dashboard/dashboard.module";
     ZonasChoferesModule,
     SimplirouteModule,
     DashboardModule,
-    // Importadores y Facturación: ver README.md dentro de cada carpeta —
-    // pendientes a propósito, todavía no listos para scaffoldear en serio.
+    ImportadoresModule,
+    // Facturación: ver README.md dentro de la carpeta — pendiente a propósito.
   ],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: ContextoInterceptor },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_FILTER, useClass: ConflictoVersionFilter },
   ],
 })
 export class AppModule {}

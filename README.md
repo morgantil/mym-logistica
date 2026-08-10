@@ -7,7 +7,12 @@ SimpliRoute para MyM. Reemplaza el sistema actual (`mym.7ward.com`).
 
 ## Empezá por acá
 
-Este proyecto tiene tres documentos que hay que leer en este orden:
+**¿Retomando después de una pausa?** Leé primero
+**[`ESTADO_DEL_PROYECTO.md`](./ESTADO_DEL_PROYECTO.md)** — una foto de 2 minutos de
+dónde está todo, qué falta y qué está bloqueado. Se reescribe en cada sesión, así
+que confiá en ese antes que en tu memoria de la última vez.
+
+Para el resto, este proyecto tiene tres documentos que hay que leer en este orden:
 
 1. **[`DOCUMENTO FUNCIONAL.md`](./DOCUMENTO%20FUNCIONAL.md)** — qué hace el sistema.
    El negocio: pedidos, destinatarios, zonas, choferes, facturación (2×1, entregas

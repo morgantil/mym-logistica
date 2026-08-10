@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { SimplirouteModule } from "../simpliroute/simpliroute.module";
 import { DESTINATARIOS_REPOSITORIO } from "./domain/destinatarios.repositorio";
 import { DestinatariosRepositorioPrisma } from "./infrastructure/destinatarios.repositorio.prisma";
 import { DestinatariosService } from "./application/destinatarios.service";
@@ -8,6 +9,7 @@ import { DestinatariosService } from "./application/destinatarios.service";
 // Se le puede agregar una interface/destinatarios.controller.ts cuando haga falta
 // una pantalla de administración del padrón fuera del flujo de importación.
 @Module({
+  imports: [SimplirouteModule],
   providers: [
     DestinatariosService,
     { provide: DESTINATARIOS_REPOSITORIO, useClass: DestinatariosRepositorioPrisma },

@@ -30,6 +30,14 @@ export interface LogisticaProviderPort {
   // §9 funcional — por afiliado/destinatario, null si "No encontrado en SimpliRoute" (§10).
   buscarDestinatarioPorAfiliado(numeroAfiliado: string): Promise<DestinatarioEnProveedor | null>;
 
+  // §12 funcional: "La zona deberá obtenerse según la dirección y/o coordenadas
+  // ... deberá poder consultarse desde la información disponible de SimpliRoute
+  // o configurarse en el sistema." CÓMO exactamente se obtiene está listado como
+  // validación técnica pendiente (DOCUMENTO TECNICO.md sección 4, ítem 4) — el
+  // mock devuelve null siempre, lo cual hoy es lo correcto: no inventamos una
+  // zona, se cae al fallback de ZonasChoferesService ("Zona sin identificar").
+  obtenerZonaSugerida(destinatario: DestinatarioEnProveedor): Promise<string | null>;
+
   // §18 funcional.
   enviarPedido(pedido: PedidoParaEnviar): Promise<ResultadoEnvio>;
 

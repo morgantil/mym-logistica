@@ -22,7 +22,10 @@ export interface Pedido {
 export interface LineaExcelPanales {
   clienteId: string;
   numeroAfiliado: string;
+  destinatario: string;
   direccion: string;
+  localidad: string;
+  telefono: string | null;
   fechaEntrega: string; // ISO date, ya parseada por el importador
   codigoProducto: string | null;
   descripcionProducto: string;
@@ -32,7 +35,10 @@ export interface LineaExcelPanales {
 export interface PedidoAgrupado {
   clienteId: string;
   numeroAfiliado: string;
+  destinatario: string;
   direccion: string;
+  localidad: string;
+  telefono: string | null;
   fechaEntrega: string;
   productos: { codigo: string | null; descripcion: string; cantidad: number }[];
   totalUnidades: number;
@@ -40,13 +46,20 @@ export interface PedidoAgrupado {
 
 // DOCUMENTO FUNCIONAL.md §7: una línea del Excel = un producto, no un pedido.
 // Se agrupan por MISMO cliente + MISMO afiliado + MISMA dirección + MISMA fecha.
+// destinatario/localidad/telefono son los mismos dentro de un mismo grupo (misma
+// persona, mismo envío) — se toman de la primera línea que arma el grupo.
 export function agruparLineasEnPedidos(lineas: LineaExcelPanales[]): PedidoAgrupado[] {
   const grupos = new Map<string, PedidoAgrupado>();
 
+  const normalizarDireccion = (direccion: string) => direccion.trim().toUpperCase().replace(/\s+/g, " ");
+
   for (const linea of lineas) {
-    const clave = [linea.clienteId, linea.numeroAfiliado, linea.direccion.trim().toUpperCase(), linea.fechaEntrega].join(
-      "|",
-    );
+    const clave = [
+      linea.clienteId,
+      linea.numeroAfiliado,
+      normalizarDireccion(linea.direccion),
+      linea.fechaEntrega,
+    ].join("|");
 
     const grupoExistente = grupos.get(clave);
     const producto = {
@@ -62,7 +75,10 @@ export function agruparLineasEnPedidos(lineas: LineaExcelPanales[]): PedidoAgrup
       grupos.set(clave, {
         clienteId: linea.clienteId,
         numeroAfiliado: linea.numeroAfiliado,
+        destinatario: linea.destinatario,
         direccion: linea.direccion,
+        localidad: linea.localidad,
+        telefono: linea.telefono,
         fechaEntrega: linea.fechaEntrega,
         productos: [producto],
         totalUnidades: linea.cantidad,
