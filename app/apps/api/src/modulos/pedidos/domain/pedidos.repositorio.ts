@@ -27,6 +27,12 @@ export interface FiltroPedidos {
   fechaHasta?: Date;
 }
 
+export interface FiltroPedidosFacturables {
+  clienteId: string;
+  fechaDesde: Date;
+  fechaHasta: Date; // exclusiva
+}
+
 export interface PaginaPedidos {
   datos: PedidoListado[];
   total: number;
@@ -41,6 +47,15 @@ export interface PedidosRepositorio {
   // §17 funcional: candidatos a "Revisión antes de enviar" — los que todavía
   // no se mandaron a SimpliRoute.
   listarPendientesDeEnvio(clienteIds?: string[]): Promise<PedidoListado[]>;
+
+  // §30 funcional ("información necesaria para facturación"): candidatos a
+  // facturar de un cliente en un período — entregados y todavía sin asignar
+  // a un grupo de facturación (evita facturar dos veces el mismo pedido).
+  // La escritura de grupoFacturacionId/reglaAplicada (una vez calculado el
+  // motor) la hace directamente FacturacionRepositorioPrisma dentro de su
+  // propia transacción — necesita atomicidad con la creación de
+  // GrupoFacturacion, que no se puede lograr cruzando dos repositorios.
+  listarFacturables(filtro: FiltroPedidosFacturables): Promise<Pedido[]>;
 
   // Ambos con bloqueo optimista: lanzan ConflictoVersionError (ver ese archivo)
   // si `version` no coincide con la fila actual — alguien más lo modificó primero.

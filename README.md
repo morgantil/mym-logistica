@@ -12,6 +12,9 @@ SimpliRoute para MyM. Reemplaza el sistema actual (`mym.7ward.com`).
 dónde está todo, qué falta y qué está bloqueado. Se reescribe en cada sesión, así
 que confiá en ese antes que en tu memoria de la última vez.
 
+**¿Necesitás saber qué falta y de quién depende** (cuentas, credenciales,
+decisiones de negocio, deploy)? Ese es **[`PENDIENTES.md`](./PENDIENTES.md)**.
+
 Para el resto, este proyecto tiene tres documentos que hay que leer en este orden:
 
 1. **[`DOCUMENTO FUNCIONAL.md`](./DOCUMENTO%20FUNCIONAL.md)** — qué hace el sistema.

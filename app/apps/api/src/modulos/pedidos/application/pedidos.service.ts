@@ -5,6 +5,7 @@ import { LOGISTICA_PROVIDER, LogisticaProviderPort } from "../../simpliroute/dom
 import {
   DatosCrearPedido,
   FiltroPedidos,
+  FiltroPedidosFacturables,
   PEDIDOS_REPOSITORIO,
   PedidosRepositorio,
 } from "../domain/pedidos.repositorio";
@@ -67,6 +68,13 @@ export class PedidosService {
     }));
   }
 
+  // Usado por FacturacionService (§30 funcional) — no aplica permisos por
+  // cliente porque siempre se llama con un clienteId puntual ya autorizado
+  // por el controller de facturación.
+  listarFacturables(filtro: FiltroPedidosFacturables) {
+    return this.repositorio.listarFacturables(filtro);
+  }
+
   // §16 funcional: carga de bultos desde la grilla. Bloqueo optimista — ver
   // ConflictoVersionError, que el controller traduce a HTTP 409.
   async actualizarBultos(pedidoId: string, bultos: number, version: number) {
@@ -105,10 +113,12 @@ export class PedidosService {
         const envio = await this.logisticaProvider.enviarPedido({
           pedidoId: pedido.id,
           destinatarioIdExterno: destinatario.simplirouteId,
+          destinatarioNombre: destinatario.nombre,
+          destinatarioTelefono: destinatario.telefono,
           direccion: pedido.direccionUsada,
           fechaProgramada: pedido.fechaProgramada,
           bultos: pedido.bultos,
-          observaciones: null,
+          observaciones: pedido.observaciones,
         });
         await this.repositorio.marcarEnviado(pedidoId, {
           simplirouteId: envio.idExterno,

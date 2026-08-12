@@ -40,9 +40,7 @@ MYM/
 ```
 
 Repo Git inicializado en la raíz de `MYM/`, rama **`develop`** (no hay
-`main`/`master` todavía, es intencional). Último commit: `d8247f4` (arranque del
-frontend). Hay trabajo de Pedidos sin commitear todavía al momento de escribir
-esta línea — si retomás vos mismo, `git status` y pedile un commit si sigue así.
+`main`/`master` todavía, es intencional). Último commit: `7e83fe9` (PWA).
 
 ## Qué está construido (backend)
 
@@ -54,32 +52,49 @@ esta línea — si retomás vos mismo, `git status` y pedile un commit si sigue 
 | Pedidos | 🟢 completo | grilla paginada, bultos, revisión antes de enviar, envío a SimpliRoute, bloqueo optimista |
 | Importadores | 🟢 completo | mapeo de columnas **genérico** (no un parser por cliente — ver DOCUMENTO TECNICO.md), agrupación, creación de pedidos. Probado con los 3 Excel reales de pañales: 207 pedidos, 0 errores (2026-08-10) |
 | Zonas/choferes | 🟢 completo | configurado a mano por el cliente, no atado a divisiones oficiales. CRUD completo + asignación zona↔chofer (2026-08-10) |
-| SimpliRoute | 🟡 mock | adapter real pendiente — falta gestionar acceso a la API (§36 funcional) |
+| SimpliRoute | 🟡 adapter real construido, sin probar | `simpliroute-http.adapter.ts` (2026-08-11) implementado contra la documentación pública, activable con `SIMPLIROUTE_MOCK=false`. Falta el API token de una cuenta real para la prueba de fuego (no hay sandbox separado) — ver README del módulo para los supuestos de mapeo a confirmar (`Client.key`=`numeroAfiliado`, `load`=bultos). Mientras tanto sigue en modo mock por defecto, sin afectar nada de lo que ya funciona. |
 | Geografía (CABA/Provincia) | 🟢 completo | resuelto con API oficial gratuita `apis.datos.gob.ar/georef`, sin depender del cliente |
 | Dashboard | 🟡 mínimo | un endpoint (pedidos por estado) — ya conectado en el frontend, resto de KPIs pendiente |
-| **Facturación** | 🔴 **bloqueada** | ver abajo |
-| Frontend | 🟡 en construcción | `apps/web` (React+Vite+Tailwind+shadcn/ui). Login (local + Google), shell, **Inicio/Dashboard**, **Pedidos** (grilla §14, detalle §15, bultos §16, revisión y envío §17-18), **Importar Excel** (§4-8, §11), **Clientes** y **Zonas/choferes** (listar, crear, editar, activar/desactivar, asignación zona↔chofer) funcionando end-to-end contra el backend real. Solo **Facturación** sigue como placeholder, bloqueada por la pregunta de negocio pendiente — es la última pantalla del nav sin construir. Probado en navegador real (Playwright) por primera vez el 2026-08-10: encontró y corrigió 4 bugs que curl no podía mostrar (scroll horizontal de página, colisión de tokenHash al refrescar, race de refresh concurrente cerrando sesión válida, nav mobile ocupando toda la altura). Dashboard sumó un resumen de "Revisión antes de enviar" (2 tiles clickeables a `/pedidos?vista=revision`, con la pestaña de Pedidos ahora también en la URL). **PWA implementada** (`vite-plugin-pwa`) con ícono placeholder propio (monograma "M" en el azul de la app — reemplazar cuando haya logo real de MyM) y service worker que cachea solo assets estáticos, nunca la API. Ver DOCUMENTO TECNICO.md sección 7, historial. |
+| **Facturación** | 🟡 **completo salvo 1 pregunta de negocio** | motor de reglas (§21-§32), vista previa/confirmación, tarifas y porcentaje con vigencia, reporte mensual exportable a Excel (§31) — todo construido y testeado (2026-08-10/11) — ver detalle abajo. Solo falta la respuesta del cliente final a 1 pregunta puntual, que no bloquea el resto del módulo. |
+| Frontend | 🟢 **8/8 pantallas construidas** | `apps/web` (React+Vite+Tailwind+shadcn/ui). Login (local + Google), shell, Inicio/Dashboard, Pedidos (grilla §14, detalle §15, bultos §16, revisión y envío §17-18), Importar Excel (§4-8, §11), Clientes, Zonas/choferes (listar, crear, editar, activar/desactivar, asignación zona↔chofer) y **Facturación** (selector cliente/mes/año, vista previa/confirmación, tarifas — 2026-08-11) funcionando end-to-end contra el backend real. Probado en navegador real (Playwright): 6 bugs reales encontrados y corregidos en total (scroll horizontal, colisión de tokenHash, race de refresh, nav mobile, `Select` de Facturación pasando de no controlado a controlado, y un bug real de negocio: la vista previa exigía tarifa de CABA y Provincia siempre aunque el cliente solo tuviera pedidos de un tipo). Dashboard con resumen de "Revisión antes de enviar". PWA instalable con ícono placeholder propio (reemplazar cuando haya logo real de MyM). Ver DOCUMENTO TECNICO.md sección 7, historial. |
 
-21 tests unitarios sobre la lógica de dominio más riesgosa (agrupación,
-mapeo de columnas, validación de envío). Todo probado end-to-end contra una base
-Neon real, no contra mocks de base de datos.
+41 tests unitarios sobre la lógica de dominio más riesgosa (agrupación,
+mapeo de columnas, validación de envío, motor de facturación). Todo probado
+end-to-end contra una base Neon real, no contra mocks de base de datos.
 
 ## Qué está bloqueado, y por qué
 
-**Facturación (Etapa 4)** no arrancó todavía. La lógica de reglas (2×1,
-unificación pañales+medicamentos) está bien definida en el documento funcional
-(§21-§32, con 4 ejemplos numéricos exactos) — se puede construir en cualquier
-momento. De las 2 decisiones de negocio que le mandamos al cliente final en
-`PREGUNTAS_FACTURACION.pdf`, queda **1 sola pendiente**:
+**Facturación (Etapa 4)** — motor de reglas, vista previa/confirmación,
+tarifas y porcentaje del segundo servicio, todo construido y con 16 tests
+contra los 4 ejemplos numéricos del §28 funcional (implementado 2026-08-10,
+ver DOCUMENTO TECNICO.md sección 7). De las 2 decisiones de negocio que le
+mandamos al cliente final en `PREGUNTAS_FACTURACION.pdf`, queda **1 sola
+pendiente**:
 
 1. 🔴 **Sin responder.** En una entrega unificada (pañales + medicamentos mismo
    cliente/dirección/fecha), ¿cuál de los dos servicios se cobra al 100% y cuál
-   con el porcentaje reducido?
+   con el porcentaje reducido? **No bloquea el resto del módulo** — solo esa
+   rama puntual (§25, casos 3-4 del §28), que hoy no se puede ni ejecutar en la
+   práctica porque medicamentos (Etapa 2/5) todavía no tiene ningún pedido
+   real en el sistema. El motor usa una constante placeholder documentada
+   (`SERVICIO_AL_CIEN_POR_CIENTO_EN_UNIFICADA`, en `motor-facturacion.ts`) que
+   se cambia en una línea el día que llegue la respuesta.
 2. 🟢 **Respondida (2026-08-10).** Para agrupar pedidos de un mismo viaje se usa
    `fechaProgramada`: el cliente arma los pedidos de un día para el otro, así que
    esa fecha ya es la fecha de entrega real, no hace falta trackear una "fecha de
    entrega efectiva" distinta — ver DOCUMENTO TECNICO.md sección 7 (historial,
    2026-08-10).
+
+**SimpliRoute real** — el adapter ya está construido (2026-08-11, `simpliroute-http.adapter.ts`)
+contra el contrato documentado en `Documentacion simpliroute/`. Lo único que
+falta es el **API token de una cuenta real** para la prueba de fuego contra
+la API de verdad (SimpliRoute no tiene sandbox separado). Mientras tanto
+sigue funcionando en modo mock por defecto — activar el real es cambiar
+`SIMPLIROUTE_MOCK=false` + cargar `SIMPLIROUTE_API_KEY` una vez que Leonardo
+consiga el token (¿ya existe una cuenta de MyM contratada del sistema viejo,
+o hay que dar de alta una nueva?). Ver README de `simpliroute/` para los
+supuestos de mapeo que hay que confirmar la primera vez que se pruebe contra
+la cuenta real.
 
 **Actualizado 2026-08-10: la carpeta de Drive con los 3 Excel reales apareció**
 localmente en `MYM/drive /` (gitignorada — tiene datos reales de pacientes/OSDE,
@@ -133,7 +148,9 @@ segundos en despertar — probar de nuevo.
 
 Usuario de prueba ya creado en Neon: `prueba@mym.test`, rol Administración
 (la contraseña la sabe quien la generó — no queda en texto plano en ningún lado,
-ni debería). También hay clientes y pedidos de prueba ("Biosintesis", "Farmapal")
+ni debería). También `qa-facturacion@mym.test` (rol Administración, creado
+2026-08-11 para QA de Facturación en navegador — mismo criterio, la
+contraseña no queda documentada acá). También hay clientes y pedidos de prueba ("Biosintesis", "Farmapal")
 para poder ver Pedidos e Importar Excel con datos reales, incluyendo uno con
 datos faltantes a propósito para ver la pestaña de Revisión con motivos
 bloqueantes. Es data de prueba, no de un cliente real — se puede borrar desde

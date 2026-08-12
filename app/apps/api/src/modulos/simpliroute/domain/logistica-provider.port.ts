@@ -16,6 +16,8 @@ export interface DestinatarioEnProveedor {
 export interface PedidoParaEnviar {
   pedidoId: string;
   destinatarioIdExterno: string;
+  destinatarioNombre: string;
+  destinatarioTelefono: string | null;
   direccion: string;
   fechaProgramada: Date;
   bultos: number | null;

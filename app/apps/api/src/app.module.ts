@@ -17,6 +17,7 @@ import { ZonasChoferesModule } from "./modulos/zonas-choferes/zonas-choferes.mod
 import { SimplirouteModule } from "./modulos/simpliroute/simpliroute.module";
 import { DashboardModule } from "./modulos/dashboard/dashboard.module";
 import { ImportadoresModule } from "./modulos/importadores/importadores.module";
+import { FacturacionModule } from "./modulos/facturacion/facturacion.module";
 
 @Module({
   imports: [
@@ -32,7 +33,7 @@ import { ImportadoresModule } from "./modulos/importadores/importadores.module";
     SimplirouteModule,
     DashboardModule,
     ImportadoresModule,
-    // Facturación: ver README.md dentro de la carpeta — pendiente a propósito.
+    FacturacionModule,
   ],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: ContextoInterceptor },

@@ -6,6 +6,7 @@ import { Pedido, PedidoListado } from "../domain/pedido";
 import {
   DatosCrearPedido,
   FiltroPedidos,
+  FiltroPedidosFacturables,
   PaginaPedidos,
   PedidosRepositorio,
 } from "../domain/pedidos.repositorio";
@@ -130,6 +131,19 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
       include: INCLUDE_LISTADO,
     });
     return pedidos.map(mapearListado);
+  }
+
+  async listarFacturables(filtro: FiltroPedidosFacturables): Promise<Pedido[]> {
+    const pedidos = await this.prisma.pedido.findMany({
+      where: {
+        clienteId: filtro.clienteId,
+        estado: "ENTREGADO",
+        grupoFacturacionId: null,
+        fechaProgramada: { gte: filtro.fechaDesde, lt: filtro.fechaHasta },
+      },
+      orderBy: { fechaProgramada: "asc" },
+    });
+    return pedidos as unknown as Pedido[];
   }
 
   // count===0 en el updateMany puede significar "no existe" o "cambió la

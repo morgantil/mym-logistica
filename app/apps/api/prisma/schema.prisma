@@ -150,7 +150,6 @@ model Cliente {
   // patrones de texto para detectar el cliente en el nombre del archivo Excel
   // (§5 funcional, ej. "BIOSINTESIS", "BELLA VISTA", "FARMAPAL")
   patronesDeteccion      String[]
-  porcentajeSegundoServicioActual Decimal? @db.Decimal(5, 2) // ver PorcentajeSegundoServicio para historial
   activo                 Boolean  @default(true)
 
   creadoEn      DateTime  @default(now())

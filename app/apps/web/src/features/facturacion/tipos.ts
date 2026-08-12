@@ -1,0 +1,45 @@
+import { CabaProvincia, EstadoGrupoFacturacion } from "@mym/shared-types";
+
+export interface TarifaCliente {
+  id: string;
+  clienteId: string;
+  tipo: CabaProvincia;
+  monto: number;
+  vigenciaDesde: string;
+  vigenciaHasta: string | null;
+}
+
+export interface PorcentajeSegundoServicio {
+  id: string;
+  clienteId: string;
+  porcentaje: number;
+  vigenciaDesde: string;
+  vigenciaHasta: string | null;
+}
+
+export type ReglaAplicada = "2x1" | "UNIFICADA" | "INDIVIDUAL";
+
+export interface GrupoFacturacion {
+  id: string;
+  clienteId: string;
+  mes: number;
+  anio: number;
+  estado: EstadoGrupoFacturacion;
+  reglaAplicada: ReglaAplicada;
+  tarifaUtilizada: number | null;
+  porcentajeAplicado: number | null;
+  importeCalculado: number;
+  confirmadoEn: string | null;
+  confirmadoPorId: string | null;
+  pedidoIds: string[];
+}
+
+export interface PedidoExcluido {
+  pedidoId: string;
+  motivo: string;
+}
+
+export interface ResultadoVistaPrevia {
+  grupos: GrupoFacturacion[];
+  excluidos: PedidoExcluido[];
+}

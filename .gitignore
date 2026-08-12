@@ -27,6 +27,10 @@ Thumbs.db
 !.vscode/extensions.json
 .idea/
 
+# Configuración local de Claude Code (permisos, tareas programadas) — no es
+# código del proyecto, es específico de cada máquina/sesión.
+.claude/
+
 # Tests / coverage
 coverage/
 
