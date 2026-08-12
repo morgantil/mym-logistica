@@ -15,6 +15,9 @@ que confiá en ese antes que en tu memoria de la última vez.
 **¿Necesitás saber qué falta y de quién depende** (cuentas, credenciales,
 decisiones de negocio, deploy)? Ese es **[`PENDIENTES.md`](./PENDIENTES.md)**.
 
+**¿Buscás las URLs desplegadas o cómo volver a desplegar?** Ese es
+**[`DEPLOY.md`](./DEPLOY.md)** — ambiente de test ya funcionando en Render + Vercel.
+
 Para el resto, este proyecto tiene tres documentos que hay que leer en este orden:
 
 1. **[`DOCUMENTO FUNCIONAL.md`](./DOCUMENTO%20FUNCIONAL.md)** — qué hace el sistema.
@@ -37,11 +40,14 @@ no como referencia visual a imitar. El sistema nuevo tiene diseño propio.
 MYM/
 ├── DOCUMENTO FUNCIONAL.md   ← qué hace el sistema (negocio)
 ├── DOCUMENTO TECNICO.md     ← cómo se construye (arquitectura, decisiones, estado)
+├── ESTADO_DEL_PROYECTO.md  ← foto rápida de dónde está todo ahora
+├── PENDIENTES.md            ← qué falta y de quién depende
+├── DEPLOY.md                 ← URLs desplegadas y cómo volver a desplegar
 ├── IMAGENES/                ← capturas del sistema actual, solo de referencia
 └── app/                     ← todo el código
     ├── apps/
-    │   ├── api/              ← backend NestJS (en desarrollo)
-    │   └── web/               ← frontend React (todavía no existe)
+    │   ├── api/              ← backend NestJS
+    │   └── web/               ← frontend React + Vite
     ├── packages/
     │   └── shared-types/     ← enums de dominio compartidos entre api y web
     └── README.md             ← cómo levantar el entorno local
@@ -49,23 +55,26 @@ MYM/
 
 ## Estado actual del proyecto
 
-Resumen rápido (el detalle completo, con fechas y motivos, está en
-`DOCUMENTO TECNICO.md` secciones 1-6):
+Resumen rápido — para el detalle real y actualizado, siempre confiar en
+`ESTADO_DEL_PROYECTO.md` antes que en esta lista, que se desactualiza fácil:
 
-- **Stack**: TypeScript en todo — NestJS (backend), React + Vite (frontend,
-  pendiente), PostgreSQL + Prisma, BullMQ + Redis para jobs asíncronos.
-- **Backend**: scaffold inicial funcionando — auth (login propio + Google),
-  roles combinables, permisos por cliente, borrado lógico y auditoría
-  universal en toda la base, módulos de clientes/destinatarios/pedidos/zonas-
-  choferes/dashboard con lógica real, e integración con SimpliRoute detrás de
-  una interfaz (mockeada hasta gestionar el acceso a la API real).
-- **Pendiente**: módulo de importación de Excel (`app/apps/api/src/modulos/importadores/`)
-  y motor de facturación (`.../facturacion/`) — cada uno tiene su propio README
-  explicando qué falta y por qué no se apuraron.
-- **Base de datos**: Neon Postgres (free tier), usada también desde desarrollo
-  local para poder hacer demos sin depender de dónde corra el backend.
-- **Despliegue**: todavía sin decidir a propósito — se retoma cuando la app
-  funcional esté construida (ver `DOCUMENTO TECNICO.md` sección 1).
+- **Stack**: TypeScript en todo — NestJS (backend), React + Vite + Tailwind +
+  shadcn/ui (frontend), PostgreSQL + Prisma.
+- **Backend**: completo salvo la pregunta de negocio pendiente de Facturación
+  (ver `PENDIENTES.md`) — auth (login propio + Google), roles combinables,
+  permisos por cliente, borrado lógico y auditoría universal, importador de
+  Excel genérico, pedidos/zonas/choferes/dashboard, motor de facturación
+  completo con reporte mensual exportable a Excel, e integración con
+  SimpliRoute (adapter real construido, activo en modo mock hasta tener un
+  token real).
+- **Frontend**: las 8 pantallas del nav construidas y probadas end-to-end,
+  PWA instalable.
+- **Base de datos**: Neon Postgres, usada desde desarrollo y desde el
+  ambiente de test desplegado (ver abajo) — separar una branch dedicada para
+  test queda pendiente antes de producción real.
+- **Despliegue**: ambiente de **test ya desplegado** (Render + Vercel, free
+  tier) — ver `DEPLOY.md` para URLs y cómo volver a hacerlo. Producción real
+  todavía no arrancó, es una decisión de negocio pendiente.
 
 ## Quick start
 

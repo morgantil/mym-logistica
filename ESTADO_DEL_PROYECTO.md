@@ -1,6 +1,6 @@
 # ESTADO DEL PROYECTO — leer esto primero si retomás después de una pausa
 
-Última actualización: **2026-08-10**. Este documento es una **foto del momento**, se
+Última actualización: **2026-08-12**. Este documento es una **foto del momento**, se
 reescribe cada vez que cambia el estado — no es un historial (eso vive en
 `DOCUMENTO TECNICO.md` sección 7). Si algo acá contradice el código o
 `DOCUMENTO TECNICO.md`, confiá en esos dos, no en esto — puede haber quedado viejo.
@@ -23,6 +23,15 @@ Documento de negocio completo: `DOCUMENTO FUNCIONAL.md`.
 - Hay un **cliente final** (el dueño real del negocio de logística, no
   necesariamente Leonardo) del que todavía faltan definiciones de negocio para
   Facturación — ver más abajo.
+
+## Ambiente de test — ya desplegado (2026-08-12)
+
+**https://mym-web-pi.vercel.app** (front) + **https://mym-n7bh.onrender.com**
+(API) — probado de punta a punta, login real funcionando. Ambos en free
+tier: se duermen tras inactividad, el primer request tarda ~50s, normal.
+Detalle completo (config exacta, gotchas encontrados) en **`DEPLOY.md`**.
+Producción real todavía no existe — es un proyecto separado a armar cuando
+haga falta, ver `PENDIENTES.md`.
 
 ## Dónde está todo
 

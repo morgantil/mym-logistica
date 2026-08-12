@@ -1,6 +1,6 @@
 # PENDIENTES — todo lo que falta y de quién depende
 
-Última actualización: **2026-08-11**. Documento vivo — se actualiza cada vez
+Última actualización: **2026-08-12**. Documento vivo — se actualiza cada vez
 que se resuelve o aparece un pendiente nuevo. Si algo de acá ya se resolvió y
 este archivo no lo refleja, confiá en `ESTADO_DEL_PROYECTO.md`/`DOCUMENTO
 TECNICO.md`, no en esto.
@@ -15,14 +15,13 @@ Cómo leer la columna "Dueño":
 
 ## 1. Para poder desplegar (test y prod)
 
-| # | Pendiente | Dueño | Qué hace falta concretamente |
+| # | Pendiente | Dueño | Estado |
 |---|---|---|---|
-| 1.1 | Repo remoto en GitHub | Leonardo | Crear el repo (o darme acceso a una cuenta de GitHub de MyM) y pushear lo que hay en local. Es el primer paso literal — sin esto no se puede conectar nada de lo demás. |
-| 1.2 | Base de datos de test separada de prod | Nosotros, una vez con acceso a Neon | Usar el sistema de "branching" de Neon (una branch para test, la principal para prod) en vez de pagar dos bases — encaja con el esquema de ramas de Git que ya tenés pensado. |
-| 1.3 | Hosting de la API (Railway o Render) | Leonardo crea la cuenta, nosotros configuramos | Cuenta + conectar el repo de GitHub. Free tier alcanza para arrancar. |
-| 1.4 | Hosting del frontend (Vercel o Netlify) | Leonardo crea la cuenta, nosotros configuramos | Ídem — conectar el mismo repo, build de Vite. |
-| 1.5 | Variables de entorno por ambiente | Nosotros | `CORS_ORIGIN`/`FRONTEND_URL` por dominio, `JWT_SECRET`/`JWT_REFRESH_SECRET` distintos en cada ambiente, `SIMPLIROUTE_MOCK=true` en test. Se arma en cuanto existan 1.1-1.4. |
-| 1.6 | Dominio propio (opcional) | Leonardo (tiene costo, ~$10-15/año) | Solo si querés una URL con marca propia en vez del subdominio gratis del hosting. No bloquea nada, se puede sumar después. |
+| 1.1 | Repo remoto en GitHub | Leonardo | ✅ **Resuelto (2026-08-11)** — `github.com/morgantil/mym-logistica`, privado. |
+| 1.2 | Ambiente de test desplegado | Nosotros | ✅ **Resuelto (2026-08-12)** — Render (API) + Vercel (front), ambos free tier, probado de punta a punta. Ver `DEPLOY.md`. |
+| 1.3 | Base de datos de test separada de prod | Nosotros | 🔲 Pendiente — hoy el ambiente de test comparte la misma Neon que desarrollo. Sirve para probar, pero antes de mostrarle esto al cliente final de forma sostenida conviene separar una branch de Neon dedicada. |
+| 1.4 | Dominio propio (opcional) | Leonardo (tiene costo, ~$10-15/año) | 🔲 Pendiente — no bloquea nada, se puede sumar cuando se decida ir a producción real. |
+| 1.5 | Producción real (instancias pagas, sin "sleep") | Leonardo decide cuándo | 🔲 Pendiente — recién cuando el cliente final apruebe pasar de demo a uso real. Costo estimado ~$25-30/mes (Render + Neon pagos, Vercel se mantiene gratis). Es un proyecto nuevo, no "ascender" el de test. |
 
 ## 2. Credenciales / cuentas externas
 
