@@ -45,3 +45,5 @@ drive */
 # Artefactos de sesiones de QA con el plugin de Playwright (capturas, logs de
 # consola, snapshots) — nunca son entregables, solo evidencia de una corrida.
 .playwright-mcp/
+.vercel
+.env*

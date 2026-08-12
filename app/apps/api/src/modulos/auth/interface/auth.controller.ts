@@ -25,17 +25,28 @@ export class AuthController {
   // solo acá donde hace falta.
   private setearCookieRefresh(res: Response, refreshToken: string) {
     const maxAge = parseDuracionAMs(this.configService.get<string>("jwt.refreshExpiresIn")!);
+    // En dev, front y back viven en el mismo "sitio" (localhost, distinto
+    // puerto) — Lax alcanza y no hace falta HTTPS. Una vez desplegado, front
+    // y back viven en dominios distintos de verdad (ej. vercel.app vs
+    // onrender.com): ahí la cookie es cross-site y el navegador NO la manda
+    // salvo SameSite=None — que a su vez exige Secure (HTTPS) por spec.
+    const cruzaDominios = process.env.NODE_ENV === "production";
     res.cookie(COOKIE_REFRESH, refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      secure: cruzaDominios,
+      sameSite: cruzaDominios ? "none" : "lax",
       path: "/auth",
       maxAge,
     });
   }
 
   private limpiarCookieRefresh(res: Response) {
-    res.clearCookie(COOKIE_REFRESH, { path: "/auth" });
+    const cruzaDominios = process.env.NODE_ENV === "production";
+    res.clearCookie(COOKIE_REFRESH, {
+      path: "/auth",
+      secure: cruzaDominios,
+      sameSite: cruzaDominios ? "none" : "lax",
+    });
   }
 
   // El DTO valida el shape del body; las credenciales en sí las valida LocalStrategy.
