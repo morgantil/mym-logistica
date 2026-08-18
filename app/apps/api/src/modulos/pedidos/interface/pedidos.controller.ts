@@ -1,4 +1,15 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  Header,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Query,
+  StreamableFile,
+  Body,
+} from "@nestjs/common";
 import { Rol } from "@prisma/client";
 import { Roles } from "../../../common/decorators/roles.decorator";
 import { UsuarioActual, UsuarioAutenticado } from "../../../common/decorators/usuario-actual.decorator";
@@ -11,12 +22,18 @@ import { ListarPedidosDto } from "./dto/listar-pedidos.dto";
 export class PedidosController {
   constructor(private pedidosService: PedidosService) {}
 
-  // Grilla principal — §14 funcional.
+  // Grilla principal (§14 funcional) y Embalaje y Despacho (§8.1 — filtra
+  // además por clienteId/fechaDesde/fechaHasta).
   @Get()
   listar(@UsuarioActual() usuario: UsuarioAutenticado, @Query() query: ListarPedidosDto) {
     return this.pedidosService.listarParaUsuario(
       usuario.id,
-      { estado: query.estado },
+      {
+        estado: query.estado,
+        clienteId: query.clienteId,
+        fechaDesde: query.fechaDesde,
+        fechaHasta: query.fechaHasta,
+      },
       query.pagina,
       query.porPagina,
     );
@@ -42,5 +59,30 @@ export class PedidosController {
   @Post("enviar-simpliroute")
   enviarASimpliRoute(@Body() dto: EnviarSimpliRouteDto) {
     return this.pedidosService.enviarASimpliRoute(dto.pedidoIds);
+  }
+
+  // §8.2 funcional v6: todas las etiquetas del pedido (una por bulto) —
+  // rol Logística, pantalla de Embalaje y Despacho.
+  @Roles(Rol.LOGISTICA, Rol.ADMINISTRACION)
+  @Get(":id/etiquetas")
+  @Header("Content-Type", "application/pdf")
+  async etiquetas(@Param("id") id: string): Promise<StreamableFile> {
+    const pdf = await this.pedidosService.generarEtiquetas(id);
+    return new StreamableFile(pdf, { disposition: `inline; filename="etiquetas-pedido-${id}.pdf"` });
+  }
+
+  // Reimpresión de una etiqueta puntual — §8.2: "reimprimir todas las
+  // etiquetas de un pedido o una etiqueta puntual".
+  @Roles(Rol.LOGISTICA, Rol.ADMINISTRACION)
+  @Get(":id/etiquetas/:numeroBulto")
+  @Header("Content-Type", "application/pdf")
+  async etiquetaPuntual(
+    @Param("id") id: string,
+    @Param("numeroBulto", ParseIntPipe) numeroBulto: number,
+  ): Promise<StreamableFile> {
+    const pdf = await this.pedidosService.generarEtiquetas(id, numeroBulto);
+    return new StreamableFile(pdf, {
+      disposition: `inline; filename="etiqueta-pedido-${id}-bulto-${numeroBulto}.pdf"`,
+    });
   }
 }

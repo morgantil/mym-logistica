@@ -14,6 +14,7 @@ import { ClientesModule } from "./modulos/clientes/clientes.module";
 import { DestinatariosModule } from "./modulos/destinatarios/destinatarios.module";
 import { PedidosModule } from "./modulos/pedidos/pedidos.module";
 import { ZonasChoferesModule } from "./modulos/zonas-choferes/zonas-choferes.module";
+import { ZonasTarifariasModule } from "./modulos/zonas-tarifarias/zonas-tarifarias.module";
 import { SimplirouteModule } from "./modulos/simpliroute/simpliroute.module";
 import { DashboardModule } from "./modulos/dashboard/dashboard.module";
 import { ImportadoresModule } from "./modulos/importadores/importadores.module";
@@ -30,6 +31,7 @@ import { FacturacionModule } from "./modulos/facturacion/facturacion.module";
     DestinatariosModule,
     PedidosModule,
     ZonasChoferesModule,
+    ZonasTarifariasModule,
     SimplirouteModule,
     DashboardModule,
     ImportadoresModule,

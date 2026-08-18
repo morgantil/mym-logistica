@@ -6,6 +6,9 @@ export interface ParametrosListarPedidos {
   pagina: number;
   porPagina: number;
   estado?: EstadoPedido;
+  clienteId?: string;
+  fechaDesde?: string;
+  fechaHasta?: string;
 }
 
 export async function listarPedidos(parametros: ParametrosListarPedidos): Promise<PaginaPedidos> {

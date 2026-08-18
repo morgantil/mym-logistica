@@ -13,9 +13,22 @@ export enum TipoServicio {
   MEDICAMENTO = "MEDICAMENTO",
 }
 
+// Clasificación geográfica simple (CABA vs. interior/provincia) que devuelve
+// GeorefArAdapter al resolver una dirección — NO refleja un enum de Prisma
+// (a partir de 2026-08-17 la unidad de facturación es ZonaTarifaria, una
+// tabla configurable, no un valor fijo). Ver DOCUMENTO TECNICO.md historial.
 export enum CabaProvincia {
   CABA = "CABA",
   PROVINCIA = "PROVINCIA",
+}
+
+// Fila de la tabla configurable de zonas de facturación (§10 funcional v6) —
+// reemplaza el enum fijo CABA/Provincia. "CABA" y "Provincia" existen como
+// filas semilla; Cordón 1/2/3 se agregan como datos, no como código nuevo.
+export interface ZonaTarifaria {
+  id: string;
+  nombre: string;
+  activa: boolean;
 }
 
 // Estados funcionales del pedido — DOCUMENTO FUNCIONAL.md §19

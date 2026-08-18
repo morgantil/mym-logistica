@@ -3,6 +3,7 @@ import { ClientesModule } from "../clientes/clientes.module";
 import { DestinatariosModule } from "../destinatarios/destinatarios.module";
 import { PedidosModule } from "../pedidos/pedidos.module";
 import { ZonasChoferesModule } from "../zonas-choferes/zonas-choferes.module";
+import { ZonasTarifariasModule } from "../zonas-tarifarias/zonas-tarifarias.module";
 import { GeografiaModule } from "../geografia/geografia.module";
 import { IMPORTACION_EXCEL_REPOSITORIO } from "./domain/importacion-excel.repositorio";
 import { LECTOR_EXCEL } from "./domain/lector-excel.port";
@@ -14,7 +15,14 @@ import { ImportarExcelService } from "./application/importar-excel.service";
 import { ImportadoresController } from "./interface/importadores.controller";
 
 @Module({
-  imports: [ClientesModule, DestinatariosModule, PedidosModule, ZonasChoferesModule, GeografiaModule],
+  imports: [
+    ClientesModule,
+    DestinatariosModule,
+    PedidosModule,
+    ZonasChoferesModule,
+    ZonasTarifariasModule,
+    GeografiaModule,
+  ],
   controllers: [ImportadoresController],
   providers: [
     ImportarExcelService,

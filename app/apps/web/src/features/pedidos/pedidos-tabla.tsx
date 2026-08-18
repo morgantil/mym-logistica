@@ -22,7 +22,12 @@ import type { PedidoListado } from "./tipos";
 
 const POR_PAGINA = 20;
 
-const formateadorFecha = new Intl.DateTimeFormat("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" });
+const formateadorFecha = new Intl.DateTimeFormat("es-AR", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  timeZone: "UTC",
+});
 
 export function PedidosTabla() {
   const { usuario } = useAuth();

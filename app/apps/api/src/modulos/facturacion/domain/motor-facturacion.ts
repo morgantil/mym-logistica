@@ -1,8 +1,13 @@
-import { CabaProvincia, TipoServicio } from "@mym/shared-types";
+import { TipoServicio } from "@mym/shared-types";
 
 // DOCUMENTO FUNCIONAL.md §21-§29: reglas de facturación. Funciones puras, sin
 // NestJS/Prisma — se testean contra los 4 casos de ejemplo del §28 sin
 // necesitar una base de datos levantada (ver README del módulo).
+//
+// La zona tarifaria (antes un enum fijo CABA/Provincia) es un id de
+// ZonaTarifaria — tabla configurable (documento funcional v6 §10.2: CABA +
+// Cordón 1/2/3, ver DOCUMENTO TECNICO.md historial 2026-08-17). El motor no
+// necesita saber cuántas zonas existen ni sus nombres, solo agrupar por id.
 
 export interface PedidoParaFacturar {
   id: string;
@@ -10,7 +15,7 @@ export interface PedidoParaFacturar {
   tipoServicio: TipoServicio;
   fechaProgramada: string; // YYYY-MM-DD
   direccionUsada: string;
-  cabaProvincia: CabaProvincia;
+  zonaTarifariaId: string;
 }
 
 export type ReglaAplicada = "2x1" | "UNIFICADA" | "INDIVIDUAL";
@@ -19,7 +24,7 @@ export interface ViajeFacturable {
   clienteId: string;
   fecha: string;
   direccion: string;
-  cabaProvincia: CabaProvincia;
+  zonaTarifariaId: string;
   pedidoIds: string[];
   reglaAplicada: ReglaAplicada;
   tarifaUtilizada: number;
@@ -27,17 +32,18 @@ export interface ViajeFacturable {
   importeCalculado: number;
 }
 
-export interface TarifasPorTipo {
-  [CabaProvincia.CABA]: number;
-  [CabaProvincia.PROVINCIA]: number;
-}
+// Mapa zonaTarifariaId → monto vigente. Solo necesita tener entradas para
+// las zonas que efectivamente aparecen entre los pedidos a facturar (ver
+// FacturacionService.generarVistaPrevia) — no un valor fijo por CABA/Provincia.
+export type TarifasPorTipo = Record<string, number>;
 
-// PLACEHOLDER — pendiente de la pregunta 1 de PREGUNTAS_FACTURACION.pdf: qué
-// servicio se cobra al 100% en una entrega unificada. El resultado numérico
-// (§28 casos 3 y 4) no depende de esta asignación — solo determina qué pedido
-// queda marcado como "principal" a efectos de trazabilidad (§32). Cambiar
-// esta constante el día que llegue la respuesta no requiere tocar el resto
-// del motor. Ver DOCUMENTO TECNICO.md, historial 2026-08-10.
+// CONFIRMADO — respuesta a la pregunta 1 de PREGUNTAS_FACTURACION.pdf, vía
+// documento funcional v6 (2026-08-17): pañales es el servicio que se cobra
+// al 100% en una entrega unificada, medicamentos lleva el porcentaje
+// adicional configurable. El resultado numérico (§28 casos 3 y 4) no
+// depende de esta asignación — solo determina qué pedido queda marcado
+// como "principal" a efectos de trazabilidad (§32). Ver DOCUMENTO
+// TECNICO.md, historial 2026-08-17.
 export const SERVICIO_AL_CIEN_POR_CIENTO_EN_UNIFICADA: TipoServicio = TipoServicio.PANAL;
 
 const normalizarDireccion = (direccion: string) => direccion.trim().toUpperCase().replace(/\s+/g, " ");
@@ -46,7 +52,7 @@ export interface GrupoClienteFechaDireccion {
   clienteId: string;
   fecha: string;
   direccion: string;
-  cabaProvincia: CabaProvincia;
+  zonaTarifariaId: string;
   pedidos: PedidoParaFacturar[];
 }
 
@@ -70,7 +76,7 @@ export function agruparPorClienteFechaDireccion(
         clienteId: pedido.clienteId,
         fecha: pedido.fechaProgramada,
         direccion: pedido.direccionUsada,
-        cabaProvincia: pedido.cabaProvincia,
+        zonaTarifariaId: pedido.zonaTarifariaId,
         pedidos: [pedido],
       });
     }
@@ -157,7 +163,7 @@ export function calcularFacturacionCliente(
   const viajes: ViajeFacturable[] = [];
 
   for (const grupo of agruparPorClienteFechaDireccion(pedidos)) {
-    const tarifa = tarifas[grupo.cabaProvincia];
+    const tarifa = tarifas[grupo.zonaTarifariaId];
     const { panales, medicamentos } = separarPorTipoServicio(grupo.pedidos);
     const { unificaciones, panalesRestantes, medicamentosRestantes } = buscarUnificaciones(
       panales,
@@ -171,7 +177,7 @@ export function calcularFacturacionCliente(
         clienteId: grupo.clienteId,
         fecha: grupo.fecha,
         direccion: grupo.direccion,
-        cabaProvincia: grupo.cabaProvincia,
+        zonaTarifariaId: grupo.zonaTarifariaId,
         pedidoIds: [principal.id, secundario.id],
         reglaAplicada: "UNIFICADA",
         tarifaUtilizada: tarifa,
@@ -186,7 +192,7 @@ export function calcularFacturacionCliente(
           clienteId: grupo.clienteId,
           fecha: grupo.fecha,
           direccion: grupo.direccion,
-          cabaProvincia: grupo.cabaProvincia,
+          zonaTarifariaId: grupo.zonaTarifariaId,
           pedidoIds: viaje.pedidoIds,
           reglaAplicada: viaje.reglaAplicada,
           tarifaUtilizada: tarifa,

@@ -1,13 +1,12 @@
 import { Type } from "class-transformer";
-import { IsDate, IsEnum, IsNumber, IsUUID, Min } from "class-validator";
-import { CabaProvincia } from "@mym/shared-types";
+import { IsDate, IsNumber, IsUUID, Min } from "class-validator";
 
 export class CrearTarifaDto {
   @IsUUID()
   clienteId!: string;
 
-  @IsEnum(CabaProvincia)
-  tipo!: CabaProvincia;
+  @IsUUID()
+  zonaTarifariaId!: string;
 
   @IsNumber()
   @Min(0)

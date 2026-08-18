@@ -1,7 +1,8 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { PermisosClienteService } from "../../../common/permisos/permisos-cliente.service";
 import { DestinatariosService } from "../../destinatarios/application/destinatarios.service";
 import { LOGISTICA_PROVIDER, LogisticaProviderPort } from "../../simpliroute/domain/logistica-provider.port";
+import { generarEtiquetasPdf } from "../infrastructure/etiqueta-pdf.generador";
 import {
   DatosCrearPedido,
   FiltroPedidos,
@@ -30,20 +31,32 @@ export class PedidosService {
     private destinatariosService: DestinatariosService,
   ) {}
 
-  // La grilla principal (§14 funcional) siempre pasa por acá, así que el filtro de
-  // "permisos por cliente" queda aplicado en un solo lugar para todo el sistema.
+  // La grilla principal (§14 funcional) y Embalaje y Despacho (§8.1, con
+  // `clienteId` puntual además del filtro por estado/fecha) siempre pasan por
+  // acá, así que el filtro de "permisos por cliente" queda aplicado en un
+  // solo lugar para todo el sistema.
   async listarParaUsuario(
     usuarioId: string,
-    filtro: Omit<FiltroPedidos, "clienteIds">,
+    filtro: Omit<FiltroPedidos, "clienteIds"> & { clienteId?: string },
     pagina: number,
     porPagina: number,
   ) {
-    const clienteIds = await this.permisosCliente.clientesPermitidosPara(usuarioId);
-    return this.repositorio.listar(
-      { ...filtro, clienteIds: clienteIds ?? undefined },
-      pagina,
-      porPagina,
-    );
+    const { clienteId, ...resto } = filtro;
+    const clientesPermitidos = await this.permisosCliente.clientesPermitidosPara(usuarioId);
+
+    // Si se pide un cliente puntual, se cruza con los permitidos — nunca se
+    // deja que el filtro puntual esquive la restricción de permisos.
+    let clienteIds: string[] | undefined;
+    if (clienteId) {
+      if (clientesPermitidos && !clientesPermitidos.includes(clienteId)) {
+        return { datos: [], total: 0 };
+      }
+      clienteIds = [clienteId];
+    } else {
+      clienteIds = clientesPermitidos ?? undefined;
+    }
+
+    return this.repositorio.listar({ ...resto, clienteIds }, pagina, porPagina);
   }
 
   async contarPorEstadoParaUsuario(usuarioId: string) {
@@ -79,6 +92,31 @@ export class PedidosService {
   // ConflictoVersionError, que el controller traduce a HTTP 409.
   async actualizarBultos(pedidoId: string, bultos: number, version: number) {
     return this.repositorio.actualizarBultos(pedidoId, bultos, version);
+  }
+
+  // §8.2 funcional v6: etiquetas de bulto. `numeroBulto` ausente = todas las
+  // del pedido (1..bultos); presente = una puntual (reimpresión de una sola).
+  // Exige que ya se haya cargado la cantidad de bultos — no tiene sentido
+  // imprimir "Bulto 1/?" con un total desconocido.
+  async generarEtiquetas(pedidoId: string, numeroBulto?: number): Promise<Buffer> {
+    const pedido = await this.repositorio.obtenerListadoPorId(pedidoId);
+    if (!pedido) {
+      throw new NotFoundException(`Pedido ${pedidoId} no encontrado.`);
+    }
+    if (!pedido.bultos || pedido.bultos < 1) {
+      throw new BadRequestException("Cargá la cantidad de bultos antes de imprimir etiquetas.");
+    }
+    if (numeroBulto !== undefined && (numeroBulto < 1 || numeroBulto > pedido.bultos)) {
+      throw new BadRequestException(`El pedido tiene ${pedido.bultos} bulto(s) — no existe el bulto ${numeroBulto}.`);
+    }
+
+    const numerosBulto = numeroBulto !== undefined
+      ? [numeroBulto]
+      : Array.from({ length: pedido.bultos }, (_, i) => i + 1);
+
+    const pdf = await generarEtiquetasPdf(pedido, numerosBulto);
+    await this.repositorio.marcarEtiquetaImpresa(pedidoId);
+    return pdf;
   }
 
   // §18 funcional: el usuario selecciona pedidos y el sistema intenta enviarlos.

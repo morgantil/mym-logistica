@@ -1,5 +1,4 @@
 import { apiClient } from "@/lib/api-client";
-import type { CabaProvincia } from "@mym/shared-types";
 import type { GrupoFacturacion, PorcentajeSegundoServicio, ResultadoVistaPrevia, TarifaCliente } from "./tipos";
 
 export async function listarTarifas(clienteId: string): Promise<TarifaCliente[]> {
@@ -9,7 +8,7 @@ export async function listarTarifas(clienteId: string): Promise<TarifaCliente[]>
 
 export async function crearTarifa(datos: {
   clienteId: string;
-  tipo: CabaProvincia;
+  zonaTarifariaId: string;
   monto: number;
   vigenciaDesde: string;
 }): Promise<TarifaCliente> {

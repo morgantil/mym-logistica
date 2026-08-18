@@ -5,12 +5,13 @@ import { validarPedidoParaEnvio } from "./validar-envio";
 function pedidoListoParaEnviar(overrides: Partial<Pedido> = {}): Pedido {
   return {
     id: "p1",
+    numero: 1,
     clienteId: "c1",
     destinatarioId: "d1",
     numeroAfiliado: "123",
     direccionUsada: "Calle 1",
     localidad: "Once",
-    cabaProvincia: null,
+    zonaTarifariaId: null,
     fechaProgramada: new Date(),
     tipoServicio: TipoServicio.PANAL,
     estado: EstadoPedido.SIN_ASIGNAR,
@@ -20,6 +21,7 @@ function pedidoListoParaEnviar(overrides: Partial<Pedido> = {}): Pedido {
     choferId: "ch1",
     bultos: 2,
     observaciones: null,
+    etiquetaImpresaEn: null,
     version: 0,
     ...overrides,
   };

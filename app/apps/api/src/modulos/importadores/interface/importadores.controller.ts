@@ -24,28 +24,36 @@ export class ImportadoresController {
 
   // §5 funcional: no hace falta elegir cliente antes de importar — `clienteId`
   // es opcional, se manda solo cuando la detección automática falló y el
-  // usuario ya lo eligió a mano en el front.
+  // usuario ya lo eligió a mano en el front. `fechaEntrega` SÍ es obligatoria
+  // — documento funcional v6 §4.1: se informa antes de subir el archivo y se
+  // aplica a todo el lote, sin importar qué traiga el Excel.
   @Roles(Rol.OPERACIONES, Rol.ADMINISTRACION)
   @Post()
   @UseInterceptors(FileInterceptor("archivo"))
   subir(
     @UploadedFile() archivo: Express.Multer.File | undefined,
     @Body("clienteId") clienteId: string | undefined,
+    @Body("fechaEntrega") fechaEntrega: string | undefined,
     @UsuarioActual() usuario: UsuarioAutenticado,
   ) {
     if (!archivo) {
       throw new BadRequestException("Falta el archivo Excel (campo 'archivo').");
     }
+    if (!fechaEntrega) {
+      throw new BadRequestException("Falta 'fechaEntrega' (YYYY-MM-DD).");
+    }
     return this.importarExcelService.procesarArchivo({
       buffer: archivo.buffer,
       nombreArchivo: archivo.originalname,
       usuarioId: usuario.id,
+      fechaEntrega,
       clienteIdManual: clienteId || undefined,
     });
   }
 
   // Segundo paso cuando /importaciones devolvió estado "requiereMapeoManual":
-  // se reenvía el MISMO archivo + el mapeo que el usuario confirmó a mano.
+  // se reenvía el MISMO archivo + el mapeo que el usuario confirmó a mano +
+  // la misma fecha de entrega ya informada en el primer paso.
   @Roles(Rol.OPERACIONES, Rol.ADMINISTRACION)
   @Post("confirmar-mapeo")
   @UseInterceptors(FileInterceptor("archivo"))
@@ -53,6 +61,7 @@ export class ImportadoresController {
     @UploadedFile() archivo: Express.Multer.File | undefined,
     @Body("clienteId") clienteId: string,
     @Body("mapeoManual") mapeoManualJson: string,
+    @Body("fechaEntrega") fechaEntrega: string | undefined,
     @UsuarioActual() usuario: UsuarioAutenticado,
   ) {
     if (!archivo) {
@@ -60,6 +69,9 @@ export class ImportadoresController {
     }
     if (!clienteId) {
       throw new BadRequestException("Falta 'clienteId'.");
+    }
+    if (!fechaEntrega) {
+      throw new BadRequestException("Falta 'fechaEntrega' (YYYY-MM-DD).");
     }
 
     let mapeoManual: MapeoColumnas;
@@ -77,6 +89,7 @@ export class ImportadoresController {
       usuarioId: usuario.id,
       clienteId,
       mapeoManual,
+      fechaEntrega,
     });
   }
 }

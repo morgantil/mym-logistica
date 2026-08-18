@@ -16,5 +16,6 @@ export const navItems: NavItem[] = [
   { to: "/importar", label: "Importar Excel", roles: ["OPERACIONES", "ADMINISTRACION"] },
   { to: "/clientes", label: "Clientes", roles: ["ADMINISTRACION"] },
   { to: "/zonas-choferes", label: "Zonas y choferes", roles: ["LOGISTICA", "ADMINISTRACION"] },
+  { to: "/embalaje-despacho", label: "Embalaje y Despacho", roles: ["LOGISTICA", "ADMINISTRACION"] },
   { to: "/facturacion", label: "Facturación", roles: ["FACTURACION", "ADMINISTRACION"] },
 ];

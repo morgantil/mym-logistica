@@ -14,41 +14,34 @@ function aTexto(valor: unknown): string | null {
   return texto === "" ? null : texto;
 }
 
-interface FechaConNota {
-  fechaIso: string;
-  // Biosíntesis/Bella Vista/Farmapal traen la fecha y una observación de
-  // entrega pegadas en la misma celda (ej. "2026-08-06 UF03 PIDE QUE
-  // INGRESE", "2026-08-06//FARMAPAL"). Se extrae la fecha del inicio del
-  // texto; lo que sobra son instrucciones de entrega reales, no basura — se
-  // guarda como nota en vez de descartarse (ver ImportarExcelService).
-  nota: string | null;
-}
-
 const FECHA_ISO_AL_INICIO = /^(\d{4}-\d{2}-\d{2})/;
 
-function aFechaConNota(valor: unknown): FechaConNota | null {
-  if (valor instanceof Date) return { fechaIso: valor.toISOString().slice(0, 10), nota: null };
+// Biosíntesis/Bella Vista/Farmapal traen la fecha y una observación de
+// entrega pegadas en la misma celda (ej. "2026-08-06 UF03 PIDE QUE
+// INGRESE", "2026-08-06//FARMAPAL"). Documento funcional v6 §4.1: la fecha
+// de entrega real es la que el usuario informa ANTES de subir el Excel
+// (aplicada a todo el lote — ver `fechaEntregaLote` en transformarFila), no
+// la del archivo. Esta función ya no decide la fecha del pedido: solo
+// separa el texto de la celda para no perder la observación de entrega
+// real que pueda venir pegada a una fecha — se guarda como nota (ver
+// ImportarExcelService), el resto se descarta.
+function extraerNotaDeCeldaFecha(valor: unknown): string | null {
+  if (valor instanceof Date) return null;
 
   const texto = aTexto(valor);
   if (!texto) return null;
 
-  const fechaCompleta = new Date(texto);
-  if (!Number.isNaN(fechaCompleta.getTime())) {
-    return { fechaIso: fechaCompleta.toISOString().slice(0, 10), nota: null };
-  }
+  if (!Number.isNaN(new Date(texto).getTime())) return null;
 
   const matchInicio = texto.match(FECHA_ISO_AL_INICIO);
   if (!matchInicio) return null;
-
-  const fecha = new Date(matchInicio[1]);
-  if (Number.isNaN(fecha.getTime())) return null;
 
   const nota = texto
     .slice(matchInicio[0].length)
     .replace(/^[\s/:.-]+/, "")
     .trim();
 
-  return { fechaIso: fecha.toISOString().slice(0, 10), nota: nota || null };
+  return nota || null;
 }
 
 function aCantidad(valor: unknown): number | null {
@@ -60,10 +53,18 @@ function aCantidad(valor: unknown): number | null {
 // la convierte en una línea de pedido validada — DOCUMENTO FUNCIONAL.md §6.
 // Una fila con errores no aborta todo el archivo: vuelve con `valida: false`
 // y sus errores puntuales, para que el importador la marque y siga con el resto.
+//
+// `fechaEntregaLote` (ISO YYYY-MM-DD) es la fecha que el usuario informó al
+// iniciar la importación — documento funcional v6 §4.1: "La fecha de entrega
+// seleccionada en pantalla tendrá prioridad sobre cualquier fecha incluida
+// dentro del Excel." Se aplica igual a todas las filas del lote; el contenido
+// de la celda de fecha del Excel ya no decide `fechaEntrega`, solo puede
+// aportar una nota de entrega pegada al texto (ver extraerNotaDeCeldaFecha).
 export function transformarFila(
   filaCruda: FilaExcelCruda,
   mapeo: MapeoColumnas,
   clienteId: string,
+  fechaEntregaLote: string,
 ): ResultadoTransformarFila {
   const errores: string[] = [];
 
@@ -76,7 +77,7 @@ export function transformarFila(
   const destinatario = aTexto(leer("destinatario"));
   const direccion = aTexto(leer("direccion"));
   const localidad = aTexto(leer("localidad"));
-  const fecha = aFechaConNota(leer("fechaEntrega"));
+  const notaFecha = extraerNotaDeCeldaFecha(leer("fechaEntrega"));
   const descripcionProducto = aTexto(leer("descripcionProducto"));
   const cantidad = aCantidad(leer("cantidad"));
   const codigoProducto = aTexto(leer("codigoProducto"));
@@ -86,7 +87,6 @@ export function transformarFila(
   if (!destinatario) errores.push("Falta destinatario.");
   if (!direccion) errores.push("Falta dirección.");
   if (!localidad) errores.push("Falta localidad.");
-  if (!fecha) errores.push("Falta o es inválida la fecha de entrega.");
   if (!descripcionProducto) errores.push("Falta producto.");
   if (!cantidad) errores.push("Falta o es inválida la cantidad.");
 
@@ -104,8 +104,8 @@ export function transformarFila(
       direccion: direccion!,
       localidad: localidad!,
       telefono,
-      fechaEntrega: fecha!.fechaIso,
-      notaFecha: fecha!.nota,
+      fechaEntrega: fechaEntregaLote,
+      notaFecha,
       codigoProducto,
       descripcionProducto: descripcionProducto!,
       cantidad: cantidad!,

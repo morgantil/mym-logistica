@@ -9,6 +9,7 @@ import { ClientesPage } from "@/features/clientes/clientes-page";
 import { ZonasChoferesPage } from "@/features/zonas-choferes/zonas-choferes-page";
 import { PedidosPage } from "@/features/pedidos/pedidos-page";
 import { FacturacionPage } from "@/features/facturacion/facturacion-page";
+import { EmbalajeDespachoPage } from "@/features/embalaje-despacho/embalaje-despacho-page";
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
           <Route path="/importar" element={<ImportarPage />} />
           <Route path="/clientes" element={<ClientesPage />} />
           <Route path="/zonas-choferes" element={<ZonasChoferesPage />} />
+          <Route path="/embalaje-despacho" element={<EmbalajeDespachoPage />} />
           <Route path="/facturacion" element={<FacturacionPage />} />
         </Route>
       </Route>

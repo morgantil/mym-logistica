@@ -124,7 +124,9 @@ export function RevisionPanel() {
                 <TableCell>{pedido.clienteNombre}</TableCell>
                 <TableCell>{pedido.destinatarioNombre}</TableCell>
                 <TableCell>{pedido.direccionUsada}</TableCell>
-                <TableCell>{new Date(pedido.fechaProgramada).toLocaleDateString("es-AR")}</TableCell>
+                <TableCell>
+                  {new Date(pedido.fechaProgramada).toLocaleDateString("es-AR", { timeZone: "UTC" })}
+                </TableCell>
                 <TableCell>
                   {bloqueado ? (
                     <div className="flex flex-wrap gap-1">

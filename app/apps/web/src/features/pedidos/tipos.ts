@@ -1,4 +1,4 @@
-import type { CabaProvincia, EstadoPedido, EstadoSimpliroute, EstadoValidacion, TipoServicio } from "@mym/shared-types";
+import type { EstadoPedido, EstadoSimpliroute, EstadoValidacion, TipoServicio } from "@mym/shared-types";
 
 export interface ProductoPedido {
   codigo: string | null;
@@ -12,12 +12,13 @@ export interface ProductoPedido {
 // esta interfaz solo declara los que la grilla realmente usa.
 export interface PedidoListado {
   id: string;
+  numero: number;
   clienteId: string;
   destinatarioId: string;
   numeroAfiliado: string;
   direccionUsada: string;
   localidad: string;
-  cabaProvincia: CabaProvincia | null;
+  zonaTarifariaId: string | null;
   fechaProgramada: string;
   tipoServicio: TipoServicio;
   estado: EstadoPedido;
@@ -27,6 +28,7 @@ export interface PedidoListado {
   choferId: string | null;
   bultos: number | null;
   observaciones: string | null;
+  etiquetaImpresaEn: string | null;
   version: number;
   clienteNombre: string;
   destinatarioNombre: string;

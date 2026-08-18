@@ -1,17 +1,11 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { CabaProvincia } from "@mym/shared-types";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { listarPorcentajes, listarTarifas } from "./api";
 import { formatearMonto } from "./formato";
 import { PorcentajeFormSheet } from "./porcentaje-form-sheet";
 import { TarifaFormSheet } from "./tarifa-form-sheet";
-
-const TEXTO_TIPO: Record<CabaProvincia, string> = {
-  [CabaProvincia.CABA]: "CABA",
-  [CabaProvincia.PROVINCIA]: "Provincia",
-};
 
 function formatearFecha(fecha: string): string {
   return new Date(fecha).toLocaleDateString("es-AR", { timeZone: "UTC" });
@@ -39,7 +33,7 @@ export function TarifasTab({ clienteId }: { clienteId: string | null }) {
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <h2 className="font-medium">Tarifas CABA / Provincia</h2>
+          <h2 className="font-medium">Tarifas por zona</h2>
           <Button type="button" variant="outline" size="sm" onClick={() => setSheetAbierto("tarifa")}>
             Nueva tarifa
           </Button>
@@ -47,7 +41,7 @@ export function TarifasTab({ clienteId }: { clienteId: string | null }) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Tipo</TableHead>
+              <TableHead>Zona</TableHead>
               <TableHead>Monto</TableHead>
               <TableHead>Vigencia desde</TableHead>
               <TableHead>Vigencia hasta</TableHead>
@@ -69,7 +63,7 @@ export function TarifasTab({ clienteId }: { clienteId: string | null }) {
             ) : (
               tarifas?.map((tarifa) => (
                 <TableRow key={tarifa.id}>
-                  <TableCell>{TEXTO_TIPO[tarifa.tipo]}</TableCell>
+                  <TableCell>{tarifa.zonaTarifariaNombre ?? tarifa.zonaTarifariaId}</TableCell>
                   <TableCell>{formatearMonto(tarifa.monto)}</TableCell>
                   <TableCell>{formatearFecha(tarifa.vigenciaDesde)}</TableCell>
                   <TableCell>{tarifa.vigenciaHasta ? formatearFecha(tarifa.vigenciaHasta) : "Vigente"}</TableCell>

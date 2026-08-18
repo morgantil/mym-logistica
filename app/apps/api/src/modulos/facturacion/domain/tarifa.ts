@@ -1,11 +1,11 @@
-import { CabaProvincia } from "@mym/shared-types";
-
-// Tarifas CABA/Provincia por cliente, con vigencia para mantener histórico —
-// DOCUMENTO FUNCIONAL.md §23.
+// Tarifas por cliente y zona tarifaria (CABA/Cordón 1/2/3, configurable —
+// ver ZonaTarifaria), con vigencia para mantener histórico. DOCUMENTO
+// FUNCIONAL.md §23, actualizado por el documento v6 §10.2 (zonas por cordón).
 export interface TarifaCliente {
   id: string;
   clienteId: string;
-  tipo: CabaProvincia;
+  zonaTarifariaId: string;
+  zonaTarifariaNombre?: string;
   monto: number;
   vigenciaDesde: Date;
   vigenciaHasta: Date | null;

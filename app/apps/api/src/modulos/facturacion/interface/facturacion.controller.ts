@@ -22,7 +22,7 @@ export class FacturacionController {
 
   @Post("tarifas")
   crearTarifa(@Body() dto: CrearTarifaDto) {
-    return this.facturacionService.crearTarifa(dto.clienteId, dto.tipo, dto.monto, dto.vigenciaDesde);
+    return this.facturacionService.crearTarifa(dto.clienteId, dto.zonaTarifariaId, dto.monto, dto.vigenciaDesde);
   }
 
   @Get("porcentaje-segundo-servicio")

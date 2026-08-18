@@ -1,7 +1,8 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { CabaProvincia, TipoServicio } from "@mym/shared-types";
+import { TipoServicio } from "@mym/shared-types";
 import { ClientesService } from "../../clientes/application/clientes.service";
 import { PedidosService } from "../../pedidos/application/pedidos.service";
+import { ZonasTarifariasService } from "../../zonas-tarifarias/application/zonas-tarifarias.service";
 import {
   FACTURACION_REPOSITORIO,
   FacturacionRepositorio,
@@ -32,14 +33,15 @@ export class FacturacionService {
     @Inject(FACTURACION_REPOSITORIO) private readonly repositorio: FacturacionRepositorio,
     private pedidosService: PedidosService,
     private clientesService: ClientesService,
+    private zonasTarifariasService: ZonasTarifariasService,
   ) {}
 
   listarTarifas(clienteId: string) {
     return this.repositorio.listarTarifas(clienteId);
   }
 
-  crearTarifa(clienteId: string, tipo: CabaProvincia, monto: number, vigenciaDesde: Date) {
-    return this.repositorio.crearTarifa({ clienteId, tipo, monto, vigenciaDesde });
+  crearTarifa(clienteId: string, zonaTarifariaId: string, monto: number, vigenciaDesde: Date) {
+    return this.repositorio.crearTarifa({ clienteId, zonaTarifariaId, monto, vigenciaDesde });
   }
 
   listarPorcentajes(clienteId: string) {
@@ -70,11 +72,11 @@ export class FacturacionService {
     const excluidos: PedidoExcluido[] = [];
     const pedidosParaFacturar: PedidoParaFacturar[] = [];
     for (const pedido of pedidos) {
-      if (!pedido.cabaProvincia) {
-        // No debería pasar en la práctica (la zona/CABA-Provincia se resuelve
+      if (!pedido.zonaTarifariaId) {
+        // No debería pasar en la práctica (la zona tarifaria se resuelve
         // antes de poder marcar un pedido como ENTREGADO) — se excluye en vez
         // de asumir una tarifa, porque es plata real. Ver §36 funcional.
-        excluidos.push({ pedidoId: pedido.id, motivo: "Sin clasificación CABA/Provincia." });
+        excluidos.push({ pedidoId: pedido.id, motivo: "Sin zona tarifaria asignada." });
         continue;
       }
       pedidosParaFacturar.push({
@@ -83,24 +85,26 @@ export class FacturacionService {
         tipoServicio: pedido.tipoServicio,
         fechaProgramada: pedido.fechaProgramada.toISOString().slice(0, 10),
         direccionUsada: pedido.direccionUsada,
-        cabaProvincia: pedido.cabaProvincia,
+        zonaTarifariaId: pedido.zonaTarifariaId,
       });
     }
 
-    // Solo se exige la tarifa del tipo (CABA/Provincia) que realmente aparece
-    // entre los pedidos a facturar — un cliente que solo entrega en CABA no
-    // debería tener que cargar una tarifa de Provincia que nunca va a usar.
+    // Solo se exige la tarifa de la zona que realmente aparece entre los
+    // pedidos a facturar — un cliente que solo entrega en CABA no debería
+    // tener que cargar una tarifa de Cordón 1 que nunca va a usar.
     const hoy = new Date();
-    const tiposUsados = new Set(pedidosParaFacturar.map((p) => p.cabaProvincia));
-    const tarifas = {} as TarifasPorTipo;
-    for (const tipo of tiposUsados) {
-      const tarifa = await this.repositorio.tarifaVigente(clienteId, tipo, hoy);
+    const zonasUsadas = new Set(pedidosParaFacturar.map((p) => p.zonaTarifariaId));
+    const todasLasZonas = await this.zonasTarifariasService.listar();
+    const nombreDeZona = (id: string) => todasLasZonas.find((z) => z.id === id)?.nombre ?? id;
+    const tarifas: TarifasPorTipo = {};
+    for (const zonaTarifariaId of zonasUsadas) {
+      const tarifa = await this.repositorio.tarifaVigente(clienteId, zonaTarifariaId, hoy);
       if (!tarifa) {
         throw new BadRequestException(
-          `Falta una tarifa vigente de ${tipo === CabaProvincia.CABA ? "CABA" : "Provincia"} para este cliente — cargala antes de generar la facturación.`,
+          `Falta una tarifa vigente de "${nombreDeZona(zonaTarifariaId)}" para este cliente — cargala antes de generar la facturación.`,
         );
       }
-      tarifas[tipo] = tarifa.monto;
+      tarifas[zonaTarifariaId] = tarifa.monto;
     }
 
     // El porcentaje del segundo servicio solo hace falta si hay una entrega

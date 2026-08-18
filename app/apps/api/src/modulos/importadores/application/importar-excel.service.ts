@@ -4,6 +4,7 @@ import { ClientesService } from "../../clientes/application/clientes.service";
 import { DestinatariosService } from "../../destinatarios/application/destinatarios.service";
 import { PedidosService } from "../../pedidos/application/pedidos.service";
 import { ZonasChoferesService } from "../../zonas-choferes/application/zonas-choferes.service";
+import { ZonasTarifariasService } from "../../zonas-tarifarias/application/zonas-tarifarias.service";
 import { NORMALIZADOR_DIRECCIONES, NormalizadorDireccionesPort } from "../../geografia/domain/normalizador-direcciones.port";
 import { agruparLineasEnPedidos, LineaExcelPanales } from "../../pedidos/domain/pedido";
 import { CampoCanonico, MapeoColumnas } from "../domain/campo-canonico";
@@ -59,15 +60,22 @@ export class ImportarExcelService {
     private destinatariosService: DestinatariosService,
     private pedidosService: PedidosService,
     private zonasChoferesService: ZonasChoferesService,
+    private zonasTarifariasService: ZonasTarifariasService,
   ) {}
 
   // Punto de entrada — DOCUMENTO FUNCIONAL.md §5: el usuario no está obligado a
   // elegir el cliente antes de importar. Si no se puede detectar ni vino
   // `clienteIdManual`, se corta acá y se le pide al front que lo pida.
+  //
+  // `fechaEntrega` (ISO YYYY-MM-DD) es obligatoria — documento funcional v6
+  // §4.1: "Antes de seleccionar el archivo, el usuario deberá informar
+  // obligatoriamente el cliente y la fecha de entrega." Se aplica a todo el
+  // lote, sin importar qué traiga el Excel (ver transformarFila).
   async procesarArchivo(params: {
     buffer: Buffer;
     nombreArchivo: string;
     usuarioId: string;
+    fechaEntrega: string;
     clienteIdManual?: string;
   }): Promise<ResultadoImportacion> {
     const clienteId =
@@ -79,17 +87,26 @@ export class ImportarExcelService {
     }
 
     const { encabezados, filas } = await this.lectorExcel.leer(params.buffer);
-    return this.resolverMapeoYProcesar(clienteId, encabezados, filas, params.nombreArchivo, params.usuarioId);
+    return this.resolverMapeoYProcesar(
+      clienteId,
+      encabezados,
+      filas,
+      params.nombreArchivo,
+      params.usuarioId,
+      params.fechaEntrega,
+    );
   }
 
   // Segundo paso cuando el primero devolvió "requiereMapeoManual": el front
-  // reenvía el mismo archivo + el mapeo que el usuario confirmó a mano.
+  // reenvía el mismo archivo + el mapeo que el usuario confirmó a mano (y la
+  // misma fecha de entrega que ya había informado en el primer paso).
   async procesarArchivoConMapeoManual(params: {
     buffer: Buffer;
     nombreArchivo: string;
     usuarioId: string;
     clienteId: string;
     mapeoManual: MapeoColumnas;
+    fechaEntrega: string;
   }): Promise<ResultadoImportacion> {
     const { encabezados, filas } = await this.lectorExcel.leer(params.buffer);
     const { mapeo: automatico } = intentarMapeoAutomatico(encabezados);
@@ -103,6 +120,7 @@ export class ImportarExcelService {
       mapeoCompleto,
       params.nombreArchivo,
       params.usuarioId,
+      params.fechaEntrega,
     );
   }
 
@@ -112,10 +130,11 @@ export class ImportarExcelService {
     filas: Record<string, unknown>[],
     nombreArchivo: string,
     usuarioId: string,
+    fechaEntrega: string,
   ): Promise<ResultadoImportacion> {
     const mapeoGuardado = await this.perfilesRepositorio.buscarPorCliente(clienteId);
     if (mapeoGuardado) {
-      return this.ejecutarPipeline(clienteId, filas, mapeoGuardado, nombreArchivo, usuarioId);
+      return this.ejecutarPipeline(clienteId, filas, mapeoGuardado, nombreArchivo, usuarioId, fechaEntrega);
     }
 
     const { mapeo, camposObligatoriosFaltantes } = intentarMapeoAutomatico(encabezados);
@@ -134,7 +153,7 @@ export class ImportarExcelService {
     // igual como perfil confirmado, así la próxima importación de este cliente
     // ni siquiera vuelve a pasar por acá.
     await this.perfilesRepositorio.guardar(clienteId, mapeo, null);
-    return this.ejecutarPipeline(clienteId, filas, mapeo, nombreArchivo, usuarioId);
+    return this.ejecutarPipeline(clienteId, filas, mapeo, nombreArchivo, usuarioId, fechaEntrega);
   }
 
   private async ejecutarPipeline(
@@ -143,6 +162,7 @@ export class ImportarExcelService {
     mapeo: MapeoColumnas,
     nombreArchivo: string,
     usuarioId: string,
+    fechaEntrega: string,
   ): Promise<ResultadoImportacionCompleta> {
     if (filas.length === 0) {
       throw new BadRequestException("El Excel no tiene filas de datos.");
@@ -158,7 +178,7 @@ export class ImportarExcelService {
     const filasConError: { fila: number; errores: string[] }[] = [];
 
     filas.forEach((filaCruda, indice) => {
-      const resultado = transformarFila(filaCruda, mapeo, clienteId);
+      const resultado = transformarFila(filaCruda, mapeo, clienteId, fechaEntrega);
       if (resultado.valida && resultado.linea) {
         lineasValidas.push(resultado.linea);
       } else {
@@ -211,12 +231,19 @@ export class ImportarExcelService {
         grupo.localidad,
       );
 
-      // §23 funcional: tarifa según CABA/Provincia. Se resuelve con la API
-      // oficial de datos.gob.ar (georef-ar-api), no con un catálogo cargado a
-      // mano — ver DOCUMENTO TECNICO.md. Nunca frena la importación si falla:
-      // en el peor caso el pedido queda sin clasificar, para revisión manual.
-      const cabaProvincia = await this.normalizadorDirecciones.clasificarCabaProvincia(
+      // §23 funcional + v6 §10.2: la clasificación CABA/Provincia se resuelve
+      // con la API oficial de datos.gob.ar (georef-ar-api) — ver DOCUMENTO
+      // TECNICO.md. A partir de ahí, la zona tarifaria (CABA o el Cordón que
+      // corresponda) se resuelve contra el mapeo configurable Localidad →
+      // ZonaTarifaria (ZonasTarifariasService), nunca fija en código. Nunca
+      // frena la importación si no se puede resolver: el pedido queda sin
+      // zona tarifaria asignada, para revisión manual.
+      const clasificacionCabaProvincia = await this.normalizadorDirecciones.clasificarCabaProvincia(
         direccionUsada,
+        grupo.localidad,
+      );
+      const zonaTarifariaId = await this.zonasTarifariasService.resolverPorLocalidad(
+        clasificacionCabaProvincia,
         grupo.localidad,
       );
 
@@ -238,7 +265,7 @@ export class ImportarExcelService {
         direccionOriginal: grupo.direccion,
         direccionUsada,
         localidad: grupo.localidad,
-        cabaProvincia,
+        zonaTarifariaId,
         fechaProgramada: new Date(grupo.fechaEntrega),
         tipoServicio: TipoServicio.PANAL,
         observaciones: observacionesPartes.length > 0 ? observacionesPartes.join(" · ") : null,

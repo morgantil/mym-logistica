@@ -1,13 +1,13 @@
 import { useState, type FormEvent } from "react";
 import { AxiosError } from "axios";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { CabaProvincia } from "@mym/shared-types";
 import { Button } from "@/components/ui/button";
 import { FilaFormulario, TablaFormulario } from "@/components/shell/fila-formulario";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { listarZonasTarifarias } from "@/features/zonas-tarifarias/api";
 import { crearTarifa } from "./api";
 
 function mensajeError(error: unknown): string {
@@ -21,8 +21,9 @@ function mensajeError(error: unknown): string {
 const HOY = new Date().toISOString().slice(0, 10);
 
 // Solo alta: una tarifa nueva cierra automáticamente la vigencia de la
-// anterior del mismo tipo (§23 funcional, "vigencia para mantener históricos") —
-// no tiene sentido "editar" una tarifa vieja, se carga una nueva.
+// anterior de la misma zona (§23 funcional, "vigencia para mantener históricos") —
+// no tiene sentido "editar" una tarifa vieja, se carga una nueva. Las zonas
+// (CABA, Cordón 1/2/3, ...) son configurables — ver Ajustes → Zonas tarifarias.
 export function TarifaFormSheet({
   clienteId,
   abierto,
@@ -32,14 +33,20 @@ export function TarifaFormSheet({
   abierto: boolean;
   onOpenChange: (abierto: boolean) => void;
 }) {
-  const [tipo, setTipo] = useState<CabaProvincia>(CabaProvincia.CABA);
+  const { data: zonas } = useQuery({
+    queryKey: ["zonas-tarifarias"],
+    queryFn: listarZonasTarifarias,
+  });
+  const zonasActivas = (zonas ?? []).filter((zona) => zona.activa);
+
+  const [zonaTarifariaId, setZonaTarifariaId] = useState("");
   const [monto, setMonto] = useState("");
   const [vigenciaDesde, setVigenciaDesde] = useState(HOY);
   const [error, setError] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
   const mutacion = useMutation({
-    mutationFn: () => crearTarifa({ clienteId, tipo, monto: Number(monto), vigenciaDesde }),
+    mutationFn: () => crearTarifa({ clienteId, zonaTarifariaId, monto: Number(monto), vigenciaDesde }),
     onSuccess: () => {
       toast.success("Tarifa cargada.");
       queryClient.invalidateQueries({ queryKey: ["facturacion", "tarifas", clienteId] });
@@ -62,7 +69,7 @@ export function TarifaFormSheet({
         <SheetHeader>
           <SheetTitle>Nueva tarifa</SheetTitle>
           <SheetDescription>
-            Cierra automáticamente la vigencia de la tarifa anterior del mismo tipo (CABA o Provincia).
+            Cierra automáticamente la vigencia de la tarifa anterior de la misma zona.
           </SheetDescription>
         </SheetHeader>
 
@@ -77,14 +84,17 @@ export function TarifaFormSheet({
           )}
 
           <TablaFormulario>
-            <FilaFormulario label="Tipo" htmlFor="tipo-tarifa" anchoEtiqueta="140px">
-              <Select value={tipo} onValueChange={(valor) => setTipo(valor as CabaProvincia)}>
-                <SelectTrigger id="tipo-tarifa">
-                  <SelectValue />
+            <FilaFormulario label="Zona" htmlFor="zona-tarifa" anchoEtiqueta="140px">
+              <Select value={zonaTarifariaId} onValueChange={setZonaTarifariaId}>
+                <SelectTrigger id="zona-tarifa">
+                  <SelectValue placeholder="Elegir zona" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={CabaProvincia.CABA}>CABA</SelectItem>
-                  <SelectItem value={CabaProvincia.PROVINCIA}>Provincia</SelectItem>
+                  {zonasActivas.map((zona) => (
+                    <SelectItem key={zona.id} value={zona.id}>
+                      {zona.nombre}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </FilaFormulario>
@@ -115,7 +125,7 @@ export function TarifaFormSheet({
           </TablaFormulario>
 
           <SheetFooter className="px-0">
-            <Button type="submit" disabled={mutacion.isPending}>
+            <Button type="submit" disabled={mutacion.isPending || !zonaTarifariaId}>
               {mutacion.isPending ? "Guardando…" : "Guardar"}
             </Button>
           </SheetFooter>

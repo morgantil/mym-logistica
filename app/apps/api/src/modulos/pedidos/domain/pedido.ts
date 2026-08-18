@@ -1,13 +1,14 @@
-import { CabaProvincia, EstadoPedido, EstadoSimpliroute, EstadoValidacion, TipoServicio } from "@mym/shared-types";
+import { EstadoPedido, EstadoSimpliroute, EstadoValidacion, TipoServicio } from "@mym/shared-types";
 
 export interface Pedido {
   id: string;
+  numero: number; // N.º de Pedido interno — §8.2 funcional v6, para etiquetas
   clienteId: string;
   destinatarioId: string;
   numeroAfiliado: string;
   direccionUsada: string;
   localidad: string;
-  cabaProvincia: CabaProvincia | null;
+  zonaTarifariaId: string | null;
   fechaProgramada: Date;
   tipoServicio: TipoServicio;
   estado: EstadoPedido;
@@ -17,6 +18,7 @@ export interface Pedido {
   choferId: string | null;
   bultos: number | null;
   observaciones: string | null;
+  etiquetaImpresaEn: Date | null;
   version: number;
 }
 

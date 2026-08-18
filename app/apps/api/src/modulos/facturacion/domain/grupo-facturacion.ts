@@ -1,4 +1,4 @@
-import { CabaProvincia, EstadoGrupoFacturacion, TipoServicio } from "@mym/shared-types";
+import { EstadoGrupoFacturacion, TipoServicio } from "@mym/shared-types";
 
 // §32 funcional (trazabilidad): agrupa los pedidos que comparten un viaje
 // facturable. Los pedidos nunca se fusionan ni se borran, solo se relacionan
@@ -30,7 +30,8 @@ export interface PedidoFacturado {
   destinatarioNombre: string;
   numeroAfiliado: string;
   direccion: string;
-  cabaProvincia: CabaProvincia | null;
+  zonaTarifariaId: string | null;
+  zonaTarifariaNombre: string | null;
   tipoServicio: TipoServicio;
   choferNombre: string | null;
   grupoId: string;

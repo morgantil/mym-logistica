@@ -94,7 +94,7 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
         direccionOriginal: datos.direccionOriginal,
         direccionUsada: datos.direccionUsada,
         localidad: datos.localidad,
-        cabaProvincia: datos.cabaProvincia as unknown as Prisma.PedidoCreateInput["cabaProvincia"],
+        zonaTarifariaId: datos.zonaTarifariaId,
         fechaProgramada: datos.fechaProgramada,
         tipoServicio: datos.tipoServicio as unknown as Prisma.PedidoCreateInput["tipoServicio"],
         observaciones: datos.observaciones,
@@ -119,6 +119,11 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
   async obtenerPorId(id: string): Promise<Pedido | null> {
     const encontrado = await this.prisma.pedido.findUnique({ where: { id } });
     return encontrado as unknown as Pedido | null;
+  }
+
+  async obtenerListadoPorId(id: string): Promise<PedidoListado | null> {
+    const encontrado = await this.prisma.pedido.findUnique({ where: { id }, include: INCLUDE_LISTADO });
+    return encontrado ? mapearListado(encontrado) : null;
   }
 
   async listarPendientesDeEnvio(clienteIds?: string[]): Promise<PedidoListado[]> {
@@ -180,5 +185,9 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
       return this.fallarSiNoExiste(id);
     }
     return this.obtenerPorId(id) as Promise<Pedido>;
+  }
+
+  async marcarEtiquetaImpresa(id: string): Promise<void> {
+    await this.prisma.pedido.update({ where: { id }, data: { etiquetaImpresaEn: new Date() } });
   }
 }

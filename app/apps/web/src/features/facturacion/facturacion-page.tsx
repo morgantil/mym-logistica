@@ -3,11 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import { listarClientesActivos } from "@/features/clientes/api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ZonasTarifariasTab } from "@/features/zonas-tarifarias/zonas-tarifarias-tab";
 import { LiquidacionTab } from "./liquidacion-tab";
 import { TarifasTab } from "./tarifas-tab";
 import { NOMBRES_MES } from "./formato";
 
-const VISTAS = ["liquidacion", "tarifas"] as const;
+const VISTAS = ["liquidacion", "tarifas", "zonas"] as const;
 type Vista = (typeof VISTAS)[number];
 
 const HOY = new Date();
@@ -97,12 +98,16 @@ export function FacturacionPage() {
         <TabsList>
           <TabsTrigger value="liquidacion">Liquidación</TabsTrigger>
           <TabsTrigger value="tarifas">Tarifas</TabsTrigger>
+          <TabsTrigger value="zonas">Zonas tarifarias</TabsTrigger>
         </TabsList>
         <TabsContent value="liquidacion" className="pt-4">
           <LiquidacionTab clienteId={clienteId} mes={mes} anio={anio} />
         </TabsContent>
         <TabsContent value="tarifas" className="pt-4">
           <TarifasTab clienteId={clienteId} />
+        </TabsContent>
+        <TabsContent value="zonas" className="pt-4">
+          <ZonasTarifariasTab />
         </TabsContent>
       </Tabs>
     </div>

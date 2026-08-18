@@ -1,16 +1,11 @@
 import ExcelJS from "exceljs";
-import { CabaProvincia, TipoServicio } from "@mym/shared-types";
+import { TipoServicio } from "@mym/shared-types";
 import { GrupoFacturacion, PedidoFacturado } from "../domain/grupo-facturacion";
 import { NOMBRES_MES } from "./nombres-mes";
 
 const TEXTO_TIPO_SERVICIO: Record<TipoServicio, string> = {
   [TipoServicio.PANAL]: "Pañales",
   [TipoServicio.MEDICAMENTO]: "Medicamentos",
-};
-
-const TEXTO_CABA_PROVINCIA: Record<CabaProvincia, string> = {
-  [CabaProvincia.CABA]: "CABA",
-  [CabaProvincia.PROVINCIA]: "Provincia",
 };
 
 const TEXTO_REGLA: Record<string, string> = {
@@ -50,7 +45,7 @@ export async function generarReporteMensualExcel(datos: {
     { header: "Destinatario", key: "destinatario", width: 28 },
     { header: "Número de afiliado", key: "afiliado", width: 18 },
     { header: "Dirección", key: "direccion", width: 32 },
-    { header: "CABA/Provincia", key: "cabaProvincia", width: 14 },
+    { header: "Zona tarifaria", key: "zonaTarifaria", width: 14 },
     { header: "Tipo de servicio", key: "tipoServicio", width: 16 },
     { header: "Chofer", key: "chofer", width: 20 },
     { header: "Regla aplicada", key: "regla", width: 14 },
@@ -67,7 +62,7 @@ export async function generarReporteMensualExcel(datos: {
       destinatario: pedido.destinatarioNombre,
       afiliado: pedido.numeroAfiliado,
       direccion: pedido.direccion,
-      cabaProvincia: pedido.cabaProvincia ? TEXTO_CABA_PROVINCIA[pedido.cabaProvincia] : "Sin clasificar",
+      zonaTarifaria: pedido.zonaTarifariaNombre ?? "Sin clasificar",
       tipoServicio: TEXTO_TIPO_SERVICIO[pedido.tipoServicio],
       chofer: pedido.choferNombre ?? "Sin asignar",
       regla: TEXTO_REGLA[pedido.reglaAplicada] ?? pedido.reglaAplicada,

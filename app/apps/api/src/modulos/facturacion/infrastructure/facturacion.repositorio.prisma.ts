@@ -1,6 +1,5 @@
 import { Injectable } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
-import { CabaProvincia } from "@mym/shared-types";
 import { PrismaService } from "../../../common/prisma/prisma.service";
 import {
   DatosCrearGrupoFacturacion,
@@ -38,31 +37,37 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
 
   listarTarifas(clienteId: string): Promise<TarifaCliente[]> {
     return this.prisma.tarifaCliente
-      .findMany({ where: { clienteId }, orderBy: { vigenciaDesde: "desc" } })
+      .findMany({
+        where: { clienteId },
+        orderBy: { vigenciaDesde: "desc" },
+        include: { zonaTarifaria: { select: { nombre: true } } },
+      })
       .then((filas) => filas.map(mapearTarifa));
   }
 
-  async tarifaVigente(clienteId: string, tipo: CabaProvincia, fecha: Date): Promise<TarifaCliente | null> {
+  async tarifaVigente(clienteId: string, zonaTarifariaId: string, fecha: Date): Promise<TarifaCliente | null> {
     const fila = await this.prisma.tarifaCliente.findFirst({
       where: {
         clienteId,
-        tipo: tipo as unknown as Prisma.EnumCabaProvinciaFilter,
+        zonaTarifariaId,
         vigenciaDesde: { lte: fecha },
         OR: [{ vigenciaHasta: null }, { vigenciaHasta: { gte: fecha } }],
       },
       orderBy: { vigenciaDesde: "desc" },
+      include: { zonaTarifaria: { select: { nombre: true } } },
     });
     return fila ? mapearTarifa(fila) : null;
   }
 
   async crearTarifa(datos: DatosCrearTarifa): Promise<TarifaCliente> {
     return this.prisma.$transaction(async (tx) => {
-      // Cierra la tarifa del mismo tipo que estuviera abierta, para no dejar
-      // dos vigentes al mismo tiempo (§23 funcional: "vigencia para mantener históricos").
+      // Cierra la tarifa de la misma zona que estuviera abierta, para no
+      // dejar dos vigentes al mismo tiempo (§23 funcional: "vigencia para
+      // mantener históricos").
       await tx.tarifaCliente.updateMany({
         where: {
           clienteId: datos.clienteId,
-          tipo: datos.tipo as unknown as Prisma.EnumCabaProvinciaFilter,
+          zonaTarifariaId: datos.zonaTarifariaId,
           vigenciaHasta: null,
         },
         data: { vigenciaHasta: new Date(datos.vigenciaDesde.getTime() - UN_DIA_MS) },
@@ -70,10 +75,11 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
       const creada = await tx.tarifaCliente.create({
         data: {
           clienteId: datos.clienteId,
-          tipo: datos.tipo as unknown as Prisma.TarifaClienteCreateInput["tipo"],
+          zonaTarifariaId: datos.zonaTarifariaId,
           monto: datos.monto,
           vigenciaDesde: datos.vigenciaDesde,
         },
+        include: { zonaTarifaria: { select: { nombre: true } } },
       });
       return mapearTarifa(creada);
     });
@@ -216,6 +222,7 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
       include: {
         destinatario: { select: { nombre: true, numeroAfiliado: true } },
         chofer: { select: { nombre: true } },
+        zonaTarifaria: { select: { id: true, nombre: true } },
         grupoFacturacion: true,
       },
       orderBy: { fechaProgramada: "asc" },
@@ -227,7 +234,8 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
       destinatarioNombre: pedido.destinatario.nombre,
       numeroAfiliado: pedido.destinatario.numeroAfiliado,
       direccion: pedido.direccionUsada,
-      cabaProvincia: pedido.cabaProvincia as unknown as PedidoFacturado["cabaProvincia"],
+      zonaTarifariaId: pedido.zonaTarifaria?.id ?? null,
+      zonaTarifariaNombre: pedido.zonaTarifaria?.nombre ?? null,
       tipoServicio: pedido.tipoServicio as unknown as PedidoFacturado["tipoServicio"],
       choferNombre: pedido.chofer?.nombre ?? null,
       // grupoFacturacion no puede ser null acá: el `where` de arriba
@@ -248,7 +256,8 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
 function mapearTarifa(fila: {
   id: string;
   clienteId: string;
-  tipo: string;
+  zonaTarifariaId: string;
+  zonaTarifaria?: { nombre: string };
   monto: Prisma.Decimal;
   vigenciaDesde: Date;
   vigenciaHasta: Date | null;
@@ -256,7 +265,8 @@ function mapearTarifa(fila: {
   return {
     id: fila.id,
     clienteId: fila.clienteId,
-    tipo: fila.tipo as unknown as TarifaCliente["tipo"],
+    zonaTarifariaId: fila.zonaTarifariaId,
+    zonaTarifariaNombre: fila.zonaTarifaria?.nombre,
     monto: Number(fila.monto),
     vigenciaDesde: fila.vigenciaDesde,
     vigenciaHasta: fila.vigenciaHasta,

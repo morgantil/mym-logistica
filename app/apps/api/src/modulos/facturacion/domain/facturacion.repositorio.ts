@@ -1,10 +1,9 @@
-import { CabaProvincia } from "@mym/shared-types";
 import { GrupoFacturacion, PedidoFacturado } from "./grupo-facturacion";
 import { PorcentajeSegundoServicio, TarifaCliente } from "./tarifa";
 
 export interface DatosCrearTarifa {
   clienteId: string;
-  tipo: CabaProvincia;
+  zonaTarifariaId: string;
   monto: number;
   vigenciaDesde: Date;
 }
@@ -31,7 +30,7 @@ export interface FacturacionRepositorio {
   // vigenciaDesde/vigenciaHasta para una fecha puntual (normalmente "hoy",
   // al generar la vista previa).
   listarTarifas(clienteId: string): Promise<TarifaCliente[]>;
-  tarifaVigente(clienteId: string, tipo: CabaProvincia, fecha: Date): Promise<TarifaCliente | null>;
+  tarifaVigente(clienteId: string, zonaTarifariaId: string, fecha: Date): Promise<TarifaCliente | null>;
   // Cierra automáticamente la tarifa anterior del mismo tipo (vigenciaHasta =
   // el día antes de la nueva vigenciaDesde) para no dejar dos tarifas del
   // mismo tipo vigentes al mismo tiempo.

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SelectorArchivo } from "@/components/shell/selector-archivo";
 import { FilaFormulario, TablaFormulario } from "@/components/shell/fila-formulario";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { listarClientesActivos } from "@/features/clientes/api";
 import { confirmarMapeo, subirExcel } from "./api";
@@ -21,17 +22,22 @@ function mensajeError(error: unknown): string {
   return "No se pudo procesar el archivo. Probá de nuevo en unos segundos.";
 }
 
+const HOY = new Date().toISOString().slice(0, 10);
+
 export function ImportarPage() {
   const queryClient = useQueryClient();
   const [archivo, setArchivo] = useState<File | null>(null);
   const [clienteElegido, setClienteElegido] = useState<string>("");
+  // Obligatoria — documento funcional v6 §4.1: se informa antes de subir el
+  // archivo, se aplica a todo el lote, el Excel ya no la puede reemplazar.
+  const [fechaEntrega, setFechaEntrega] = useState<string>(HOY);
   const [resultado, setResultado] = useState<ResultadoImportacion | null>(null);
 
   const { data: clientes } = useQuery({ queryKey: ["clientes"], queryFn: listarClientesActivos });
 
   const mutacionSubir = useMutation({
     mutationFn: ({ archivo, clienteId }: { archivo: File; clienteId?: string }) =>
-      subirExcel(archivo, clienteId),
+      subirExcel(archivo, fechaEntrega, clienteId),
     onSuccess: (data) => {
       setResultado(data);
       if (data.estado === "completada") {
@@ -46,7 +52,7 @@ export function ImportarPage() {
       if (!archivo || resultado?.estado !== "requiereMapeoManual") {
         throw new Error("Falta el archivo o el cliente para confirmar el mapeo.");
       }
-      return confirmarMapeo({ archivo, clienteId: resultado.clienteId, mapeoManual });
+      return confirmarMapeo({ archivo, clienteId: resultado.clienteId, mapeoManual, fechaEntrega });
     },
     onSuccess: (data) => {
       setResultado(data);
@@ -60,12 +66,13 @@ export function ImportarPage() {
   function reiniciar() {
     setArchivo(null);
     setClienteElegido("");
+    setFechaEntrega(HOY);
     setResultado(null);
   }
 
   function manejarSubmitInicial(evento: FormEvent) {
     evento.preventDefault();
-    if (!archivo) return;
+    if (!archivo || !fechaEntrega) return;
     mutacionSubir.mutate({ archivo, clienteId: clienteElegido || undefined });
   }
 
@@ -83,6 +90,22 @@ export function ImportarPage() {
           <CardContent>
             <form onSubmit={manejarSubmitInicial} className="flex flex-col gap-4">
               <TablaFormulario>
+                <FilaFormulario
+                  label="Fecha de entrega"
+                  htmlFor="fecha-entrega"
+                  descripcion="Se aplica a todos los pedidos de este archivo — el Excel no la puede reemplazar."
+                >
+                  <Input
+                    id="fecha-entrega"
+                    type="date"
+                    value={fechaEntrega}
+                    onChange={(e) => setFechaEntrega(e.target.value)}
+                    required
+                    disabled={enviando}
+                    className="w-full sm:w-48"
+                  />
+                </FilaFormulario>
+
                 <FilaFormulario label="Archivo Excel" htmlFor="archivo">
                   <SelectorArchivo
                     id="archivo"
@@ -113,7 +136,7 @@ export function ImportarPage() {
                 </FilaFormulario>
               </TablaFormulario>
 
-              <Button type="submit" disabled={!archivo || enviando} className="self-start">
+              <Button type="submit" disabled={!archivo || !fechaEntrega || enviando} className="self-start">
                 {enviando ? "Importando…" : "Importar"}
               </Button>
             </form>

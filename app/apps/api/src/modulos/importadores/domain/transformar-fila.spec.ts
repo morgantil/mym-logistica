@@ -12,8 +12,10 @@ const MAPEO: MapeoColumnas = {
   codigoProducto: "Codigo",
 };
 
+const FECHA_LOTE = "2026-08-20";
+
 describe("transformarFila", () => {
-  it("transforma una fila completa en una línea válida", () => {
+  it("transforma una fila completa en una línea válida, con la fecha del lote (no la del Excel)", () => {
     const resultado = transformarFila(
       {
         Afiliado: 12345,
@@ -27,6 +29,7 @@ describe("transformarFila", () => {
       },
       MAPEO,
       "cliente-1",
+      FECHA_LOTE,
     );
 
     expect(resultado.valida).toBe(true);
@@ -36,7 +39,7 @@ describe("transformarFila", () => {
       numeroAfiliado: "12345",
       destinatario: "Juan Pérez",
       direccion: "Rivadavia 100",
-      fechaEntrega: "2026-08-15",
+      fechaEntrega: FECHA_LOTE,
       cantidad: 4,
       codigoProducto: "EAN001",
     });
@@ -47,6 +50,7 @@ describe("transformarFila", () => {
       { Afiliado: "12345", Nombre: "", Domicilio: "Rivadavia 100" },
       MAPEO,
       "cliente-1",
+      FECHA_LOTE,
     );
 
     expect(resultado.valida).toBe(false);
@@ -68,13 +72,14 @@ describe("transformarFila", () => {
       },
       MAPEO,
       "cliente-1",
+      FECHA_LOTE,
     );
 
     expect(resultado.valida).toBe(false);
     expect(resultado.errores).toContain("Falta o es inválida la cantidad.");
   });
 
-  it("separa la fecha de una observación pegada en la misma celda (Biosíntesis/Bella Vista/Farmapal reales)", () => {
+  it("separa la fecha de una observación pegada en la misma celda (Biosíntesis/Bella Vista/Farmapal reales) — la fecha usada es la del lote, la nota se conserva", () => {
     const resultado = transformarFila(
       {
         Afiliado: "12345",
@@ -87,16 +92,17 @@ describe("transformarFila", () => {
       },
       MAPEO,
       "cliente-1",
+      FECHA_LOTE,
     );
 
     expect(resultado.valida).toBe(true);
     expect(resultado.linea).toMatchObject({
-      fechaEntrega: "2026-08-06",
+      fechaEntrega: FECHA_LOTE,
       notaFecha: "UF03 PIDE QUE INGRESE",
     });
   });
 
-  it("una fecha sin ningún patrón reconocible al inicio sigue siendo inválida", () => {
+  it("una celda de fecha sin ningún patrón reconocible al inicio no aporta nota, pero no invalida la fila (la fecha real es la del lote)", () => {
     const resultado = transformarFila(
       {
         Afiliado: "12345",
@@ -109,10 +115,14 @@ describe("transformarFila", () => {
       },
       MAPEO,
       "cliente-1",
+      FECHA_LOTE,
     );
 
-    expect(resultado.valida).toBe(false);
-    expect(resultado.errores).toContain("Falta o es inválida la fecha de entrega.");
+    expect(resultado.valida).toBe(true);
+    expect(resultado.linea).toMatchObject({
+      fechaEntrega: FECHA_LOTE,
+      notaFecha: null,
+    });
   });
 
   it("campo obligatorio sin mapeo (encabezado no confirmado) también cuenta como faltante", () => {
@@ -123,6 +133,7 @@ describe("transformarFila", () => {
       { Afiliado: "1", Nombre: "Juan", Domicilio: "Calle 1", Fecha: "2026-01-01", Producto: "X", Cantidad: 2 },
       mapeoIncompleto,
       "cliente-1",
+      FECHA_LOTE,
     );
 
     expect(resultado.valida).toBe(false);

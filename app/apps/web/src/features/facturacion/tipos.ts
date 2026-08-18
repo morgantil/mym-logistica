@@ -1,9 +1,10 @@
-import { CabaProvincia, EstadoGrupoFacturacion } from "@mym/shared-types";
+import { EstadoGrupoFacturacion } from "@mym/shared-types";
 
 export interface TarifaCliente {
   id: string;
   clienteId: string;
-  tipo: CabaProvincia;
+  zonaTarifariaId: string;
+  zonaTarifariaNombre?: string;
   monto: number;
   vigenciaDesde: string;
   vigenciaHasta: string | null;

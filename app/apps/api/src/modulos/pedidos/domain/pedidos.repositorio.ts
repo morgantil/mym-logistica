@@ -1,4 +1,4 @@
-import { CabaProvincia, EstadoPedido, EstadoSimpliroute, EstadoValidacion, TipoServicio } from "@mym/shared-types";
+import { EstadoPedido, EstadoSimpliroute, EstadoValidacion, TipoServicio } from "@mym/shared-types";
 import { Pedido, PedidoListado } from "./pedido";
 
 export interface DatosCrearPedido {
@@ -9,7 +9,7 @@ export interface DatosCrearPedido {
   direccionOriginal: string;
   direccionUsada: string;
   localidad: string;
-  cabaProvincia: CabaProvincia | null;
+  zonaTarifariaId: string | null;
   fechaProgramada: Date;
   tipoServicio: TipoServicio;
   observaciones: string | null;
@@ -43,6 +43,9 @@ export interface PedidosRepositorio {
   contarPorEstado(clienteIds?: string[]): Promise<Record<string, number>>;
   crear(datos: DatosCrearPedido): Promise<Pedido>;
   obtenerPorId(id: string): Promise<Pedido | null>;
+  // Con nombres de cliente/destinatario y productos — lo que necesita la
+  // etiqueta de bulto (§8.2 funcional v6), a diferencia de obtenerPorId.
+  obtenerListadoPorId(id: string): Promise<PedidoListado | null>;
 
   // §17 funcional: candidatos a "Revisión antes de enviar" — los que todavía
   // no se mandaron a SimpliRoute.
@@ -61,6 +64,10 @@ export interface PedidosRepositorio {
   // si `version` no coincide con la fila actual — alguien más lo modificó primero.
   actualizarBultos(id: string, bultos: number, version: number): Promise<Pedido>;
   marcarEnviado(id: string, datos: { simplirouteId: string; version: number }): Promise<Pedido>;
+
+  // Sin bloqueo optimista a propósito: es solo informativo ("¿ya se imprimió
+  // alguna etiqueta?"), no hay dato de negocio en juego que se pueda pisar.
+  marcarEtiquetaImpresa(id: string): Promise<void>;
 }
 
 export const PEDIDOS_REPOSITORIO = Symbol("PEDIDOS_REPOSITORIO");

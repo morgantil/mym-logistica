@@ -36,11 +36,6 @@ enum TipoServicio {
   MEDICAMENTO
 }
 
-enum CabaProvincia {
-  CABA
-  PROVINCIA
-}
-
 // DOCUMENTO FUNCIONAL.md §19
 enum EstadoPedido {
   SIN_ASIGNAR
@@ -191,23 +186,28 @@ model PerfilImportacion {
   @@map("perfiles_importacion")
 }
 
-// Tarifas CABA/Provincia por cliente, con vigencia para mantener histórico (§23 funcional)
+// Tarifas por cliente y zona tarifaria, con vigencia para mantener histórico
+// (§23 funcional). "Zona tarifaria" es genérica y configurable (no un enum
+// fijo CABA/Provincia) — el documento funcional v6 pide poder tener CABA +
+// Cordón 1/2/3, y que la relación Localidad → zona sea configurable, sin
+// tocar código para agregar/renombrar una zona. Ver ZonaTarifaria más abajo.
 model TarifaCliente {
-  id             String        @id @default(uuid())
-  clienteId      String
-  tipo           CabaProvincia
-  monto          Decimal       @db.Decimal(12, 2)
-  vigenciaDesde  DateTime
-  vigenciaHasta  DateTime?
+  id              String        @id @default(uuid())
+  clienteId       String
+  zonaTarifariaId String
+  monto           Decimal       @db.Decimal(12, 2)
+  vigenciaDesde   DateTime
+  vigenciaHasta   DateTime?
 
   creadoEn       DateTime      @default(now())
   creadoPorId    String?
   eliminadoEn    DateTime?
   eliminadoPorId String?
 
-  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  cliente       Cliente       @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  zonaTarifaria ZonaTarifaria @relation(fields: [zonaTarifariaId], references: [id])
 
-  @@index([clienteId, tipo, vigenciaDesde])
+  @@index([clienteId, zonaTarifariaId, vigenciaDesde])
   @@map("tarifas_cliente")
 }
 
@@ -285,6 +285,43 @@ model ZonaChofer {
 }
 
 // ---------------------------------------------------------------------------
+// Zonas tarifarias — §10 funcional (v6). NO es lo mismo que Zona/Chofer de
+// arriba (eso es logística: a qué chofer le toca un pedido). Esto es
+// facturación: qué tarifa aplica. Se modela como tabla, no enum, porque el
+// documento pide explícitamente "la relación Localidad → Cordón deberá ser
+// configurable y no quedar fija en código" — agregar una zona nueva (o
+// renombrar una) es una fila nueva, no un deploy.
+// ---------------------------------------------------------------------------
+
+model ZonaTarifaria {
+  id     String  @id @default(uuid())
+  nombre String  @unique // ej. "CABA", "Cordón 1", "Cordón 2", "Cordón 3"
+  activa Boolean @default(true)
+
+  eliminadoEn DateTime?
+
+  localidades LocalidadZonaTarifaria[]
+  tarifas     TarifaCliente[]
+  pedidos     Pedido[]
+
+  @@map("zonas_tarifarias")
+}
+
+// Mapeo Localidad (texto normalizado) → ZonaTarifaria, configurable por
+// Administración. CABA no necesita entradas acá (se resuelve directo por la
+// clasificación CABA/Provincia de GeorefArAdapter) — esta tabla es para
+// decidir a qué Cordón pertenece cada localidad de Provincia.
+model LocalidadZonaTarifaria {
+  id              String @id @default(uuid())
+  localidad       String @unique
+  zonaTarifariaId String
+
+  zonaTarifaria ZonaTarifaria @relation(fields: [zonaTarifariaId], references: [id])
+
+  @@map("localidades_zonas_tarifarias")
+}
+
+// ---------------------------------------------------------------------------
 // Importación de Excel — §4, §5, §6 funcional
 // ---------------------------------------------------------------------------
 
@@ -312,6 +349,10 @@ model ImportacionExcel {
 
 model Pedido {
   id                   String            @id @default(uuid())
+  // N.º de Pedido interno — documento funcional v6 §8.2: "mismo número en
+  // todas las etiquetas del pedido". Secuencial y legible, distinto del `id`
+  // (UUID interno, no pensado para mostrarse en una etiqueta impresa).
+  numero               Int               @unique @default(autoincrement())
   clienteId            String
   destinatarioId       String
   importacionId        String?
@@ -321,7 +362,7 @@ model Pedido {
   direccionUsada       String // la que efectivamente se usa para zona/planificación (§11 funcional)
   direccionNormalizada String?
   localidad            String
-  cabaProvincia        CabaProvincia?
+  zonaTarifariaId      String?
 
   fechaProgramada      DateTime
   fechaEntregaEfectiva DateTime?
@@ -338,6 +379,10 @@ model Pedido {
   ticket               String? // opcional — Farmapal (§4 funcional)
   simplirouteId        String?
   observaciones        String?
+  // Cuándo se imprimió por última vez alguna etiqueta de este pedido — null =
+  // nunca. §8.1 funcional v6: "estado de impresión de la etiqueta" en la
+  // pantalla de Embalaje y Despacho. No impide reimprimir, solo informa.
+  etiquetaImpresaEn    DateTime?
 
   grupoFacturacionId   String?
   reglaAplicada        String? // "2x1" | "UNIFICADA" | "INDIVIDUAL" — informativo, el detalle vive en GrupoFacturacion
@@ -356,6 +401,7 @@ model Pedido {
   importacion      ImportacionExcel? @relation(fields: [importacionId], references: [id])
   zona             Zona?             @relation(fields: [zonaId], references: [id])
   chofer           Chofer?           @relation(fields: [choferId], references: [id])
+  zonaTarifaria    ZonaTarifaria?    @relation(fields: [zonaTarifariaId], references: [id])
   grupoFacturacion GrupoFacturacion? @relation(fields: [grupoFacturacionId], references: [id])
   productos        Producto[]
 

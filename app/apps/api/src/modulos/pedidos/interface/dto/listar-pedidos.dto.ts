@@ -1,14 +1,29 @@
 import { Type } from "class-transformer";
-import { IsEnum, IsInt, IsOptional, Max, Min } from "class-validator";
+import { IsDate, IsEnum, IsInt, IsOptional, IsUUID, Max, Min } from "class-validator";
 import { EstadoPedido } from "@mym/shared-types";
 
-// Filtro por cliente puntual queda para cuando haga falta: el filtrado por
-// "qué clientes puede ver este usuario" ya lo aplica PedidosService.listarParaUsuario
-// vía PermisosClienteService, independientemente de este DTO.
+// `clienteId`/`fechaDesde`/`fechaHasta` los usa la pantalla de Embalaje y
+// Despacho (§8.1 funcional v6) — el filtrado por "qué clientes puede ver
+// este usuario" lo sigue aplicando PedidosService.listarParaUsuario vía
+// PermisosClienteService, cruzado con `clienteId` si viene.
 export class ListarPedidosDto {
   @IsOptional()
   @IsEnum(EstadoPedido)
   estado?: EstadoPedido;
+
+  @IsOptional()
+  @IsUUID()
+  clienteId?: string;
+
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  fechaDesde?: Date;
+
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  fechaHasta?: Date;
 
   @IsOptional()
   @Type(() => Number)

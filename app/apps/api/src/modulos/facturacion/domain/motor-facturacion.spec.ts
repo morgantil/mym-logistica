@@ -1,4 +1,4 @@
-import { CabaProvincia, TipoServicio } from "@mym/shared-types";
+import { TipoServicio } from "@mym/shared-types";
 import {
   PedidoParaFacturar,
   agruparPorClienteFechaDireccion,
@@ -8,7 +8,11 @@ import {
   separarPorTipoServicio,
 } from "./motor-facturacion";
 
-const TARIFAS = { [CabaProvincia.CABA]: 1000, [CabaProvincia.PROVINCIA]: 1500 };
+// IDs genéricos — el motor no le da significado especial a ninguna zona,
+// solo agrupa por id (ver comentario de TarifasPorTipo en motor-facturacion.ts).
+const ZONA_CABA = "zona-caba";
+const ZONA_PROVINCIA = "zona-provincia";
+const TARIFAS = { [ZONA_CABA]: 1000, [ZONA_PROVINCIA]: 1500 };
 const PORCENTAJE_SEGUNDO_SERVICIO = 50;
 
 function pedido(overrides: Partial<PedidoParaFacturar> & { id: string }): PedidoParaFacturar {
@@ -17,7 +21,7 @@ function pedido(overrides: Partial<PedidoParaFacturar> & { id: string }): Pedido
     tipoServicio: TipoServicio.PANAL,
     fechaProgramada: "2026-08-01",
     direccionUsada: "Av. Siempre Viva 123",
-    cabaProvincia: CabaProvincia.CABA,
+    zonaTarifariaId: ZONA_CABA,
     ...overrides,
   };
 }
@@ -183,15 +187,15 @@ describe("aplicarDosPorUno", () => {
   });
 });
 
-describe("calcularFacturacionCliente — tarifa CABA vs Provincia", () => {
-  it("usa la tarifa correspondiente según cabaProvincia del grupo", () => {
+describe("calcularFacturacionCliente — tarifa por zona tarifaria", () => {
+  it("usa la tarifa correspondiente según la zona tarifaria del grupo", () => {
     const viajes = calcularFacturacionCliente(
       [
-        pedido({ id: "caba", cabaProvincia: CabaProvincia.CABA }),
+        pedido({ id: "caba", zonaTarifariaId: ZONA_CABA }),
         pedido({
           id: "provincia",
           direccionUsada: "Otra dirección 999",
-          cabaProvincia: CabaProvincia.PROVINCIA,
+          zonaTarifariaId: ZONA_PROVINCIA,
         }),
       ],
       TARIFAS,
