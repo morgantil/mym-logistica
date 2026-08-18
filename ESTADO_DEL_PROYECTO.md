@@ -1,6 +1,6 @@
 # ESTADO DEL PROYECTO — leer esto primero si retomás después de una pausa
 
-Última actualización: **2026-08-17**. Este documento es una **foto del momento**, se
+Última actualización: **2026-08-18**. Este documento es una **foto del momento**, se
 reescribe cada vez que cambia el estado — no es un historial (eso vive en
 `DOCUMENTO TECNICO.md` sección 7). Si algo acá contradice el código o
 `DOCUMENTO TECNICO.md`, confiá en esos dos, no en esto — puede haber quedado viejo.
@@ -24,14 +24,21 @@ contra el código el 2026-08-17).
   necesariamente Leonardo) del que siguen faltando algunas definiciones de
   negocio — ver `TEMAS_PENDIENTES.md`.
 
-## Ambiente de test — desplegado (2026-08-12)
+## Ambiente de test — desplegado (2026-08-12, al día 2026-08-18)
 
 **https://mym-web-pi.vercel.app** (front) + **https://mym-n7bh.onrender.com**
 (API) — probado de punta a punta, login real funcionando. Ambos en free
 tier: se duermen tras inactividad, el primer request tarda ~50s, normal.
-Detalle completo (config exacta, gotchas encontrados) en **`DEPLOY.md`**.
-Producción real todavía no existe — proyecto separado a armar cuando haga
-falta, ver `TEMAS_PENDIENTES.md`.
+Desde el 2026-08-18 corre ahí todo lo construido hasta esa fecha: Zonas
+tarifarias, Embalaje y Despacho, Facturación completa y la fecha de
+entrega informada por el usuario — verificado en navegador real contra
+las URLs desplegadas, no solo en local. Nota: la PWA cachea el frontend
+con un service worker (Workbox) que actualiza en segundo plano, no al
+instante — quien ya tenía la app abierta puede seguir viendo la versión
+anterior hasta que su navegador la renueve solo. Detalle completo (config
+exacta, gotchas encontrados) en **`DEPLOY.md`**. Producción real todavía
+no existe — proyecto separado a armar cuando haga falta, ver
+`TEMAS_PENDIENTES.md`.
 
 ## Dónde está todo
 
