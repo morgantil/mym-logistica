@@ -1,57 +1,72 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post } from "@nestjs/common";
 import { Rol } from "@prisma/client";
 import { Roles } from "../../../common/decorators/roles.decorator";
 import { ZonasChoferesService } from "../application/zonas-choferes.service";
 import { ActualizarChoferDto, CrearChoferDto } from "./dto/chofer.dto";
-import { ActualizarZonaDto, AsignarChoferDto, CrearZonaDto } from "./dto/zona.dto";
+import { ActualizarVehiculoDto, CrearVehiculoDto } from "./dto/vehiculo.dto";
 
 @Controller()
 export class ZonasChoferesController {
   constructor(private service: ZonasChoferesService) {}
 
-  // `conChofer=true` es lo que usa la pantalla de administración para mostrar
-  // qué chofer tiene asignado cada zona — el resto de la app (ej. selects
-  // simples) sigue viendo la lista plana.
+  // Zonas es de solo lectura acá — SimpliRoute no publica alta/edición de
+  // Zonas en su API pública, cualquier cambio se sigue haciendo ahí.
   @Get("zonas")
-  listarZonas(@Query("conChofer") conChofer?: string) {
-    return conChofer === "true" ? this.service.listarZonasConChofer() : this.service.listarZonas();
-  }
-
-  @Roles(Rol.LOGISTICA, Rol.ADMINISTRACION)
-  @Post("zonas")
-  crearZona(@Body() dto: CrearZonaDto) {
-    return this.service.crearZona(dto.nombre);
-  }
-
-  @Roles(Rol.LOGISTICA, Rol.ADMINISTRACION)
-  @Patch("zonas/:id")
-  actualizarZona(@Param("id") id: string, @Body() dto: ActualizarZonaDto) {
-    return this.service.actualizarZona(id, dto.nombre);
-  }
-
-  // §12-§13 funcional: asignar (o quitar, con choferId null) el chofer de una zona.
-  @Roles(Rol.LOGISTICA, Rol.ADMINISTRACION)
-  @Patch("zonas/:id/chofer")
-  asignarChofer(@Param("id") id: string, @Body() dto: AsignarChoferDto) {
-    return this.service.asignarChofer(id, dto.choferId ?? null);
+  listarZonas() {
+    return this.service.listarZonas();
   }
 
   @Get("choferes")
-  listarChoferes(@Query("incluirInactivos") incluirInactivos?: string) {
-    return incluirInactivos === "true"
-      ? this.service.listarTodosLosChoferes()
-      : this.service.listarChoferes();
+  listarChoferes() {
+    return this.service.listarChoferes();
   }
 
   @Roles(Rol.LOGISTICA, Rol.ADMINISTRACION)
   @Post("choferes")
   crearChofer(@Body() dto: CrearChoferDto) {
-    return this.service.crearChofer(dto.nombre);
+    return this.service.crearChofer(dto);
   }
 
   @Roles(Rol.LOGISTICA, Rol.ADMINISTRACION)
   @Patch("choferes/:id")
-  actualizarChofer(@Param("id") id: string, @Body() dto: ActualizarChoferDto) {
+  actualizarChofer(@Param("id", ParseIntPipe) id: number, @Body() dto: ActualizarChoferDto) {
     return this.service.actualizarChofer(id, dto);
+  }
+
+  @Roles(Rol.LOGISTICA, Rol.ADMINISTRACION)
+  @Delete("choferes/:id")
+  eliminarChofer(@Param("id", ParseIntPipe) id: number) {
+    return this.service.eliminarChofer(id);
+  }
+
+  @Get("vehiculos")
+  listarVehiculos() {
+    return this.service.listarVehiculos();
+  }
+
+  @Roles(Rol.LOGISTICA, Rol.ADMINISTRACION)
+  @Post("vehiculos")
+  crearVehiculo(@Body() dto: CrearVehiculoDto) {
+    return this.service.crearVehiculo(dto);
+  }
+
+  @Roles(Rol.LOGISTICA, Rol.ADMINISTRACION)
+  @Patch("vehiculos/:id")
+  actualizarVehiculo(@Param("id", ParseIntPipe) id: number, @Body() dto: ActualizarVehiculoDto) {
+    return this.service.actualizarVehiculo(id, dto);
+  }
+
+  @Roles(Rol.LOGISTICA, Rol.ADMINISTRACION)
+  @Delete("vehiculos/:id")
+  eliminarVehiculo(@Param("id", ParseIntPipe) id: number) {
+    return this.service.eliminarVehiculo(id);
+  }
+
+  // Botón "Sincronizar ahora" del frontend — el resto de las lecturas se
+  // refrescan solas cuando el cache está vencido (ZonasChoferesService).
+  @Roles(Rol.LOGISTICA, Rol.ADMINISTRACION)
+  @Post("simpliroute-cache/sincronizar")
+  sincronizar() {
+    return this.service.sincronizar();
   }
 }

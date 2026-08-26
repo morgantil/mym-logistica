@@ -28,17 +28,71 @@ export interface ResultadoEnvio {
   idExterno: string;
 }
 
+// §12 funcional (Zona): "deberá poder consultarse desde la información
+// disponible de SimpliRoute". Decisión 2026-08-25/26 (DOCUMENTO TECNICO.md
+// historial): SimpliRoute es la fuente de verdad para Zonas, Choferes y
+// Vehículos. Zonas es de solo lectura pública en la API (sin
+// POST/PUT/PATCH/DELETE) — `poligono` viene tal cual lo devuelve
+// `GET /v1/zones/`, el point-in-polygon para resolver a qué zona pertenece
+// una dirección es lógica nuestra (ver zonas-choferes/domain/punto-en-poligono.ts),
+// SimpliRoute no expone un endpoint para eso.
+export interface CoordenadaProveedor {
+  lat: number;
+  lng: number;
+}
+
+export interface ZonaProveedor {
+  id: number;
+  nombre: string;
+  habilitada: boolean;
+  dias: string[];
+  poligono: CoordenadaProveedor[];
+  vehiculosIds: number[];
+}
+
+// Choferes/Vehículos SÍ tienen CRUD completo publicado
+// (`/v1/accounts/drivers/`, `/v1/routes/vehicles/`) — se leen y también se
+// escriben contra SimpliRoute, nunca solo contra una copia local.
+export interface ChoferProveedor {
+  id: number;
+  nombre: string;
+  username: string;
+  telefono: string | null;
+  email: string | null;
+  activo: boolean;
+}
+
+export interface DatosChofer {
+  nombre: string;
+  username: string;
+  telefono?: string | null;
+  email?: string | null;
+  // Requerido al crear. Al actualizar, SimpliRoute solo documenta PUT (no
+  // PATCH) para Users, con `password` en el ejemplo de body — no está
+  // documentado si omitirlo preserva la contraseña existente
+  // (Documentacion simpliroute/04, "PUT semantics = NOT_DOCUMENTED" para
+  // Users). El adapter HTTP lo omite del body si no se manda, pero esto
+  // queda como NEEDS_VERIFICATION hasta probarlo contra la cuenta real.
+  password?: string;
+}
+
+export interface VehiculoProveedor {
+  id: number;
+  nombre: string;
+  patente: string | null;
+  choferPredeterminadoId: number | null;
+  estado: string;
+}
+
+export interface DatosVehiculo {
+  nombre: string;
+  patente?: string | null;
+  choferPredeterminadoId?: number | null;
+}
+
 export interface LogisticaProviderPort {
   // §9 funcional — por afiliado/destinatario, null si "No encontrado en SimpliRoute" (§10).
   buscarDestinatarioPorAfiliado(numeroAfiliado: string): Promise<DestinatarioEnProveedor | null>;
-
-  // §12 funcional: "La zona deberá obtenerse según la dirección y/o coordenadas
-  // ... deberá poder consultarse desde la información disponible de SimpliRoute
-  // o configurarse en el sistema." CÓMO exactamente se obtiene está listado como
-  // validación técnica pendiente (DOCUMENTO TECNICO.md sección 4, ítem 4) — el
-  // mock devuelve null siempre, lo cual hoy es lo correcto: no inventamos una
-  // zona, se cae al fallback de ZonasChoferesService ("Zona sin identificar").
-  obtenerZonaSugerida(destinatario: DestinatarioEnProveedor): Promise<string | null>;
 
   // §18 funcional.
   enviarPedido(pedido: PedidoParaEnviar): Promise<ResultadoEnvio>;
@@ -46,6 +100,20 @@ export interface LogisticaProviderPort {
   // §19 funcional — el mapeo a EstadoPedido propio se hace en el módulo de pedidos,
   // no acá: este puerto solo devuelve el estado crudo tal cual lo informa el proveedor.
   consultarEstado(idExterno: string): Promise<string>;
+
+  // §12-§13 funcional — catálogos que ZonasChoferesService cachea localmente
+  // y refresca periódicamente (nunca se consultan en vivo en cada request).
+  listarZonas(): Promise<ZonaProveedor[]>;
+  listarChoferes(): Promise<ChoferProveedor[]>;
+  listarVehiculos(): Promise<VehiculoProveedor[]>;
+
+  crearChofer(datos: DatosChofer): Promise<ChoferProveedor>;
+  actualizarChofer(id: number, datos: DatosChofer): Promise<ChoferProveedor>;
+  eliminarChofer(id: number): Promise<void>;
+
+  crearVehiculo(datos: DatosVehiculo): Promise<VehiculoProveedor>;
+  actualizarVehiculo(id: number, datos: DatosVehiculo): Promise<VehiculoProveedor>;
+  eliminarVehiculo(id: number): Promise<void>;
 }
 
 export const LOGISTICA_PROVIDER = Symbol("LOGISTICA_PROVIDER");

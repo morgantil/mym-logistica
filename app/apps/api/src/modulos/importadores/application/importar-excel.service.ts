@@ -218,16 +218,19 @@ export class ImportarExcelService {
         direccionUsada = resuelto.direccionAUsar;
       }
 
-      // §9-§10 funcional: consulta a SimpliRoute. §12-§13: zona → chofer a
-      // partir de lo que sugiera SimpliRoute (hoy: nada, está mockeado) con
-      // fallback a la localidad. Si no resuelve nada, queda "sin identificar"/
+      // §9-§10 funcional: consulta a SimpliRoute (trae lat/lon geocodificadas
+      // si el destinatario ya existe ahí). §12-§13: zona → chofer resuelto por
+      // point-in-polygon contra el catálogo de Zonas de SimpliRoute, con
+      // fallback a coincidencia por localidad si no hay coordenadas o no
+      // matchea ninguna zona. Si no resuelve nada, queda "sin identificar"/
       // "sin asignar" tal cual pide el documento — no se inventa un valor.
-      const { encontrado, destinatario: destinatarioSincronizado, zonaSugerida } =
+      const { encontrado, destinatario: destinatarioSincronizado } =
         await this.destinatariosService.sincronizarConSimpliRoute(destinatarioActual, grupo.numeroAfiliado);
       destinatarioActual = destinatarioSincronizado;
 
-      const { zonaId, choferId } = await this.zonasChoferesService.resolverZonaChofer(
-        zonaSugerida,
+      const { zonaId, zonaNombre, choferId, choferNombre } = await this.zonasChoferesService.resolverZonaChofer(
+        destinatarioActual.latitud,
+        destinatarioActual.longitud,
         grupo.localidad,
       );
 
@@ -270,7 +273,9 @@ export class ImportarExcelService {
         tipoServicio: TipoServicio.PANAL,
         observaciones: observacionesPartes.length > 0 ? observacionesPartes.join(" · ") : null,
         zonaId,
+        zonaNombre,
         choferId,
+        choferNombre,
         estadoSimpliroute: encontrado ? EstadoSimpliroute.NO_ENVIADO : EstadoSimpliroute.NO_ENCONTRADO,
         // Ya pasó transformarFila (campos obligatorios presentes) para llegar hasta acá.
         estadoValidacion: EstadoValidacion.VALIDO,

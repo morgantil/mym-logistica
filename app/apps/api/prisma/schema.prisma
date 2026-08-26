@@ -83,13 +83,13 @@ enum AccionAuditoria {
 // ---------------------------------------------------------------------------
 
 model Usuario {
-  id            String    @id @default(uuid())
-  email         String    @unique
-  nombre        String
-  passwordHash  String? // null si el usuario solo usa Google OAuth
-  googleId      String?   @unique
-  roles         Rol[] // combinables — ver DOCUMENTO TECNICO.md sección 2
-  activo        Boolean   @default(true)
+  id           String  @id @default(uuid())
+  email        String  @unique
+  nombre       String
+  passwordHash String? // null si el usuario solo usa Google OAuth
+  googleId     String? @unique
+  roles        Rol[] // combinables — ver DOCUMENTO TECNICO.md sección 2
+  activo       Boolean @default(true)
 
   creadoEn      DateTime  @default(now())
   actualizadoEn DateTime  @updatedAt
@@ -140,27 +140,27 @@ model UsuarioCliente {
 // ---------------------------------------------------------------------------
 
 model Cliente {
-  id                     String   @id @default(uuid())
-  nombre                 String
+  id                String   @id @default(uuid())
+  nombre            String
   // patrones de texto para detectar el cliente en el nombre del archivo Excel
   // (§5 funcional, ej. "BIOSINTESIS", "BELLA VISTA", "FARMAPAL")
-  patronesDeteccion      String[]
-  activo                 Boolean  @default(true)
+  patronesDeteccion String[]
+  activo            Boolean  @default(true)
 
-  creadoEn      DateTime  @default(now())
-  actualizadoEn DateTime  @updatedAt
-  creadoPorId   String?
+  creadoEn         DateTime  @default(now())
+  actualizadoEn    DateTime  @updatedAt
+  creadoPorId      String?
   actualizadoPorId String?
-  eliminadoEn   DateTime?
-  eliminadoPorId String?
+  eliminadoEn      DateTime?
+  eliminadoPorId   String?
 
-  tarifas               TarifaCliente[]
-  destinatarios         Destinatario[]
-  pedidos               Pedido[]
-  gruposFacturacion     GrupoFacturacion[]
-  importaciones         ImportacionExcel[]
-  usuariosPermitidos    UsuarioCliente[]
-  perfilImportacion     PerfilImportacion?
+  tarifas            TarifaCliente[]
+  destinatarios      Destinatario[]
+  pedidos            Pedido[]
+  gruposFacturacion  GrupoFacturacion[]
+  importaciones      ImportacionExcel[]
+  usuariosPermitidos UsuarioCliente[]
+  perfilImportacion  PerfilImportacion?
 
   @@map("clientes")
 }
@@ -172,13 +172,13 @@ model Cliente {
 // usuario una vez. A partir de ahí queda acá y las próximas importaciones de
 // ese mismo cliente no vuelven a preguntar nada.
 model PerfilImportacion {
-  id            String   @id @default(uuid())
-  clienteId     String   @unique
+  id            String @id @default(uuid())
+  clienteId     String @unique
   mapeoColumnas Json // Record<CampoCanonico, string> — ver modulos/importadores/domain/campo-canonico.ts
 
-  creadoEn      DateTime @default(now())
-  actualizadoEn DateTime @updatedAt
-  creadoPorId   String?
+  creadoEn         DateTime @default(now())
+  actualizadoEn    DateTime @updatedAt
+  creadoPorId      String?
   actualizadoPorId String?
 
   cliente Cliente @relation(fields: [clienteId], references: [id])
@@ -192,14 +192,14 @@ model PerfilImportacion {
 // Cordón 1/2/3, y que la relación Localidad → zona sea configurable, sin
 // tocar código para agregar/renombrar una zona. Ver ZonaTarifaria más abajo.
 model TarifaCliente {
-  id              String        @id @default(uuid())
+  id              String    @id @default(uuid())
   clienteId       String
   zonaTarifariaId String
-  monto           Decimal       @db.Decimal(12, 2)
+  monto           Decimal   @db.Decimal(12, 2)
   vigenciaDesde   DateTime
   vigenciaHasta   DateTime?
 
-  creadoEn       DateTime      @default(now())
+  creadoEn       DateTime  @default(now())
   creadoPorId    String?
   eliminadoEn    DateTime?
   eliminadoPorId String?
@@ -216,7 +216,7 @@ model TarifaCliente {
 // ---------------------------------------------------------------------------
 
 model Destinatario {
-  id                   String    @id @default(uuid())
+  id                   String   @id @default(uuid())
   clienteId            String
   numeroAfiliado       String
   nombre               String
@@ -225,15 +225,15 @@ model Destinatario {
   localidad            String
   telefono             String?
   simplirouteId        String?
-  latitud              Decimal?  @db.Decimal(9, 6)
-  longitud             Decimal?  @db.Decimal(9, 6)
+  latitud              Decimal? @db.Decimal(9, 6)
+  longitud             Decimal? @db.Decimal(9, 6)
 
-  creadoEn      DateTime  @default(now())
-  actualizadoEn DateTime  @updatedAt
-  creadoPorId   String?
+  creadoEn         DateTime  @default(now())
+  actualizadoEn    DateTime  @updatedAt
+  creadoPorId      String?
   actualizadoPorId String?
-  eliminadoEn   DateTime?
-  eliminadoPorId String?
+  eliminadoEn      DateTime?
+  eliminadoPorId   String?
 
   cliente Cliente  @relation(fields: [clienteId], references: [id])
   pedidos Pedido[]
@@ -243,45 +243,53 @@ model Destinatario {
 }
 
 // ---------------------------------------------------------------------------
-// Zonas y choferes — §12, §13 funcional
+// Zonas, choferes y vehículos — §12, §13 funcional.
+//
+// Decisión 2026-08-25/26 (ver DOCUMENTO TECNICO.md historial): revierte el
+// diseño anterior (Zona/Chofer/ZonaChofer configurados a mano acá). Ahora
+// SimpliRoute es la fuente de verdad — estas tres tablas son un CACHE de
+// solo lectura interna, refrescado por ZonasChoferesService contra
+// LogisticaProviderPort (nunca se escribe acá directamente desde un
+// formulario). Altas/ediciones de Chofer y Vehículo van derecho a la API de
+// SimpliRoute (tiene CRUD completo); Zonas es de solo lectura pública en
+// SimpliRoute (sin POST/PUT/PATCH/DELETE), así que acá también es solo
+// lectura — cualquier alta/edición de zona se sigue haciendo en SimpliRoute.
+// `id` es el ID numérico real de SimpliRoute, no un uuid propio.
 // ---------------------------------------------------------------------------
 
-model Zona {
-  id     String @id @default(uuid())
-  nombre String @unique
+model ZonaSimpliRouteCache {
+  id             Int      @id
+  nombre         String
+  habilitada     Boolean
+  dias           String[] // schedules tal cual los nombra SimpliRoute (Monday, Tuesday, ...)
+  poligono       Json // [{ lat: string, lng: string }, ...] tal cual lo devuelve GET /v1/zones/
+  vehiculosIds   Int[] // Vehicle IDs de SimpliRoute asignados a esta zona
+  sincronizadoEn DateTime @default(now())
 
-  eliminadoEn DateTime?
-
-  choferes ZonaChofer[]
-  pedidos  Pedido[]
-
-  @@map("zonas")
+  @@map("zonas_simpliroute_cache")
 }
 
-model Chofer {
-  id     String  @id @default(uuid())
-  nombre String
-  activo Boolean @default(true)
+model ChoferSimpliRouteCache {
+  id             Int      @id // SimpliRoute User/Driver id
+  nombre         String
+  username       String
+  telefono       String?
+  email          String?
+  activo         Boolean
+  sincronizadoEn DateTime @default(now())
 
-  eliminadoEn DateTime?
-
-  zonas   ZonaChofer[]
-  pedidos Pedido[]
-
-  @@map("choferes")
+  @@map("choferes_simpliroute_cache")
 }
 
-model ZonaChofer {
-  id       String @id @default(uuid())
-  zonaId   String
-  choferId String
-  activo   Boolean @default(true)
+model VehiculoSimpliRouteCache {
+  id                     Int      @id
+  nombre                 String
+  patente                String?
+  choferPredeterminadoId Int? // Vehicle.default_driver
+  estado                 String
+  sincronizadoEn         DateTime @default(now())
 
-  zona   Zona   @relation(fields: [zonaId], references: [id])
-  chofer Chofer @relation(fields: [choferId], references: [id])
-
-  @@unique([zonaId, choferId])
-  @@map("zonas_choferes")
+  @@map("vehiculos_simpliroute_cache")
 }
 
 // ---------------------------------------------------------------------------
@@ -326,14 +334,14 @@ model LocalidadZonaTarifaria {
 // ---------------------------------------------------------------------------
 
 model ImportacionExcel {
-  id             String            @id @default(uuid())
-  clienteId      String? // null = "Cliente sin identificar" hasta que el usuario lo confirme
-  nombreArchivo  String
-  urlArchivo     String? // key/ruta en el bucket (Cloudflare R2) — null hasta que se configuren credenciales R2 (ver .env.example)
-  estado         EstadoImportacion @default(PROCESANDO)
-  totalFilas     Int?
-  filasConError  Int?
-  usuarioId      String
+  id            String            @id @default(uuid())
+  clienteId     String? // null = "Cliente sin identificar" hasta que el usuario lo confirme
+  nombreArchivo String
+  urlArchivo    String? // key/ruta en el bucket (Cloudflare R2) — null hasta que se configuren credenciales R2 (ver .env.example)
+  estado        EstadoImportacion @default(PROCESANDO)
+  totalFilas    Int?
+  filasConError Int?
+  usuarioId     String
 
   creadoEn DateTime @default(now())
 
@@ -348,14 +356,14 @@ model ImportacionExcel {
 // ---------------------------------------------------------------------------
 
 model Pedido {
-  id                   String            @id @default(uuid())
+  id             String  @id @default(uuid())
   // N.º de Pedido interno — documento funcional v6 §8.2: "mismo número en
   // todas las etiquetas del pedido". Secuencial y legible, distinto del `id`
   // (UUID interno, no pensado para mostrarse en una etiqueta impresa).
-  numero               Int               @unique @default(autoincrement())
-  clienteId            String
-  destinatarioId       String
-  importacionId        String?
+  numero         Int     @unique @default(autoincrement())
+  clienteId      String
+  destinatarioId String
+  importacionId  String?
 
   numeroAfiliado       String // snapshot al momento de importar
   direccionOriginal    String // tal cual vino en el Excel
@@ -367,40 +375,49 @@ model Pedido {
   fechaProgramada      DateTime
   fechaEntregaEfectiva DateTime?
 
-  tipoServicio         TipoServicio
-  estado               EstadoPedido      @default(SIN_ASIGNAR)
-  estadoValidacion     EstadoValidacion  @default(PENDIENTE)
-  estadoSimpliroute    EstadoSimpliroute @default(NO_ENVIADO)
+  tipoServicio      TipoServicio
+  estado            EstadoPedido      @default(SIN_ASIGNAR)
+  estadoValidacion  EstadoValidacion  @default(PENDIENTE)
+  estadoSimpliroute EstadoSimpliroute @default(NO_ENVIADO)
 
-  zonaId               String?
-  choferId             String?
-  bultos               Int?
-  remito               String?
-  ticket               String? // opcional — Farmapal (§4 funcional)
-  simplirouteId        String?
-  observaciones        String?
+  // ID numérico de SimpliRoute (Zone.id / driver id resuelto vía vehículo de
+  // la zona — ver ZonasChoferesService.resolverZonaChofer), guardado como
+  // string por consistencia con el resto del modelo. `zonaNombre`/
+  // `choferNombre` son snapshot al momento de resolver (mismo criterio que
+  // `numeroAfiliado` arriba) — así un pedido sigue mostrando su zona/chofer
+  // aunque el cache de SimpliRoute cambie o esa zona ya no exista más
+  // adelante. Pedidos anteriores al 2026-08-26 tienen acá `null` (el ID
+  // apuntaba a las tablas Zona/Chofer manuales ya eliminadas) pero conservan
+  // el nombre en el snapshot — ver migración `zonas_choferes_desde_simpliroute`.
+  zonaId            String?
+  zonaNombre        String?
+  choferId          String?
+  choferNombre      String?
+  bultos            Int?
+  remito            String?
+  ticket            String? // opcional — Farmapal (§4 funcional)
+  simplirouteId     String?
+  observaciones     String?
   // Cuándo se imprimió por última vez alguna etiqueta de este pedido — null =
   // nunca. §8.1 funcional v6: "estado de impresión de la etiqueta" en la
   // pantalla de Embalaje y Despacho. No impide reimprimir, solo informa.
-  etiquetaImpresaEn    DateTime?
+  etiquetaImpresaEn DateTime?
 
-  grupoFacturacionId   String?
-  reglaAplicada        String? // "2x1" | "UNIFICADA" | "INDIVIDUAL" — informativo, el detalle vive en GrupoFacturacion
+  grupoFacturacionId String?
+  reglaAplicada      String? // "2x1" | "UNIFICADA" | "INDIVIDUAL" — informativo, el detalle vive en GrupoFacturacion
 
-  version              Int               @default(0) // bloqueo optimista — ver nota de convenciones arriba
+  version Int @default(0) // bloqueo optimista — ver nota de convenciones arriba
 
-  creadoEn      DateTime  @default(now())
-  actualizadoEn DateTime  @updatedAt
-  creadoPorId   String?
+  creadoEn         DateTime  @default(now())
+  actualizadoEn    DateTime  @updatedAt
+  creadoPorId      String?
   actualizadoPorId String?
-  eliminadoEn   DateTime?
-  eliminadoPorId String?
+  eliminadoEn      DateTime?
+  eliminadoPorId   String?
 
   cliente          Cliente           @relation(fields: [clienteId], references: [id])
   destinatario     Destinatario      @relation(fields: [destinatarioId], references: [id])
   importacion      ImportacionExcel? @relation(fields: [importacionId], references: [id])
-  zona             Zona?             @relation(fields: [zonaId], references: [id])
-  chofer           Chofer?           @relation(fields: [choferId], references: [id])
   zonaTarifaria    ZonaTarifaria?    @relation(fields: [zonaTarifariaId], references: [id])
   grupoFacturacion GrupoFacturacion? @relation(fields: [grupoFacturacionId], references: [id])
   productos        Producto[]
@@ -413,7 +430,7 @@ model Pedido {
 // Una línea del Excel = un producto. Varios productos + mismo afiliado/dirección/fecha
 // se agrupan en un mismo Pedido (§7 funcional).
 model Producto {
-  id          String @id @default(uuid())
+  id          String  @id @default(uuid())
   pedidoId    String
   codigo      String? // EAN
   descripcion String
@@ -432,13 +449,13 @@ model Producto {
 
 // Historial de porcentaje aplicado a entregas unificadas, con vigencia (mismo criterio que TarifaCliente)
 model PorcentajeSegundoServicio {
-  id            String   @id @default(uuid())
+  id            String    @id @default(uuid())
   clienteId     String
-  porcentaje    Decimal  @db.Decimal(5, 2)
+  porcentaje    Decimal   @db.Decimal(5, 2)
   vigenciaDesde DateTime
   vigenciaHasta DateTime?
 
-  creadoEn    DateTime @default(now())
+  creadoEn    DateTime  @default(now())
   creadoPorId String?
   eliminadoEn DateTime?
 
@@ -448,19 +465,19 @@ model PorcentajeSegundoServicio {
 // Agrupa los pedidos que comparten un viaje facturable (2x1, unificación, o individual).
 // Los pedidos NUNCA se fusionan ni se borran — solo se relacionan acá (§32 funcional).
 model GrupoFacturacion {
-  id               String                 @id @default(uuid())
-  clienteId        String
-  mes              Int
-  anio             Int
-  estado           EstadoGrupoFacturacion @default(BORRADOR) // vista previa hasta confirmar
+  id        String                 @id @default(uuid())
+  clienteId String
+  mes       Int
+  anio      Int
+  estado    EstadoGrupoFacturacion @default(BORRADOR) // vista previa hasta confirmar
 
-  reglaAplicada    String // "2x1" | "UNIFICADA" | "INDIVIDUAL"
-  tarifaUtilizada  Decimal?               @db.Decimal(12, 2)
-  porcentajeAplicado Decimal?             @db.Decimal(5, 2)
-  importeCalculado Decimal                @db.Decimal(12, 2)
+  reglaAplicada      String // "2x1" | "UNIFICADA" | "INDIVIDUAL"
+  tarifaUtilizada    Decimal? @db.Decimal(12, 2)
+  porcentajeAplicado Decimal? @db.Decimal(5, 2)
+  importeCalculado   Decimal  @db.Decimal(12, 2)
 
-  confirmadoEn     DateTime?
-  confirmadoPorId  String?
+  confirmadoEn    DateTime?
+  confirmadoPorId String?
 
   creadoEn DateTime @default(now())
 

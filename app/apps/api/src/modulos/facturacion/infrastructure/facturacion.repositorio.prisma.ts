@@ -221,7 +221,6 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
       where: { clienteId, grupoFacturacion: { mes, anio } },
       include: {
         destinatario: { select: { nombre: true, numeroAfiliado: true } },
-        chofer: { select: { nombre: true } },
         zonaTarifaria: { select: { id: true, nombre: true } },
         grupoFacturacion: true,
       },
@@ -237,7 +236,7 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
       zonaTarifariaId: pedido.zonaTarifaria?.id ?? null,
       zonaTarifariaNombre: pedido.zonaTarifaria?.nombre ?? null,
       tipoServicio: pedido.tipoServicio as unknown as PedidoFacturado["tipoServicio"],
-      choferNombre: pedido.chofer?.nombre ?? null,
+      choferNombre: pedido.choferNombre,
       // grupoFacturacion no puede ser null acá: el `where` de arriba
       // (`grupoFacturacion: { mes, anio }`) ya excluye los pedidos sin grupo.
       grupoId: pedido.grupoFacturacion!.id,

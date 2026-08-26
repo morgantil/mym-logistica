@@ -15,7 +15,9 @@ export interface DatosCrearPedido {
   observaciones: string | null;
   productos: { codigo: string | null; descripcion: string; cantidad: number }[];
   zonaId: string | null;
+  zonaNombre: string | null;
   choferId: string | null;
+  choferNombre: string | null;
   estadoSimpliroute: EstadoSimpliroute;
   estadoValidacion: EstadoValidacion;
 }

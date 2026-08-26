@@ -14,24 +14,24 @@ import {
 // Include compartido por listar() y listarPendientesDeEnvio(): son los únicos
 // dos métodos que devuelven PedidoListado (ver domain/pedido.ts) en vez del
 // Pedido base.
+// Zona/Chofer ya no son relaciones (ver schema.prisma) — `zonaNombre` y
+// `choferNombre` son columnas planas del propio Pedido (snapshot al momento
+// de resolverlas, ver DOCUMENTO TECNICO.md historial 2026-08-26), no hace
+// falta joinearlas.
 const INCLUDE_LISTADO = {
   cliente: { select: { nombre: true } },
   destinatario: { select: { nombre: true } },
-  zona: { select: { nombre: true } },
-  chofer: { select: { nombre: true } },
   productos: { select: { codigo: true, descripcion: true, cantidad: true } },
 } satisfies Prisma.PedidoInclude;
 
 type FilaPedidoListado = Prisma.PedidoGetPayload<{ include: typeof INCLUDE_LISTADO }>;
 
 function mapearListado(fila: FilaPedidoListado): PedidoListado {
-  const { cliente, destinatario, zona, chofer, ...resto } = fila;
+  const { cliente, destinatario, ...resto } = fila;
   return {
     ...(resto as unknown as Pedido),
     clienteNombre: cliente.nombre,
     destinatarioNombre: destinatario.nombre,
-    zonaNombre: zona?.nombre ?? null,
-    choferNombre: chofer?.nombre ?? null,
     productos: fila.productos,
   };
 }
@@ -99,7 +99,9 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
         tipoServicio: datos.tipoServicio as unknown as Prisma.PedidoCreateInput["tipoServicio"],
         observaciones: datos.observaciones,
         zonaId: datos.zonaId,
+        zonaNombre: datos.zonaNombre,
         choferId: datos.choferId,
+        choferNombre: datos.choferNombre,
         estadoSimpliroute:
           datos.estadoSimpliroute as unknown as Prisma.PedidoCreateInput["estadoSimpliroute"],
         estadoValidacion:

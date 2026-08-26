@@ -15,7 +15,6 @@ export interface ResultadoProcesarDestinatario {
 export interface ResultadoSincronizarSimpliRoute {
   encontrado: boolean;
   destinatario: Destinatario;
-  zonaSugerida: string | null;
 }
 
 @Injectable()
@@ -85,9 +84,10 @@ export class DestinatariosService {
   }
 
   // §9, §10, §12 funcional: consulta si el destinatario existe en SimpliRoute.
-  // Si existe, guarda coordenadas/id externo (necesarios para determinar zona
-  // después) y devuelve la zona que sugiera el proveedor (hoy: siempre null,
-  // el mock no tiene con qué sugerir nada — ver LogisticaProviderPort).
+  // Si existe, guarda coordenadas/id externo — necesarios para que
+  // ZonasChoferesService.resolverZonaChofer pueda hacer el point-in-polygon
+  // contra el catálogo de Zonas (ver DOCUMENTO TECNICO.md historial
+  // 2026-08-25/26).
   async sincronizarConSimpliRoute(
     destinatario: Destinatario,
     numeroAfiliado: string,
@@ -97,7 +97,7 @@ export class DestinatariosService {
     );
 
     if (!encontradoEnProveedor) {
-      return { encontrado: false, destinatario, zonaSugerida: null };
+      return { encontrado: false, destinatario };
     }
 
     const actualizado = await this.repositorio.actualizarDatosSimpliRoute(destinatario.id, {
@@ -106,8 +106,6 @@ export class DestinatariosService {
       longitud: encontradoEnProveedor.longitud,
     });
 
-    const zonaSugerida = await this.logisticaProvider.obtenerZonaSugerida(encontradoEnProveedor);
-
-    return { encontrado: true, destinatario: actualizado, zonaSugerida };
+    return { encontrado: true, destinatario: actualizado };
   }
 }

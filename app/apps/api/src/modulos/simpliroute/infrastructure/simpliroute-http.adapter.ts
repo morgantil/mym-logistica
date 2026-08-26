@@ -1,10 +1,15 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
+  ChoferProveedor,
+  DatosChofer,
+  DatosVehiculo,
   DestinatarioEnProveedor,
   LogisticaProviderPort,
   PedidoParaEnviar,
   ResultadoEnvio,
+  VehiculoProveedor,
+  ZonaProveedor,
 } from "../domain/logistica-provider.port";
 
 const BASE_URL = "https://api.simpliroute.com";
@@ -50,6 +55,76 @@ interface ClientSimpliRoute {
 interface VisitaSimpliRoute {
   id: number | string;
   status: string;
+}
+
+// GET /v1/zones/ — Documentacion simpliroute/04 §65-71. Solo lectura pública
+// (sin POST/PUT/PATCH/DELETE) — de ahí que este adapter no tenga métodos de
+// escritura para zonas.
+interface ZonaSimpliRoute {
+  id: number;
+  name: string;
+  coordinates: { lat: string; lng: string }[];
+  vehicles: number[];
+  enabled: boolean;
+  schedules: string[];
+}
+
+// GET/POST/PUT/DELETE /v1/accounts/drivers/ — Documentacion simpliroute/04
+// §44-59. El ejemplo oficial de creación no incluye `is_driver` en el
+// response, pero sí en el request — se asume `activo = is_driver` porque no
+// existe otro campo de estado documentado más confiable ("blocked" aparece
+// en /v1/accounts/me/ pero no está confirmado en list/retrieve de drivers).
+interface ChoferSimpliRoute {
+  id: number;
+  username: string;
+  name: string;
+  phone: string;
+  email: string;
+  is_driver: boolean;
+  blocked?: boolean;
+}
+
+// GET/POST/PATCH/PUT/DELETE /v1/routes/vehicles/ — Documentacion simpliroute/04
+// §4-41. A diferencia de Drivers, el root de create/update es un objeto, no
+// un array (ver ejemplo oficial "Crear Vehicle").
+interface VehiculoSimpliRoute {
+  id: number;
+  name: string;
+  license_plate: string | null;
+  default_driver: number | string | null;
+  status: string;
+}
+
+function mapearZona(zona: ZonaSimpliRoute): ZonaProveedor {
+  return {
+    id: zona.id,
+    nombre: zona.name,
+    habilitada: zona.enabled,
+    dias: zona.schedules,
+    poligono: zona.coordinates.map((c) => ({ lat: Number(c.lat), lng: Number(c.lng) })),
+    vehiculosIds: zona.vehicles,
+  };
+}
+
+function mapearChofer(chofer: ChoferSimpliRoute): ChoferProveedor {
+  return {
+    id: chofer.id,
+    nombre: chofer.name,
+    username: chofer.username,
+    telefono: chofer.phone || null,
+    email: chofer.email || null,
+    activo: chofer.is_driver && chofer.blocked !== true,
+  };
+}
+
+function mapearVehiculo(vehiculo: VehiculoSimpliRoute): VehiculoProveedor {
+  return {
+    id: vehiculo.id,
+    nombre: vehiculo.name,
+    patente: vehiculo.license_plate || null,
+    choferPredeterminadoId: vehiculo.default_driver !== null ? Number(vehiculo.default_driver) : null,
+    estado: vehiculo.status,
+  };
 }
 
 // Adapter real — reemplaza a SimplirouteMockAdapter cuando SIMPLIROUTE_MOCK=false
@@ -138,18 +213,6 @@ export class SimplirouteHttpAdapter implements LogisticaProviderPort {
     }
   }
 
-  // No existe en la documentación pública ningún endpoint de "sugerencia de
-  // zona por dirección" — GET /v1/zones/ solo lista zonas ya configuradas en
-  // la cuenta, no resuelve cuál corresponde a una dirección puntual. Sigue
-  // devolviendo null a propósito (§12 funcional; ver comentario en el
-  // puerto) — el fallback por localidad de ZonasChoferesService se sigue
-  // usando siempre hasta que se confirme otra vía (ForceField/Territory
-  // Planner requiere el addon `territory_planner`, no viene activado por
-  // defecto).
-  async obtenerZonaSugerida(_destinatario: DestinatarioEnProveedor): Promise<string | null> {
-    return null;
-  }
-
   // §18 funcional: crea una Visit. `load` = bultos es una interpretación —
   // SimpliRoute no define la unidad de `load` (depende de configuración de
   // cuenta, Documentacion simpliroute/05 §13) — a confirmar con la cuenta
@@ -186,5 +249,104 @@ export class SimplirouteHttpAdapter implements LogisticaProviderPort {
       `/v1/routes/visits/${encodeURIComponent(idExterno)}/`,
     );
     return primerElemento(respuesta).status;
+  }
+
+  // §12 funcional. Solo lectura pública (Documentacion simpliroute/04 §65-71) —
+  // ZonasChoferesService cachea el resultado, esto nunca se llama en cada
+  // request de la app.
+  async listarZonas(): Promise<ZonaProveedor[]> {
+    const zonas = await this.solicitar<ZonaSimpliRoute[]>("GET", "/v1/zones/");
+    return zonas.map(mapearZona);
+  }
+
+  async listarChoferes(): Promise<ChoferProveedor[]> {
+    const choferes = await this.solicitar<ChoferSimpliRoute[]>("GET", "/v1/accounts/drivers/");
+    return choferes.filter((c) => c.is_driver).map(mapearChofer);
+  }
+
+  // Root array según ejemplo oficial (Documentacion simpliroute/04 §48),
+  // aunque se cree un solo chofer.
+  async crearChofer(datos: DatosChofer): Promise<ChoferProveedor> {
+    const body = [
+      {
+        username: datos.username,
+        name: datos.nombre,
+        phone: datos.telefono ?? "",
+        email: datos.email ?? "",
+        is_admin: false,
+        is_driver: true,
+        password: datos.password,
+      },
+    ];
+    const respuesta = await this.solicitar<ChoferSimpliRoute | ChoferSimpliRoute[]>(
+      "POST",
+      "/v1/accounts/drivers/",
+      body,
+    );
+    return mapearChofer(primerElemento(respuesta));
+  }
+
+  // Solo PUT está documentado para Users (no PATCH) — ver DatosChofer.password
+  // en el puerto para la ambigüedad de qué pasa si se omite la contraseña.
+  async actualizarChofer(id: number, datos: DatosChofer): Promise<ChoferProveedor> {
+    const body = [
+      {
+        username: datos.username,
+        name: datos.nombre,
+        phone: datos.telefono ?? "",
+        email: datos.email ?? "",
+        is_admin: false,
+        ...(datos.password ? { password: datos.password } : {}),
+      },
+    ];
+    const respuesta = await this.solicitar<ChoferSimpliRoute | ChoferSimpliRoute[]>(
+      "PUT",
+      `/v1/accounts/drivers/${id}/`,
+      body,
+    );
+    return mapearChofer(primerElemento(respuesta));
+  }
+
+  async eliminarChofer(id: number): Promise<void> {
+    await this.solicitar<void>("DELETE", `/v1/accounts/drivers/${id}/`);
+  }
+
+  async listarVehiculos(): Promise<VehiculoProveedor[]> {
+    const vehiculos = await this.solicitar<VehiculoSimpliRoute[]>("GET", "/v1/routes/vehicles/");
+    return vehiculos.map(mapearVehiculo);
+  }
+
+  // Root objeto (no array) según ejemplo oficial de Vehicle — a diferencia de Drivers.
+  async crearVehiculo(datos: DatosVehiculo): Promise<VehiculoProveedor> {
+    const body = {
+      name: datos.nombre,
+      license_plate: datos.patente ?? undefined,
+      default_driver: datos.choferPredeterminadoId ?? null,
+    };
+    const vehiculo = await this.solicitar<VehiculoSimpliRoute>("POST", "/v1/routes/vehicles/", body);
+    return mapearVehiculo(vehiculo);
+  }
+
+  // PATCH está documentado como actualización parcial para Vehicle (a
+  // diferencia de Users, que solo tiene PUT) — se usa acá para no pisar
+  // campos que esta app no administra.
+  async actualizarVehiculo(id: number, datos: DatosVehiculo): Promise<VehiculoProveedor> {
+    const body = {
+      name: datos.nombre,
+      ...(datos.patente !== undefined ? { license_plate: datos.patente } : {}),
+      ...(datos.choferPredeterminadoId !== undefined
+        ? { default_driver: datos.choferPredeterminadoId }
+        : {}),
+    };
+    const vehiculo = await this.solicitar<VehiculoSimpliRoute>(
+      "PATCH",
+      `/v1/routes/vehicles/${id}/`,
+      body,
+    );
+    return mapearVehiculo(vehiculo);
+  }
+
+  async eliminarVehiculo(id: number): Promise<void> {
+    await this.solicitar<void>("DELETE", `/v1/routes/vehicles/${id}/`);
   }
 }

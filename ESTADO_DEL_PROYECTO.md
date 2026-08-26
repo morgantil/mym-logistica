@@ -1,6 +1,6 @@
 # ESTADO DEL PROYECTO — leer esto primero si retomás después de una pausa
 
-Última actualización: **2026-08-18**. Este documento es una **foto del momento**, se
+Última actualización: **2026-08-25**. Este documento es una **foto del momento**, se
 reescribe cada vez que cambia el estado — no es un historial (eso vive en
 `DOCUMENTO TECNICO.md` sección 7). Si algo acá contradice el código o
 `DOCUMENTO TECNICO.md`, confiá en esos dos, no en esto — puede haber quedado viejo.
@@ -72,7 +72,7 @@ Repo Git en la raíz de `MYM/`, rama **`develop`**, remoto en
 | Destinatarios | 🟢 completo | padrón, detección de diferencia de dirección, sync con SimpliRoute |
 | Pedidos | 🟢 completo | grilla paginada, N.º de pedido interno, bultos, revisión antes de enviar, envío a SimpliRoute, bloqueo optimista |
 | Importadores | 🟢 completo | mapeo de columnas genérico, agrupación. **Fecha de entrega ahora la informa el usuario antes de subir el Excel** (2026-08-17, no se extrae más del archivo). Probado con los 3 Excel reales: 207 pedidos, 0 errores |
-| Zonas/choferes (logística) | 🟢 completo | configurado a mano, CRUD + asignación zona↔chofer. **No se va a importar desde SimpliRoute** (decisión 2026-08-17) — SimpliRoute resuelve la asignación real del otro lado |
+| Zonas/choferes (logística) | 🟢 completo (rediseñado 2026-08-26) | Se trae en vivo de SimpliRoute con cache local (refresco perezoso + "Sincronizar ahora") — Choferes/Vehículos con alta/edición/baja completas contra SimpliRoute, Zonas de solo lectura. La zona de un pedido se resuelve con point-in-polygon contra el destinatario geocodificado. Revierte la decisión del 2026-08-17. Falta solo probar las escrituras de Choferes/Vehículos contra la cuenta real (ver `TEMAS_PENDIENTES.md` sección 2) |
 | Zonas tarifarias (facturación) | 🟢 completo (2026-08-17) | reemplaza el enum fijo CABA/Provincia por un modelo configurable (CABA + Cordón 1/2/3/…) — tabla + pantalla propia, sin código nuevo para agregar una zona |
 | Embalaje y Despacho | 🟢 completo (2026-08-17) | pantalla nueva: filtra por fecha/cliente/estado, carga de bultos, genera/reimprime etiquetas en PDF (una por bulto) |
 | SimpliRoute | 🟢 **validado con la cuenta real**, sigue en modo mock por decisión | token real probado en lectura y escritura (2026-08-16) contra `MYM LOGISTICA Y DISTRIBUCION SRL`. `SIMPLIROUTE_MOCK=true` por decisión de timing de Leonardo, no por duda técnica. **No se va a construir importación de Zonas/Choferes** — sí una sincronización de estados (+ chofer/vehículo asignado), bloqueada por el nombre de un estado nuevo que Leonardo va a agregar del lado de SimpliRoute — ver `TEMAS_PENDIENTES.md` sección 2. |
@@ -106,6 +106,7 @@ Resumen de lo más importante, todo del lado de Leonardo o del cliente final
 4. Tamaño/impresora real de la etiqueta de bulto (se usó un default de 10×15cm).
 5. Reglas de tratamiento de entregas fallidas/canceladas/reentregas.
 6. Qué cuenta de Google usar para el login, y logo real de MyM.
+7. Probar alta/edición/baja de Choferes y Vehículos contra la cuenta real de SimpliRoute (construido y probado en mock; las escrituras reales las tiene que correr Leonardo, mismo bloqueo de siempre para el entorno de Claude Code).
 
 ## Decisiones que ya están tomadas — no volver a discutir sin motivo nuevo
 
@@ -121,7 +122,7 @@ Resumen de lo más importante, todo del lado de Leonardo o del cliente final
 - CABA/Provincia se resuelve con la API oficial del Estado, no con catálogo manual.
 - Zona logística: manual/configurable a mano — no derivada de datos oficiales.
 - Zona tarifaria (facturación): tabla configurable, no un enum fijo — se puede agregar/renombrar una zona sin tocar código (2026-08-17).
-- SimpliRoute: no se importan Zonas/Choferes propios — se sincronizan estados y asignación (chofer/vehículo) después de enviar el pedido, nunca antes (2026-08-17).
+- SimpliRoute: Zonas/Choferes/Vehículos se consultan en vivo desde SimpliRoute (CRUD donde la API lo permite — Choferes y Vehículos —, solo lectura donde no — Zonas), construido y probado en navegador real (modo mock) el 2026-08-26 — revierte la decisión anterior de manejarlos a mano en MyM (2026-08-17, ver `TEMAS_PENDIENTES.md`).
 - Despliegue de test: Render + Vercel, free tier. Producción real es un proyecto aparte, todavía sin decidir cuándo armarlo.
 
 ## Cómo levantar esto si volvés en frío

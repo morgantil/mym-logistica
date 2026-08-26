@@ -1,6 +1,6 @@
 # TEMAS PENDIENTES — vista consolidada de todo lo que falta
 
-Última actualización: **2026-08-17**. Documento vivo, separado de `PENDIENTES.md`
+Última actualización: **2026-08-26**. Documento vivo, separado de `PENDIENTES.md`
 (ese sigue con el detalle histórico de despliegue/credenciales). Este junta
 **todo** lo que queda para terminar el proyecto — técnico, de negocio y de
 assets — en un solo lugar.
@@ -29,21 +29,28 @@ navegador real — ver `DOCUMENTO TECNICO.md` historial 2026-08-17.
 | 1.3 | Concepto "Subcliente" (Bulto/Bolsa por cliente) | Nosotros, cuando arranque Etapa 2 | No existe en el schema. No bloquea nada hoy. |
 | 1.4 | Cargar las localidades reales en "Localidades por zona" | Leonardo / Cliente final | Facturación → Zonas tarifarias ya funciona, pero está vacía. Sin esto, los pedidos de Provincia no se pueden facturar (quedan "sin zona tarifaria"). |
 
-## 2. SimpliRoute — arquitectura definida el 2026-08-17
+## 2. SimpliRoute — Zonas/Choferes/Vehículos construido el 2026-08-26 (revierte lo del 2026-08-17)
 
-**No se va a construir ninguna importación de Zonas/Choferes.** El sistema
-propio no tiene (ni va a tener) carga manual de esos datos como copia de
-SimpliRoute — se investigó contra la documentación oficial: los campos
-`driver`/`vehicle` de una Visita quedan vacíos hasta que SimpliRoute arma la
-ruta en su Route Designer, no hay forma de "consultar antes". Se resuelve
-solo, como parte de la misma sincronización de estados (punto 2.2).
+**Construido de punta a punta** con luz verde explícita de Leonardo. Principio
+general para toda la integración con SimpliRoute, no solo para esto:
+SimpliRoute es la fuente de verdad. En los recursos donde su API pública
+permite CRUD (Choferes, Vehículos) MyM lee **y** edita directo contra
+SimpliRoute. En los recursos de solo lectura (Zonas, y también Fleets/Skills
+si algún día hicieran falta) MyM solo trae y muestra — cualquier alta o
+edición de Zona sigue haciéndose en SimpliRoute. Detalle completo en
+`DOCUMENTO TECNICO.md` historial 2026-08-26 y en el README de
+`zonas-choferes/`.
 
 | # | Pendiente | Dueño | Detalle |
 |---|---|---|---|
-| 2.1 | Sincronización de estados (+ chofer/vehículo asignado) | Nosotros, bloqueado por 2.2 | Reemplaza los 6 estados propios (`EstadoPedido`) por los reales de SimpliRoute (`pending`, `completed`, `failed`, + un estado inicial nuevo). Afecta Facturación (hoy filtra por `ENTREGADO`) y Dashboard — no se puede programar sin el nombre del estado nuevo. |
-| 2.2 | Nombre del estado inicial nuevo en SimpliRoute | Leonardo | SimpliRoute no tiene hoy un estado para "recién creado" — Leonardo/su equipo lo va a agregar en la configuración de la cuenta y pasarnos el nombre. Bloquea 2.1. |
-| 2.3 | Probar el envío real de un pedido (crear una Visita) | Nosotros, coordinado con Leonardo | Única operación del adapter nunca probada contra la cuenta real — a propósito, es la única que podría aparecerle a un chofer real. Adapter ya construido. Hacer la prueba con cuidado y borrar el registro de prueba después. |
-| 2.4 | Activar modo real (`SIMPLIROUTE_MOCK=false`) | Leonardo decide cuándo | Sin duda técnica pendiente — es 100% timing de negocio. |
+| 2.1 | ~~Rediseñar el módulo `zonas-choferes/`~~ | ✅ Construido 2026-08-26 | Cache local (3 tablas nuevas) sincronizado desde SimpliRoute, refresco perezoso (TTL 15 min) + botón "Sincronizar ahora". Sin BullMQ/Redis — nunca se llegaron a usar en este proyecto, con 11/12/17 registros reales no hace falta un job real. Probado en navegador real (modo mock). |
+| 2.2 | ~~Point-in-polygon para resolver zona~~ | ✅ Construido 2026-08-26 | `zonas-choferes/domain/punto-en-poligono.ts`, 8 tests. Se resuelve al mismo tiempo que CABA/Provincia, con fallback a coincidencia por localidad si no hay coordenadas o no matchea ninguna zona. |
+| 2.3 | ~~Confirmar addon de Zonas habilitado~~ | ✅ Resuelto 2026-08-26 | Confirmado con `GET /v1/zones/` real: **11 zonas** activas. También `GET /v1/routes/vehicles/` (12) y `GET /v1/accounts/drivers/` (17). Sin ninguna escritura contra la cuenta real. |
+| 2.4 | Probar escritura de Choferes/Vehículos contra la cuenta real | Leonardo (mismo patrón que 2.6) | `crearChofer`/`actualizarChofer`/`eliminarChofer`/`crearVehiculo`/`actualizarVehiculo`/`eliminarVehiculo` están construidos y con `SIMPLIROUTE_MOCK=true` funcionan de punta a punta, pero nunca se probaron contra la cuenta real — el entorno de Claude Code bloquea escrituras contra servicios externos reales (mismo bloqueo ya documentado para Destinatario). Si se quiere confirmar antes de confiar en esto en producción, correrlo manualmente. |
+| 2.5 | Sincronización de estados (+ chofer/vehículo asignado a un pedido puntual) | Nosotros, bloqueado por 2.6 | Reemplaza los 6 estados propios (`EstadoPedido`) por los reales de SimpliRoute (`pending`, `completed`, `failed`, + un estado inicial nuevo). Afecta Facturación (hoy filtra por `ENTREGADO`) y Dashboard. Distinto del catálogo de Zonas/Choferes/Vehículos de arriba: acá se trata del chofer/vehículo que terminó atendiendo un pedido específico, que sigue sin estar disponible hasta que SimpliRoute arma la ruta en su Route Designer. |
+| 2.6 | Nombre del estado inicial nuevo en SimpliRoute | Leonardo | SimpliRoute no tiene hoy un estado para "recién creado" — Leonardo/su equipo lo va a agregar en la configuración de la cuenta y pasarnos el nombre. Bloquea 2.5. |
+| 2.7 | Probar el envío real de un pedido (crear una Visita) | Nosotros, coordinado con Leonardo | Única operación del adapter de Pedidos nunca probada contra la cuenta real — a propósito, es la única que podría aparecerle a un chofer real. Adapter ya construido. Hacer la prueba con cuidado y borrar el registro de prueba después. |
+| 2.8 | Activar modo real (`SIMPLIROUTE_MOCK=false`) | Leonardo decide cuándo | Sin duda técnica pendiente — es 100% timing de negocio. |
 
 ## 3. Etiquetas de envío y Embalaje y Despacho — ✅ construidas y probadas (2026-08-17)
 

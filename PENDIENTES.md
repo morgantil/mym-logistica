@@ -1,6 +1,6 @@
 # PENDIENTES — todo lo que falta y de quién depende
 
-Última actualización: **2026-08-17**. Documento vivo — se actualiza cada vez
+Última actualización: **2026-08-25**. Documento vivo — se actualiza cada vez
 que se resuelve o aparece un pendiente nuevo. Si algo de acá ya se resolvió y
 este archivo no lo refleja, confiá en `ESTADO_DEL_PROYECTO.md`/`DOCUMENTO
 TECNICO.md`, no en esto.
@@ -36,20 +36,19 @@ Cómo leer la columna "Dueño":
 | 2.2 | Token real de la API de SimpliRoute | ✅ **Resuelto (2026-08-16)** | Conseguido desde la pantalla de Perfil de la cuenta real (`MYM LOGISTICA Y DISTRIBUCION SRL`) y probado contra la API real: lectura (`GET /v1/accounts/me/`, búsqueda de destinatario, estados reales) **y** escritura (crear/actualizar/borrar un destinatario de prueba, ciclo completo verificado sin dejar rastro en la cuenta real). Guardado en `app/apps/api/.env` (nunca en Git). **Sigue en `SIMPLIROUTE_MOCK="true"`** — de las 10 validaciones técnicas del §36 funcional, 9 ya están confirmadas contra la API real; solo falta decidir con Leonardo cuándo pasar a real (decisión de negocio/timing, ya no de riesgo técnico) y la arquitectura webhook vs. polling. Ver detalle en `DOCUMENTO TECNICO.md` sección 4 e historial 2026-08-16. |
 | 2.3 | Storage de archivos Excel (Cloudflare R2) | Leonardo crea la cuenta (si no existe una de MyM) | No bloquea nada — los Excel se procesan igual, solo no se archivan para poder "descargar el original" después. Baja prioridad. |
 
-## 2.5 SimpliRoute — arquitectura definida el 2026-08-17
+## 2.5 SimpliRoute — Zonas/Choferes/Vehículos construido el 2026-08-26 (revierte lo del 2026-08-17)
 
-**Descartada la importación de Zonas/Choferes** — el sistema no va a tener
-carga manual propia de eso como copia de SimpliRoute. Se investigó contra la
-documentación oficial: la asignación real de chofer/vehículo la resuelve
-SimpliRoute en su Route Designer, después de enviar el pedido, no antes —
-no hay endpoint para "consultarla" de antemano. Se resuelve sola, como parte
-de la sincronización de estados.
+**Construido de punta a punta** — Zonas se trae de SimpliRoute de solo
+lectura, Choferes y Vehículos se traen y también se pueden crear/editar/
+borrar desde MyM porque su API sí tiene CRUD completo. Falta solo probar las
+escrituras de Choferes/Vehículos contra la cuenta real (mismo bloqueo de
+siempre para escrituras desde el entorno de Claude Code). Detalle completo y
+lista de pendientes actualizada en `TEMAS_PENDIENTES.md` sección 2 — ese
+documento es el más al día para este tema.
 
 | # | Pendiente | Dueño | Detalle |
 |---|---|---|---|
 | 2.5.1 | Activar modo real (`SIMPLIROUTE_MOCK=false`) | Leonardo decide cuándo | El token ya funciona, probado en lectura y escritura (2026-08-16). Ya no es una duda técnica — es decidir el momento en que el sistema empiece a mandar tráfico real a tu cuenta de SimpliRoute. |
-| 2.5.2 | Sincronización de estados (+ chofer/vehículo) | Nosotros, bloqueado por 2.5.3 | Reemplaza los 6 estados propios por los reales de SimpliRoute (`pending`, `completed`, `failed`, + un estado inicial nuevo). Afecta Facturación y Dashboard — no se puede programar sin el nombre del estado nuevo. |
-| 2.5.3 | Nombre del estado inicial nuevo en SimpliRoute | Leonardo | SimpliRoute no tiene hoy un estado para "recién creado" — Leonardo/su equipo lo agrega del lado de la cuenta de SimpliRoute y nos pasa el nombre. Bloquea 2.5.2. |
 
 ## 3. Decisiones de negocio pendientes (no técnicas)
 

@@ -1,121 +1,262 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../../common/prisma/prisma.service";
+import {
+  DatosChofer,
+  DatosVehiculo,
+  LOGISTICA_PROVIDER,
+  LogisticaProviderPort,
+} from "../../simpliroute/domain/logistica-provider.port";
+import { Coordenada, encontrarZona } from "../domain/punto-en-poligono";
 
-// Sin regla de negocio propia todavía (a diferencia de clientes/destinatarios) —
-// mapeo directo a Prisma sin separación domain/application/infrastructure.
-// Si en algún momento "asignar chofer según zona" (§13 funcional) crece en
-// complejidad, ahí sí se justifica partirlo siguiendo el patrón de clientes/.
+export interface ResultadoZonaChofer {
+  zonaId: string | null;
+  zonaNombre: string | null;
+  choferId: string | null;
+  choferNombre: string | null;
+}
+
+// Cache de solo lectura de Zonas/Choferes/Vehículos de SimpliRoute — decisión
+// 2026-08-25/26 (ver DOCUMENTO TECNICO.md historial): SimpliRoute es la
+// fuente de verdad, acá solo se guarda una copia sincronizada para que las
+// pantallas no dependan de pegarle a la API en cada request. Sin BullMQ/Redis
+// (nunca se llegó a usar en este proyecto — ver historial): el refresco es
+// perezoso (si el cache está vencido, se refresca antes de responder la
+// próxima lectura) más un botón explícito de "sincronizar ahora" en el
+// frontend. Con 11 zonas / 12 vehículos / 17 choferes reales, esto alcanza —
+// si el catálogo creciera mucho, ahí sí valdría la pena un job real.
 @Injectable()
 export class ZonasChoferesService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(ZonasChoferesService.name);
+  private static readonly TTL_CACHE_MS = 15 * 60 * 1000;
 
-  listarZonas() {
-    return this.prisma.zona.findMany({ orderBy: { nombre: "asc" } });
-  }
+  constructor(
+    private prisma: PrismaService,
+    @Inject(LOGISTICA_PROVIDER) private readonly logisticaProvider: LogisticaProviderPort,
+  ) {}
 
-  // Para la pantalla de administración: cada zona con su chofer activo
-  // actual (si tiene) — misma noción de "chofer de la zona" que usa
-  // choferPorZona más abajo, solo que para las N zonas de una.
-  async listarZonasConChofer() {
-    const zonas = await this.prisma.zona.findMany({
-      orderBy: { nombre: "asc" },
-      include: { choferes: { where: { activo: true }, include: { chofer: true }, take: 1 } },
+  // El "chofer asignado" que se muestra por zona es informativo (mismo
+  // criterio que resolverZonaChofer: primer vehículo de la zona → su chofer
+  // predeterminado) — no es una relación editable acá, solo refleja lo que
+  // ya está configurado en SimpliRoute.
+  async listarZonas() {
+    await this.asegurarCacheFresca();
+    const [zonas, vehiculos, choferes] = await Promise.all([
+      this.prisma.zonaSimpliRouteCache.findMany({ orderBy: { nombre: "asc" } }),
+      this.prisma.vehiculoSimpliRouteCache.findMany(),
+      this.prisma.choferSimpliRouteCache.findMany(),
+    ]);
+    const vehiculoPorId = new Map(vehiculos.map((v) => [v.id, v]));
+    const choferPorId = new Map(choferes.map((c) => [c.id, c]));
+
+    return zonas.map((zona) => {
+      const vehiculo = zona.vehiculosIds[0] !== undefined ? vehiculoPorId.get(zona.vehiculosIds[0]) : undefined;
+      const chofer =
+        vehiculo?.choferPredeterminadoId !== null && vehiculo?.choferPredeterminadoId !== undefined
+          ? choferPorId.get(vehiculo.choferPredeterminadoId)
+          : undefined;
+
+      return {
+        id: zona.id,
+        nombre: zona.nombre,
+        habilitada: zona.habilitada,
+        dias: zona.dias,
+        vehiculosIds: zona.vehiculosIds,
+        chofer: chofer ? { id: chofer.id, nombre: chofer.nombre } : null,
+      };
     });
-    return zonas.map(({ choferes, ...zona }) => ({
-      ...zona,
-      chofer: choferes[0]?.chofer ?? null,
-    }));
   }
 
-  async crearZona(nombre: string) {
-    return this.prisma.zona.create({ data: { nombre } });
+  async listarChoferes() {
+    await this.asegurarCacheFresca();
+    return this.prisma.choferSimpliRouteCache.findMany({ orderBy: { nombre: "asc" } });
   }
 
-  async actualizarZona(id: string, nombre: string) {
-    await this.asegurarQueExisteZona(id);
-    return this.prisma.zona.update({ where: { id }, data: { nombre } });
+  async listarVehiculos() {
+    await this.asegurarCacheFresca();
+    return this.prisma.vehiculoSimpliRouteCache.findMany({ orderBy: { nombre: "asc" } });
   }
 
-  // §12-§13 funcional: asigna (o quita, si choferId es null) el chofer de una
-  // zona. Una zona tiene un solo chofer "activo" a la vez en la práctica —
-  // choferPorZona ya tomaba el primero, así que reasignar desactiva cualquier
-  // relación previa en vez de acumularlas.
-  async asignarChofer(zonaId: string, choferId: string | null) {
-    await this.asegurarQueExisteZona(zonaId);
+  async crearChofer(datos: DatosChofer) {
+    const creado = await this.logisticaProvider.crearChofer(datos);
+    await this.sincronizar();
+    return creado;
+  }
 
-    await this.prisma.zonaChofer.updateMany({
-      where: { zonaId, activo: true },
-      data: { activo: false },
+  async actualizarChofer(id: number, datos: DatosChofer) {
+    const actualizado = await this.logisticaProvider.actualizarChofer(id, datos);
+    await this.sincronizar();
+    return actualizado;
+  }
+
+  async eliminarChofer(id: number) {
+    await this.logisticaProvider.eliminarChofer(id);
+    await this.sincronizar();
+  }
+
+  async crearVehiculo(datos: DatosVehiculo) {
+    const creado = await this.logisticaProvider.crearVehiculo(datos);
+    await this.sincronizar();
+    return creado;
+  }
+
+  async actualizarVehiculo(id: number, datos: DatosVehiculo) {
+    const actualizado = await this.logisticaProvider.actualizarVehiculo(id, datos);
+    await this.sincronizar();
+    return actualizado;
+  }
+
+  async eliminarVehiculo(id: number) {
+    await this.logisticaProvider.eliminarVehiculo(id);
+    await this.sincronizar();
+  }
+
+  // Refresco completo y explícito — botón "Sincronizar ahora" del frontend,
+  // y también lo que dispara internamente cada alta/edición/baja de arriba
+  // para que el cache nunca quede desactualizado respecto de lo que se
+  // acaba de escribir en SimpliRoute.
+  async sincronizar() {
+    const [zonas, choferes, vehiculos] = await Promise.all([
+      this.logisticaProvider.listarZonas(),
+      this.logisticaProvider.listarChoferes(),
+      this.logisticaProvider.listarVehiculos(),
+    ]);
+
+    await this.prisma.$transaction([
+      this.prisma.zonaSimpliRouteCache.deleteMany({}),
+      this.prisma.choferSimpliRouteCache.deleteMany({}),
+      this.prisma.vehiculoSimpliRouteCache.deleteMany({}),
+      ...zonas.map((zona) =>
+        this.prisma.zonaSimpliRouteCache.create({
+          data: {
+            id: zona.id,
+            nombre: zona.nombre,
+            habilitada: zona.habilitada,
+            dias: zona.dias,
+            poligono: zona.poligono as unknown as Prisma.InputJsonValue,
+            vehiculosIds: zona.vehiculosIds,
+          },
+        }),
+      ),
+      ...choferes.map((chofer) =>
+        this.prisma.choferSimpliRouteCache.create({
+          data: {
+            id: chofer.id,
+            nombre: chofer.nombre,
+            username: chofer.username,
+            telefono: chofer.telefono,
+            email: chofer.email,
+            activo: chofer.activo,
+          },
+        }),
+      ),
+      ...vehiculos.map((vehiculo) =>
+        this.prisma.vehiculoSimpliRouteCache.create({
+          data: {
+            id: vehiculo.id,
+            nombre: vehiculo.nombre,
+            patente: vehiculo.patente,
+            choferPredeterminadoId: vehiculo.choferPredeterminadoId,
+            estado: vehiculo.estado,
+          },
+        }),
+      ),
+    ]);
+
+    this.logger.log(
+      `Sincronizado con SimpliRoute: ${zonas.length} zonas, ${choferes.length} choferes, ${vehiculos.length} vehículos.`,
+    );
+    return { zonas: zonas.length, choferes: choferes.length, vehiculos: vehiculos.length };
+  }
+
+  private async asegurarCacheFresca() {
+    const masReciente = await this.prisma.zonaSimpliRouteCache.findFirst({
+      orderBy: { sincronizadoEn: "desc" },
+      select: { sincronizadoEn: true },
     });
 
-    if (choferId) {
-      await this.prisma.zonaChofer.upsert({
-        where: { zonaId_choferId: { zonaId, choferId } },
-        create: { zonaId, choferId, activo: true },
-        update: { activo: true },
-      });
+    const vencido =
+      !masReciente || Date.now() - masReciente.sincronizadoEn.getTime() > ZonasChoferesService.TTL_CACHE_MS;
+
+    if (!vencido) return;
+
+    try {
+      await this.sincronizar();
+    } catch (error) {
+      // Si SimpliRoute está caído, seguimos con lo que haya en cache
+      // (aunque esté vencido) en vez de romper toda la pantalla — mismo
+      // criterio que el resto de la integración (nunca frenar el resto de
+      // la app por un problema puntual de red con SimpliRoute).
+      this.logger.warn(
+        `No se pudo refrescar el cache de SimpliRoute, se sigue usando el último conocido: ${error instanceof Error ? error.message : error}`,
+      );
     }
-
-    return this.listarZonasConChofer().then((zonas) => zonas.find((z) => z.id === zonaId));
-  }
-
-  private async asegurarQueExisteZona(id: string) {
-    const zona = await this.prisma.zona.findUnique({ where: { id } });
-    if (!zona) throw new NotFoundException(`Zona ${id} no encontrada.`);
-  }
-
-  listarChoferes() {
-    return this.prisma.chofer.findMany({ where: { activo: true }, orderBy: { nombre: "asc" } });
-  }
-
-  listarTodosLosChoferes() {
-    return this.prisma.chofer.findMany({ orderBy: { nombre: "asc" } });
-  }
-
-  async crearChofer(nombre: string) {
-    return this.prisma.chofer.create({ data: { nombre } });
-  }
-
-  async actualizarChofer(id: string, datos: { nombre?: string; activo?: boolean }) {
-    const chofer = await this.prisma.chofer.findUnique({ where: { id } });
-    if (!chofer) throw new NotFoundException(`Chofer ${id} no encontrado.`);
-    return this.prisma.chofer.update({ where: { id }, data: datos });
-  }
-
-  // §13 funcional: "Se consulta la relación zona/chofer. Se asigna el chofer
-  // correspondiente." — si no hay relación activa, el pedido queda "Chofer sin asignar".
-  async choferPorZona(zonaId: string) {
-    const relacion = await this.prisma.zonaChofer.findFirst({
-      where: { zonaId, activo: true },
-      include: { chofer: true },
-    });
-    return relacion?.chofer ?? null;
   }
 
   // §12-§13 funcional, orquestado: zona → chofer, en un solo paso para que lo
   // use el importador al crear pedidos.
   //
-  // Orden de prioridad para la zona: (1) lo que sugiera SimpliRoute — hoy
-  // siempre null, ver LogisticaProviderPort — (2) coincidencia por nombre
-  // contra la localidad del pedido, como fallback débil y configurable
-  // (cargando Zonas con el mismo nombre que las localidades reales). Si
-  // ninguna de las dos resuelve algo, "Zona sin identificar" / "Chofer sin
-  // asignar", tal cual pide el documento funcional — no se inventa una zona.
+  // Prioridad para resolver la zona: (1) point-in-polygon contra las
+  // coordenadas del destinatario, si SimpliRoute ya las tiene geocodificadas
+  // (2) fallback débil por coincidencia de nombre contra la localidad, igual
+  // que antes. Si ninguna resuelve algo, "Zona sin identificar" / "Chofer sin
+  // asignar" tal cual pide el documento funcional — no se inventa una zona.
+  // El chofer sale de mirar el primer vehículo asignado a la zona en
+  // SimpliRoute y su conductor predeterminado — si la zona no tiene ningún
+  // vehículo asignado (o el vehículo no tiene chofer predeterminado), queda
+  // "Chofer sin asignar" igual aunque la zona sí se haya identificado.
   async resolverZonaChofer(
-    nombreZonaSugerida: string | null,
+    latitud: number | null,
+    longitud: number | null,
     localidadFallback: string,
-  ): Promise<{ zonaId: string | null; choferId: string | null }> {
-    const nombreABuscar = nombreZonaSugerida ?? localidadFallback;
+  ): Promise<ResultadoZonaChofer> {
+    await this.asegurarCacheFresca();
 
-    const zona = await this.prisma.zona.findFirst({
-      where: { nombre: { equals: nombreABuscar, mode: "insensitive" } },
+    const zonasHabilitadas = await this.prisma.zonaSimpliRouteCache.findMany({
+      where: { habilitada: true },
     });
+    const candidatas = zonasHabilitadas.map((zona) => ({
+      ...zona,
+      poligono: zona.poligono as unknown as Coordenada[],
+    }));
 
-    if (!zona) {
-      return { zonaId: null, choferId: null };
+    let zonaEncontrada: (typeof candidatas)[number] | null = null;
+
+    if (latitud !== null && longitud !== null) {
+      zonaEncontrada = encontrarZona({ lat: latitud, lng: longitud }, candidatas);
     }
 
-    const chofer = await this.choferPorZona(zona.id);
-    return { zonaId: zona.id, choferId: chofer?.id ?? null };
+    if (!zonaEncontrada) {
+      zonaEncontrada =
+        candidatas.find((zona) => zona.nombre.toLowerCase() === localidadFallback.toLowerCase()) ?? null;
+    }
+
+    if (!zonaEncontrada) {
+      return { zonaId: null, zonaNombre: null, choferId: null, choferNombre: null };
+    }
+
+    const vehiculoId = zonaEncontrada.vehiculosIds[0] ?? null;
+    let choferId: number | null = null;
+    let choferNombre: string | null = null;
+
+    if (vehiculoId !== null) {
+      const vehiculo = await this.prisma.vehiculoSimpliRouteCache.findUnique({ where: { id: vehiculoId } });
+      if (vehiculo?.choferPredeterminadoId !== null && vehiculo?.choferPredeterminadoId !== undefined) {
+        const chofer = await this.prisma.choferSimpliRouteCache.findUnique({
+          where: { id: vehiculo.choferPredeterminadoId },
+        });
+        if (chofer) {
+          choferId = chofer.id;
+          choferNombre = chofer.nombre;
+        }
+      }
+    }
+
+    return {
+      zonaId: String(zonaEncontrada.id),
+      zonaNombre: zonaEncontrada.nombre,
+      choferId: choferId !== null ? String(choferId) : null,
+      choferNombre,
+    };
   }
 }
