@@ -1,5 +1,11 @@
 import { apiClient } from "@/lib/api-client";
-import type { GrupoFacturacion, PorcentajeSegundoServicio, ResultadoVistaPrevia, TarifaCliente } from "./tipos";
+import type {
+  GrupoFacturacion,
+  PorcentajeSegundoServicio,
+  ResultadoVistaPrevia,
+  TarifaCliente,
+  TarifaTransportista,
+} from "./tipos";
 
 export async function listarTarifas(clienteId: string): Promise<TarifaCliente[]> {
   const { data } = await apiClient.get<TarifaCliente[]>("/facturacion/tarifas", { params: { clienteId } });
@@ -32,6 +38,19 @@ export async function crearPorcentaje(datos: {
     "/facturacion/porcentaje-segundo-servicio",
     datos,
   );
+  return data;
+}
+
+export async function listarTarifasTransportista(): Promise<TarifaTransportista[]> {
+  const { data } = await apiClient.get<TarifaTransportista[]>("/facturacion/tarifa-transportista");
+  return data;
+}
+
+export async function crearTarifaTransportista(datos: {
+  monto: number;
+  vigenciaDesde: string;
+}): Promise<TarifaTransportista> {
+  const { data } = await apiClient.post<TarifaTransportista>("/facturacion/tarifa-transportista", datos);
   return data;
 }
 

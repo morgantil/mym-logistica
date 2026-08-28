@@ -52,6 +52,14 @@ export class FacturacionService {
     return this.repositorio.crearPorcentaje({ clienteId, porcentaje, vigenciaDesde });
   }
 
+  listarTarifasTransportista() {
+    return this.repositorio.listarTarifasTransportista();
+  }
+
+  crearTarifaTransportista(monto: number, vigenciaDesde: Date) {
+    return this.repositorio.crearTarifaTransportista({ monto, vigenciaDesde });
+  }
+
   listarGrupos(clienteId: string, mes: number, anio: number) {
     return this.repositorio.listarGrupos(clienteId, mes, anio);
   }

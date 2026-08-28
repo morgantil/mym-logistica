@@ -1,5 +1,5 @@
 import { GrupoFacturacion, PedidoFacturado } from "./grupo-facturacion";
-import { PorcentajeSegundoServicio, TarifaCliente } from "./tarifa";
+import { PorcentajeSegundoServicio, TarifaCliente, TarifaTransportista } from "./tarifa";
 
 export interface DatosCrearTarifa {
   clienteId: string;
@@ -11,6 +11,11 @@ export interface DatosCrearTarifa {
 export interface DatosCrearPorcentaje {
   clienteId: string;
   porcentaje: number;
+  vigenciaDesde: Date;
+}
+
+export interface DatosCrearTarifaTransportista {
+  monto: number;
   vigenciaDesde: Date;
 }
 
@@ -40,6 +45,12 @@ export interface FacturacionRepositorio {
   listarPorcentajes(clienteId: string): Promise<PorcentajeSegundoServicio[]>;
   porcentajeVigente(clienteId: string, fecha: Date): Promise<PorcentajeSegundoServicio | null>;
   crearPorcentaje(datos: DatosCrearPorcentaje): Promise<PorcentajeSegundoServicio>;
+
+  // Liquidación a transportistas — monto por viaje, configurable con
+  // vigencia (decisión 2026-08-26). Sin clienteId: un único valor.
+  listarTarifasTransportista(): Promise<TarifaTransportista[]>;
+  tarifaTransportistaVigente(fecha: Date): Promise<TarifaTransportista | null>;
+  crearTarifaTransportista(datos: DatosCrearTarifaTransportista): Promise<TarifaTransportista>;
 
   // Grupos de facturación (vista previa / confirmación) — §21, §32 funcional.
   existeGrupoConfirmado(clienteId: string, mes: number, anio: number): Promise<boolean>;

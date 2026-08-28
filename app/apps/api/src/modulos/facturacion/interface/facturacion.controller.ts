@@ -5,6 +5,7 @@ import { UsuarioActual, UsuarioAutenticado } from "../../../common/decorators/us
 import { FacturacionService } from "../application/facturacion.service";
 import { CrearPorcentajeDto } from "./dto/crear-porcentaje.dto";
 import { CrearTarifaDto } from "./dto/crear-tarifa.dto";
+import { CrearTarifaTransportistaDto } from "./dto/crear-tarifa-transportista.dto";
 import { PeriodoDto } from "./dto/periodo.dto";
 
 // Todo el módulo queda detrás de Rol.FACTURACION/ADMINISTRACION — a
@@ -33,6 +34,20 @@ export class FacturacionController {
   @Post("porcentaje-segundo-servicio")
   crearPorcentaje(@Body() dto: CrearPorcentajeDto) {
     return this.facturacionService.crearPorcentaje(dto.clienteId, dto.porcentaje, dto.vigenciaDesde);
+  }
+
+  // Liquidación a transportistas — §4 TEMAS_PENDIENTES.md: monto por viaje
+  // configurable, sin clienteId. El cálculo de cuántos viajes hizo cada
+  // chofer todavía no está construido (depende de sincronizar Rutas desde
+  // SimpliRoute) — esto solo administra el valor del monto.
+  @Get("tarifa-transportista")
+  listarTarifasTransportista() {
+    return this.facturacionService.listarTarifasTransportista();
+  }
+
+  @Post("tarifa-transportista")
+  crearTarifaTransportista(@Body() dto: CrearTarifaTransportistaDto) {
+    return this.facturacionService.crearTarifaTransportista(dto.monto, dto.vigenciaDesde);
   }
 
   // §21 funcional ("al cierre de cada mes, por cliente"): trae los grupos ya

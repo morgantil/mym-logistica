@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api-client";
-import type { LocalidadZonaTarifaria, ZonaTarifaria } from "./tipos";
+import type { LocalidadZonaTarifaria, ZonaSimpliRouteZonaTarifaria, ZonaTarifaria } from "./tipos";
 
 export async function listarZonasTarifarias(): Promise<ZonaTarifaria[]> {
   const { data } = await apiClient.get<ZonaTarifaria[]>("/zonas-tarifarias");
@@ -34,4 +34,24 @@ export async function asignarLocalidad(localidad: string, zonaTarifariaId: strin
 
 export async function quitarLocalidad(id: string): Promise<void> {
   await apiClient.delete(`/zonas-tarifarias/localidades/${id}`);
+}
+
+export async function listarMapeoZonasSimpliRoute(): Promise<ZonaSimpliRouteZonaTarifaria[]> {
+  const { data } = await apiClient.get<ZonaSimpliRouteZonaTarifaria[]>("/zonas-tarifarias/zonas-simpliroute");
+  return data;
+}
+
+export async function asignarZonaSimpliRoute(
+  zonaSimpliRouteId: number,
+  zonaTarifariaId: string,
+): Promise<ZonaSimpliRouteZonaTarifaria> {
+  const { data } = await apiClient.post<ZonaSimpliRouteZonaTarifaria>("/zonas-tarifarias/zonas-simpliroute", {
+    zonaSimpliRouteId,
+    zonaTarifariaId,
+  });
+  return data;
+}
+
+export async function quitarZonaSimpliRoute(zonaSimpliRouteId: number): Promise<void> {
+  await apiClient.delete(`/zonas-tarifarias/zonas-simpliroute/${zonaSimpliRouteId}`);
 }

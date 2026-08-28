@@ -1,8 +1,13 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post } from "@nestjs/common";
 import { Rol } from "@prisma/client";
 import { Roles } from "../../../common/decorators/roles.decorator";
 import { ZonasTarifariasService } from "../application/zonas-tarifarias.service";
-import { ActualizarZonaTarifariaDto, AsignarLocalidadDto, CrearZonaTarifariaDto } from "./dto/zona-tarifaria.dto";
+import {
+  ActualizarZonaTarifariaDto,
+  AsignarLocalidadDto,
+  AsignarZonaSimpliRouteDto,
+  CrearZonaTarifariaDto,
+} from "./dto/zona-tarifaria.dto";
 
 @Controller("zonas-tarifarias")
 export class ZonasTarifariasController {
@@ -41,5 +46,25 @@ export class ZonasTarifariasController {
   @Delete("localidades/:id")
   quitarLocalidad(@Param("id") id: string) {
     return this.service.quitarLocalidad(id);
+  }
+
+  // Mapeo Zona de SimpliRoute → Cordón — decisión 2026-08-26 (ver DOCUMENTO
+  // TECNICO.md historial): alternativa más liviana al mapeo por localidad,
+  // 11 zonas reales en vez de cientos de localidades.
+  @Get("zonas-simpliroute")
+  listarMapeoZonasSimpliRoute() {
+    return this.service.listarMapeoZonasSimpliRoute();
+  }
+
+  @Roles(Rol.ADMINISTRACION, Rol.FACTURACION)
+  @Post("zonas-simpliroute")
+  asignarZonaSimpliRoute(@Body() dto: AsignarZonaSimpliRouteDto) {
+    return this.service.asignarZonaSimpliRoute(dto.zonaSimpliRouteId, dto.zonaTarifariaId);
+  }
+
+  @Roles(Rol.ADMINISTRACION, Rol.FACTURACION)
+  @Delete("zonas-simpliroute/:zonaSimpliRouteId")
+  quitarZonaSimpliRoute(@Param("zonaSimpliRouteId", ParseIntPipe) zonaSimpliRouteId: number) {
+    return this.service.quitarZonaSimpliRoute(zonaSimpliRouteId);
   }
 }

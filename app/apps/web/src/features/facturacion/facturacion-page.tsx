@@ -6,9 +6,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ZonasTarifariasTab } from "@/features/zonas-tarifarias/zonas-tarifarias-tab";
 import { LiquidacionTab } from "./liquidacion-tab";
 import { TarifasTab } from "./tarifas-tab";
+import { TransportistasTab } from "./transportistas-tab";
 import { NOMBRES_MES } from "./formato";
 
-const VISTAS = ["liquidacion", "tarifas", "zonas"] as const;
+const VISTAS = ["liquidacion", "tarifas", "zonas", "transportistas"] as const;
 type Vista = (typeof VISTAS)[number];
 
 const HOY = new Date();
@@ -99,6 +100,7 @@ export function FacturacionPage() {
           <TabsTrigger value="liquidacion">Liquidación</TabsTrigger>
           <TabsTrigger value="tarifas">Tarifas</TabsTrigger>
           <TabsTrigger value="zonas">Zonas tarifarias</TabsTrigger>
+          <TabsTrigger value="transportistas">Transportistas</TabsTrigger>
         </TabsList>
         <TabsContent value="liquidacion" className="pt-4">
           <LiquidacionTab clienteId={clienteId} mes={mes} anio={anio} />
@@ -108,6 +110,9 @@ export function FacturacionPage() {
         </TabsContent>
         <TabsContent value="zonas" className="pt-4">
           <ZonasTarifariasTab />
+        </TabsContent>
+        <TabsContent value="transportistas" className="pt-4">
+          <TransportistasTab />
         </TabsContent>
       </Tabs>
     </div>

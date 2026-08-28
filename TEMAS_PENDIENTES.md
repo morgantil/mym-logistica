@@ -27,7 +27,7 @@ navegador real — ver `DOCUMENTO TECNICO.md` historial 2026-08-17.
 | 1.1 | Pregunta 1 de `PREGUNTAS_FACTURACION.pdf` | ✅ **Resuelta e implementada** | Pañales se factura al 100%, medicamentos con porcentaje adicional configurable. |
 | 1.2 | Combinaciones habilitadas de entrega unificada | Nosotros, cargar como configuración | Farmaet↔Biosíntesis/Farmapal; Bella Vista medicamentos↔OSDE Bella Vista pañales/Previvax. Dato de configuración — falta cargarlo cuando arranque Etapa 2. |
 | 1.3 | Concepto "Subcliente" (Bulto/Bolsa por cliente) | Nosotros, cuando arranque Etapa 2 | No existe en el schema. No bloquea nada hoy. |
-| 1.4 | Cargar las localidades reales en "Localidades por zona" | Leonardo / Cliente final | Facturación → Zonas tarifarias ya funciona, pero está vacía. Sin esto, los pedidos de Provincia no se pueden facturar (quedan "sin zona tarifaria"). |
+| 1.4 | Cargar las localidades reales en "Localidades por zona" — **o** el atajo nuevo | Leonardo / Cliente final | Construido 2026-08-26: alternativa a cargar cientos de localidades — mapear directo las 11 zonas reales de SimpliRoute a un Cordón (`Facturación → Zonas tarifarias → "Cordón por zona de SimpliRoute"`), mucho menos trabajo. Falta que Leonardo/cliente final confirme que esas 11 zonas (dibujadas para logística) representan bien los Cordones de facturación, y las asigne. El mapeo por localidad sigue existiendo como fallback si una zona no está mapeada o el destinatario no tiene coordenadas. |
 
 ## 2. SimpliRoute — Zonas/Choferes/Vehículos construido el 2026-08-26 (revierte lo del 2026-08-17)
 
@@ -68,8 +68,8 @@ fecha/cliente/estado, carga de bultos, imprime/reimprime etiquetas en PDF
 
 | # | Pendiente | Dueño | Detalle |
 |---|---|---|---|
-| 4.1 | Tarifa fija por viaje para cada transportista | Leonardo | Sin definir — Leonardo se lo llevó para pensar ("me lo llevo"). Regla simple: se paga por viaje realizado, sin 2×1 ni entrega unificada. |
-| 4.2 | Construir cálculo/exportación de liquidación por viaje | Nosotros, una vez definida la tarifa | Nuevo — no hay código todavía (`Chofer` no tiene ningún campo de tarifa). |
+| 4.1 | ~~Tarifa fija por viaje para cada transportista~~ | ✅ Construido 2026-08-26 | En vez de pedirle a Leonardo un número fijo, se construyó como un **monto configurable con historial de vigencia** (`Facturación → Transportistas`, mismo patrón que `PorcentajeSegundoServicio`) — lo carga/actualiza directamente quien haga Facturación, sin depender de código. Probado en navegador real. |
+| 4.2 | Construir el *cálculo* de liquidación (cuántos viajes hizo cada chofer) | Nosotros, bloqueado | El monto ya está (4.1), pero contar viajes reales requiere sincronizar datos de Rutas/Viajes desde SimpliRoute — hoy no se sincronizan (ver sección 2, ítem 2.5). Sin eso, no hay de dónde sacar "cuántos viajes hizo Fulano este mes". |
 
 ## 5. Reglas de negocio sin definir
 
@@ -91,7 +91,7 @@ fecha/cliente/estado, carga de bultos, imprime/reimprime etiquetas en PDF
 
 | # | Pendiente | Dueño | Detalle |
 |---|---|---|---|
-| 7.1 | Login con Google (`GOOGLE_CLIENT_ID`/`SECRET`) | Leonardo decide la cuenta | Gratis. |
+| 7.1 | Login con Google (`GOOGLE_CLIENT_ID`/`SECRET`) | Leonardo decide | Leonardo está evaluando sacarlo de este MVP y quedarse solo con login local. Para eso hacía falta una forma de gestionar usuarios sin Google — construida 2026-08-26 (pantalla "Usuarios", rol Administración: alta con contraseña temporal, roles combinables, permisos por cliente, resetear contraseña, activar/desactivar). Decisión pendiente: sacar el botón "Continuar con Google" del login o dejarlo (el código sigue andando de cualquier manera, no hay que tocarlo para decidir esto). |
 | 7.2 | Storage de archivos Excel (Cloudflare R2) | Leonardo crea la cuenta | Baja prioridad. |
 
 ## 8. Infraestructura / despliegue

@@ -2,8 +2,10 @@ import { Module } from "@nestjs/common";
 import { USUARIOS_REPOSITORIO } from "./domain/usuarios.repositorio";
 import { UsuariosRepositorioPrisma } from "./infrastructure/usuarios.repositorio.prisma";
 import { UsuariosService } from "./application/usuarios.service";
+import { UsuariosController } from "./interface/usuarios.controller";
 
 @Module({
+  controllers: [UsuariosController],
   providers: [
     UsuariosService,
     { provide: USUARIOS_REPOSITORIO, useClass: UsuariosRepositorioPrisma },

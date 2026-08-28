@@ -1,4 +1,4 @@
-import { IsBoolean, IsOptional, IsString, IsUUID, MinLength } from "class-validator";
+import { IsBoolean, IsInt, IsOptional, IsString, IsUUID, MinLength } from "class-validator";
 
 export class CrearZonaTarifariaDto {
   @IsString()
@@ -21,6 +21,14 @@ export class AsignarLocalidadDto {
   @IsString()
   @MinLength(1)
   localidad!: string;
+
+  @IsUUID()
+  zonaTarifariaId!: string;
+}
+
+export class AsignarZonaSimpliRouteDto {
+  @IsInt()
+  zonaSimpliRouteId!: number;
 
   @IsUUID()
   zonaTarifariaId!: string;

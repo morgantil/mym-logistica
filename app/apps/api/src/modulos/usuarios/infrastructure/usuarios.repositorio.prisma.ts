@@ -32,4 +32,32 @@ export class UsuariosRepositorioPrisma implements UsuariosRepositorio {
   actualizarGoogleId(usuarioId: string, googleId: string): Promise<Usuario> {
     return this.prisma.usuario.update({ where: { id: usuarioId }, data: { googleId } });
   }
+
+  listar(): Promise<Usuario[]> {
+    return this.prisma.usuario.findMany({ orderBy: { nombre: "asc" } });
+  }
+
+  actualizar(
+    id: string,
+    datos: Partial<Pick<Usuario, "nombre" | "roles" | "activo" | "passwordHash">>,
+  ): Promise<Usuario> {
+    return this.prisma.usuario.update({ where: { id }, data: datos });
+  }
+
+  async clientesPermitidosDe(usuarioId: string): Promise<string[]> {
+    const asignaciones = await this.prisma.usuarioCliente.findMany({
+      where: { usuarioId },
+      select: { clienteId: true },
+    });
+    return asignaciones.map((a) => a.clienteId);
+  }
+
+  async asignarClientesPermitidos(usuarioId: string, clienteIds: string[]): Promise<void> {
+    await this.prisma.$transaction([
+      this.prisma.usuarioCliente.deleteMany({ where: { usuarioId } }),
+      this.prisma.usuarioCliente.createMany({
+        data: clienteIds.map((clienteId) => ({ usuarioId, clienteId })),
+      }),
+    ]);
+  }
 }

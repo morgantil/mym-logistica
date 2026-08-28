@@ -308,9 +308,10 @@ model ZonaTarifaria {
 
   eliminadoEn DateTime?
 
-  localidades LocalidadZonaTarifaria[]
-  tarifas     TarifaCliente[]
-  pedidos     Pedido[]
+  localidades       LocalidadZonaTarifaria[]
+  zonasSimpliRoute  ZonaSimpliRouteZonaTarifaria[]
+  tarifas           TarifaCliente[]
+  pedidos           Pedido[]
 
   @@map("zonas_tarifarias")
 }
@@ -327,6 +328,25 @@ model LocalidadZonaTarifaria {
   zonaTarifaria ZonaTarifaria @relation(fields: [zonaTarifariaId], references: [id])
 
   @@map("localidades_zonas_tarifarias")
+}
+
+// Mapeo Zona de SimpliRoute → ZonaTarifaria (Cordón) — decisión 2026-08-26
+// (ver DOCUMENTO TECNICO.md historial): en vez de depender solo del mapeo
+// Localidad → Cordón de arriba (manual, localidad por localidad), se puede
+// aprovechar que las Zonas de SimpliRoute ya tienen un polígono geográfico
+// real, dibujado por el equipo de operaciones. Solo 11 zonas reales hoy —
+// mapear cada una a un Cordón es mucho menos trabajo que cargar cada
+// localidad a mano. Se prioriza sobre LocalidadZonaTarifaria al resolver un
+// pedido (ver ZonasTarifariasService.resolverPorZonaSimpliRoute), pero no lo
+// reemplaza: sigue siendo fallback si la zona de SimpliRoute no está
+// mapeada o el destinatario no tiene coordenadas todavía.
+model ZonaSimpliRouteZonaTarifaria {
+  zonaSimpliRouteId Int    @id
+  zonaTarifariaId   String
+
+  zonaTarifaria ZonaTarifaria @relation(fields: [zonaTarifariaId], references: [id])
+
+  @@map("zonas_simpliroute_zonas_tarifarias")
 }
 
 // ---------------------------------------------------------------------------
@@ -460,6 +480,29 @@ model PorcentajeSegundoServicio {
   eliminadoEn DateTime?
 
   @@map("porcentajes_segundo_servicio")
+}
+
+// Liquidación a transportistas (documento funcional v6, alcance nuevo) —
+// decisión 2026-08-26: en vez de un valor fijo en código, es un monto
+// configurable con historial de vigencia (mismo patrón que
+// PorcentajeSegundoServicio/TarifaCliente), editable por el rol Facturación.
+// No tiene clienteId: es un monto único por viaje realizado, sin distinguir
+// cliente ni tipo de entrega (regla simple confirmada por Leonardo: "se paga
+// por viaje realizado, sin 2×1 ni entrega unificada"). El *cálculo* de
+// cuántos viajes hizo cada chofer (para multiplicar por este monto) todavía
+// no está construido — depende de sincronizar datos de Rutas/Viajes desde
+// SimpliRoute, que hoy no se sincronizan (ver TEMAS_PENDIENTES.md sección 2).
+model TarifaTransportista {
+  id            String    @id @default(uuid())
+  monto         Decimal   @db.Decimal(12, 2)
+  vigenciaDesde DateTime
+  vigenciaHasta DateTime?
+
+  creadoEn    DateTime  @default(now())
+  creadoPorId String?
+  eliminadoEn DateTime?
+
+  @@map("tarifas_transportista")
 }
 
 // Agrupa los pedidos que comparten un viaje facturable (2x1, unificación, o individual).

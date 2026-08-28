@@ -18,6 +18,15 @@ export interface PorcentajeSegundoServicio {
   vigenciaHasta: string | null;
 }
 
+// Liquidación a transportistas — monto por viaje, configurable con vigencia,
+// sin clienteId (decisión 2026-08-26, ver DOCUMENTO TECNICO.md historial).
+export interface TarifaTransportista {
+  id: string;
+  monto: number;
+  vigenciaDesde: string;
+  vigenciaHasta: string | null;
+}
+
 export type ReglaAplicada = "2x1" | "UNIFICADA" | "INDIVIDUAL";
 
 export interface GrupoFacturacion {

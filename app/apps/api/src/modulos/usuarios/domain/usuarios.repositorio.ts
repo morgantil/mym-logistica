@@ -14,6 +14,19 @@ export interface UsuariosRepositorio {
     roles: Usuario["roles"];
   }): Promise<Usuario>;
   actualizarGoogleId(usuarioId: string, googleId: string): Promise<Usuario>;
+
+  // Administración de usuarios (pantalla "Usuarios", rol Administración) —
+  // agregado 2026-08-26 al sacar el login con Google del MVP: hasta acá el
+  // único alta posible era vía Google o directo en la base.
+  listar(): Promise<Usuario[]>;
+  actualizar(
+    id: string,
+    datos: Partial<Pick<Usuario, "nombre" | "roles" | "activo" | "passwordHash">>,
+  ): Promise<Usuario>;
+  clientesPermitidosDe(usuarioId: string): Promise<string[]>;
+  // Reemplaza el conjunto completo — un array vacío significa "ve todos los
+  // clientes" (mismo criterio que PermisosClienteService ya usa en lectura).
+  asignarClientesPermitidos(usuarioId: string, clienteIds: string[]): Promise<void>;
 }
 
 // Token de inyección — Nest no puede usar una interfaz TS como token en runtime.

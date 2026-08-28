@@ -55,6 +55,57 @@ export class ZonasTarifariasService {
     await this.prisma.localidadZonaTarifaria.delete({ where: { id } });
   }
 
+  // Mapeo Zona de SimpliRoute → ZonaTarifaria (Cordón) — decisión 2026-08-26:
+  // alternativa más liviana al mapeo por Localidad (11 zonas reales en vez de
+  // cientos de localidades). No reemplaza el mapeo por localidad, es
+  // prioritario sobre él (ver resolverParaPedido).
+  listarMapeoZonasSimpliRoute() {
+    return this.prisma.zonaSimpliRouteZonaTarifaria.findMany({
+      orderBy: { zonaSimpliRouteId: "asc" },
+      include: { zonaTarifaria: { select: { nombre: true } } },
+    });
+  }
+
+  async asignarZonaSimpliRoute(zonaSimpliRouteId: number, zonaTarifariaId: string) {
+    await this.asegurarQueExiste(zonaTarifariaId);
+    return this.prisma.zonaSimpliRouteZonaTarifaria.upsert({
+      where: { zonaSimpliRouteId },
+      create: { zonaSimpliRouteId, zonaTarifariaId },
+      update: { zonaTarifariaId },
+    });
+  }
+
+  async quitarZonaSimpliRoute(zonaSimpliRouteId: number) {
+    const fila = await this.prisma.zonaSimpliRouteZonaTarifaria.findUnique({ where: { zonaSimpliRouteId } });
+    if (!fila) throw new NotFoundException(`Mapeo de zona SimpliRoute ${zonaSimpliRouteId} no encontrado.`);
+    await this.prisma.zonaSimpliRouteZonaTarifaria.delete({ where: { zonaSimpliRouteId } });
+  }
+
+  // Resuelve la ZonaTarifaria del pedido considerando, en orden: (1) CABA
+  // siempre resuelve directo (ver resolverPorLocalidad); (2) si hay una zona
+  // de SimpliRoute ya resuelta para este pedido (ZonasChoferesService.
+  // resolverZonaChofer) y está mapeada a un Cordón, se usa esa — es más
+  // precisa porque viene de coordenadas reales, no de texto; (3) si no,
+  // fallback al mapeo por localidad de siempre. Nunca inventa un cordón.
+  async resolverParaPedido(
+    clasificacion: CabaProvincia | null,
+    localidad: string,
+    zonaSimpliRouteId: string | null,
+  ): Promise<string | null> {
+    if (clasificacion === CabaProvincia.CABA) {
+      return this.resolverPorLocalidad(clasificacion, localidad);
+    }
+
+    if (zonaSimpliRouteId !== null) {
+      const mapeo = await this.prisma.zonaSimpliRouteZonaTarifaria.findUnique({
+        where: { zonaSimpliRouteId: Number(zonaSimpliRouteId) },
+      });
+      if (mapeo) return mapeo.zonaTarifariaId;
+    }
+
+    return this.resolverPorLocalidad(clasificacion, localidad);
+  }
+
   // Resuelve la ZonaTarifaria de un pedido a partir de la clasificación
   // CABA/Provincia de GeorefArAdapter + la localidad. CABA siempre resuelve
   // a la zona "CABA" (no necesita mapeo, hay una sola). Provincia depende del

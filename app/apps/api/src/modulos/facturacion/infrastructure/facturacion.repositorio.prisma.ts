@@ -5,10 +5,11 @@ import {
   DatosCrearGrupoFacturacion,
   DatosCrearPorcentaje,
   DatosCrearTarifa,
+  DatosCrearTarifaTransportista,
   FacturacionRepositorio,
 } from "../domain/facturacion.repositorio";
 import { GrupoFacturacion, PedidoFacturado } from "../domain/grupo-facturacion";
-import { PorcentajeSegundoServicio, TarifaCliente } from "../domain/tarifa";
+import { PorcentajeSegundoServicio, TarifaCliente, TarifaTransportista } from "../domain/tarifa";
 
 const UN_DIA_MS = 24 * 60 * 60 * 1000;
 
@@ -117,6 +118,36 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
         },
       });
       return mapearPorcentaje(creado);
+    });
+  }
+
+  listarTarifasTransportista(): Promise<TarifaTransportista[]> {
+    return this.prisma.tarifaTransportista
+      .findMany({ orderBy: { vigenciaDesde: "desc" } })
+      .then((filas) => filas.map(mapearTarifaTransportista));
+  }
+
+  async tarifaTransportistaVigente(fecha: Date): Promise<TarifaTransportista | null> {
+    const fila = await this.prisma.tarifaTransportista.findFirst({
+      where: {
+        vigenciaDesde: { lte: fecha },
+        OR: [{ vigenciaHasta: null }, { vigenciaHasta: { gte: fecha } }],
+      },
+      orderBy: { vigenciaDesde: "desc" },
+    });
+    return fila ? mapearTarifaTransportista(fila) : null;
+  }
+
+  async crearTarifaTransportista(datos: DatosCrearTarifaTransportista): Promise<TarifaTransportista> {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.tarifaTransportista.updateMany({
+        where: { vigenciaHasta: null },
+        data: { vigenciaHasta: new Date(datos.vigenciaDesde.getTime() - UN_DIA_MS) },
+      });
+      const creada = await tx.tarifaTransportista.create({
+        data: { monto: datos.monto, vigenciaDesde: datos.vigenciaDesde },
+      });
+      return mapearTarifaTransportista(creada);
     });
   }
 
@@ -283,6 +314,20 @@ function mapearPorcentaje(fila: {
     id: fila.id,
     clienteId: fila.clienteId,
     porcentaje: Number(fila.porcentaje),
+    vigenciaDesde: fila.vigenciaDesde,
+    vigenciaHasta: fila.vigenciaHasta,
+  };
+}
+
+function mapearTarifaTransportista(fila: {
+  id: string;
+  monto: Prisma.Decimal;
+  vigenciaDesde: Date;
+  vigenciaHasta: Date | null;
+}): TarifaTransportista {
+  return {
+    id: fila.id,
+    monto: Number(fila.monto),
     vigenciaDesde: fila.vigenciaDesde,
     vigenciaHasta: fila.vigenciaHasta,
   };

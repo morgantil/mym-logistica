@@ -10,13 +10,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 // Reuso del formulario genérico de un campo "Nombre" — ver ese componente
 // para el porqué de compartirlo entre Zona/Chofer/ZonaTarifaria.
 import { NombreFormSheet } from "@/features/zonas-choferes/nombre-form-sheet";
+import { listarZonas } from "@/features/zonas-choferes/api";
 import {
   actualizarZonaTarifaria,
   asignarLocalidad,
+  asignarZonaSimpliRoute,
   crearZonaTarifaria,
   listarMapeoLocalidades,
+  listarMapeoZonasSimpliRoute,
   listarZonasTarifarias,
   quitarLocalidad,
+  quitarZonaSimpliRoute,
 } from "./api";
 import type { ZonaTarifaria } from "./tipos";
 
@@ -37,6 +41,14 @@ export function ZonasTarifariasTab() {
   const { data: mapeo, isLoading: cargandoMapeo } = useQuery({
     queryKey: ["zonas-tarifarias", "localidades"],
     queryFn: listarMapeoLocalidades,
+  });
+  const { data: zonasSimpliRoute, isLoading: cargandoZonasSimpliRoute } = useQuery({
+    queryKey: ["zonas"],
+    queryFn: listarZonas,
+  });
+  const { data: mapeoSimpliRoute } = useQuery({
+    queryKey: ["zonas-tarifarias", "zonas-simpliroute"],
+    queryFn: listarMapeoZonasSimpliRoute,
   });
 
   const mutacionGuardar = useMutation({
@@ -72,6 +84,21 @@ export function ZonasTarifariasTab() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["zonas-tarifarias", "localidades"] }),
     onError: () => toast.error("No se pudo quitar la localidad."),
   });
+
+  const mutacionAsignarZonaSimpliRoute = useMutation({
+    mutationFn: ({ zonaSimpliRouteId, zonaTarifariaId }: { zonaSimpliRouteId: number; zonaTarifariaId: string }) =>
+      asignarZonaSimpliRoute(zonaSimpliRouteId, zonaTarifariaId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["zonas-tarifarias", "zonas-simpliroute"] }),
+    onError: () => toast.error("No se pudo asignar el cordón."),
+  });
+
+  const mutacionQuitarZonaSimpliRoute = useMutation({
+    mutationFn: (zonaSimpliRouteId: number) => quitarZonaSimpliRoute(zonaSimpliRouteId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["zonas-tarifarias", "zonas-simpliroute"] }),
+    onError: () => toast.error("No se pudo quitar el cordón."),
+  });
+
+  const SIN_CORDON = "SIN_CORDON";
 
   function manejarAsignarLocalidad(evento: FormEvent) {
     evento.preventDefault();
@@ -231,6 +258,76 @@ export function ZonasTarifariasTab() {
                   </TableCell>
                 </TableRow>
               ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <h2 className="font-medium">Cordón por zona de SimpliRoute</h2>
+        <p className="text-sm text-muted-foreground">
+          Alternativa a cargar localidad por localidad: las zonas que ya están dibujadas en SimpliRoute
+          (con polígono real) se pueden mapear directo a un Cordón. Si un pedido cae dentro de una de estas
+          zonas, se usa este Cordón — solo si no matchea ninguna, se cae al mapeo por localidad de arriba.
+        </p>
+
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Zona de SimpliRoute</TableHead>
+              <TableHead>Cordón asignado</TableHead>
+              <TableHead>Acciones</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {cargandoZonasSimpliRoute ? (
+              <TableRow>
+                <TableCell colSpan={3} className="text-muted-foreground">
+                  Cargando…
+                </TableCell>
+              </TableRow>
+            ) : zonasSimpliRoute?.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={3} className="text-muted-foreground">
+                  Todavía no hay zonas en SimpliRoute (o el addon de Zonas no está habilitado en la cuenta).
+                </TableCell>
+              </TableRow>
+            ) : (
+              zonasSimpliRoute?.map((zona) => {
+                const asignacion = mapeoSimpliRoute?.find((m) => m.zonaSimpliRouteId === zona.id);
+                return (
+                  <TableRow key={zona.id}>
+                    <TableCell>{zona.nombre}</TableCell>
+                    <TableCell>
+                      <Select
+                        value={asignacion?.zonaTarifariaId ?? SIN_CORDON}
+                        onValueChange={(valor) => {
+                          if (valor === SIN_CORDON) {
+                            mutacionQuitarZonaSimpliRoute.mutate(zona.id);
+                          } else {
+                            mutacionAsignarZonaSimpliRoute.mutate({ zonaSimpliRouteId: zona.id, zonaTarifariaId: valor });
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="w-full sm:w-56">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={SIN_CORDON}>Sin asignar</SelectItem>
+                          {zonas?.filter((z) => z.activa).map((z) => (
+                            <SelectItem key={z.id} value={z.id}>
+                              {z.nombre}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {zona.vehiculosIds.length === 0 ? "Sin vehículo asignado en SimpliRoute" : ""}
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>

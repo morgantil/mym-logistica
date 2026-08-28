@@ -75,37 +75,41 @@ Repo Git en la raíz de `MYM/`, rama **`develop`**, remoto en
 | Zonas/choferes (logística) | 🟢 completo (rediseñado 2026-08-26) | Se trae en vivo de SimpliRoute con cache local (refresco perezoso + "Sincronizar ahora") — Choferes/Vehículos con alta/edición/baja completas contra SimpliRoute, Zonas de solo lectura. La zona de un pedido se resuelve con point-in-polygon contra el destinatario geocodificado. Revierte la decisión del 2026-08-17. Falta solo probar las escrituras de Choferes/Vehículos contra la cuenta real (ver `TEMAS_PENDIENTES.md` sección 2) |
 | Zonas tarifarias (facturación) | 🟢 completo (2026-08-17) | reemplaza el enum fijo CABA/Provincia por un modelo configurable (CABA + Cordón 1/2/3/…) — tabla + pantalla propia, sin código nuevo para agregar una zona |
 | Embalaje y Despacho | 🟢 completo (2026-08-17) | pantalla nueva: filtra por fecha/cliente/estado, carga de bultos, genera/reimprime etiquetas en PDF (una por bulto) |
-| SimpliRoute | 🟢 **validado con la cuenta real**, sigue en modo mock por decisión | token real probado en lectura y escritura (2026-08-16) contra `MYM LOGISTICA Y DISTRIBUCION SRL`. `SIMPLIROUTE_MOCK=true` por decisión de timing de Leonardo, no por duda técnica. **No se va a construir importación de Zonas/Choferes** — sí una sincronización de estados (+ chofer/vehículo asignado), bloqueada por el nombre de un estado nuevo que Leonardo va a agregar del lado de SimpliRoute — ver `TEMAS_PENDIENTES.md` sección 2. |
+| SimpliRoute | 🟢 **validado con la cuenta real**, sigue en modo mock por decisión | token real probado en lectura y escritura (2026-08-16) contra `MYM LOGISTICA Y DISTRIBUCION SRL`. `SIMPLIROUTE_MOCK=true` por decisión de timing de Leonardo, no por duda técnica. Zonas/Choferes/Vehículos se traen en vivo desde SimpliRoute (2026-08-26, revierte una decisión anterior — ver fila "Zonas/choferes" abajo). Falta la sincronización de estados (+ chofer/vehículo asignado a un pedido puntual), bloqueada por el nombre de un estado nuevo que Leonardo va a agregar del lado de SimpliRoute — ver `TEMAS_PENDIENTES.md` sección 2. |
 | Geografía (CABA/Provincia) | 🟢 completo | resuelto con API oficial gratuita `apis.datos.gob.ar/georef` |
 | Dashboard | 🟡 mínimo | pedidos por estado + resumen de revisión — resto de KPIs pendiente, no urgente |
-| **Facturación** | 🟢 **completo** | motor de reglas, vista previa/confirmación, tarifas por zona configurable, reporte mensual a Excel. La única pregunta de negocio que faltaba (qué servicio se cobra 100% en unificada) se respondió e implementó el 2026-08-17. |
+| **Facturación** | 🟢 **completo** | motor de reglas, vista previa/confirmación, tarifas por zona configurable, reporte mensual a Excel, tarifa a transportistas configurable (nueva, 2026-08-26 — el *cálculo* de liquidación por viaje todavía no, ver `TEMAS_PENDIENTES.md` §4.2). La única pregunta de negocio que faltaba (qué servicio se cobra 100% en unificada) se respondió e implementó el 2026-08-17. |
+| **Usuarios** | 🟢 completo (nuevo, 2026-08-26) | alta con contraseña temporal, roles combinables, permisos por cliente, resetear contraseña, activar/desactivar — antes de esto no existía forma de gestionar usuarios más que a mano en la base. |
 
-41 tests unitarios sobre la lógica de dominio más riesgosa, todos pasando.
+49 tests unitarios sobre la lógica de dominio más riesgosa, todos pasando.
 Todo probado contra una base Neon real, no contra mocks de base de datos.
 
-## Frontend — 10 pantallas construidas
+## Frontend — 12 pantallas construidas
 
-`apps/web` (React+Vite+Tailwind+shadcn/ui): Login (local + Google), shell,
+`apps/web` (React+Vite+Tailwind+shadcn/ui): Login (local + Google, ver
+`TEMAS_PENDIENTES.md` §7.1 sobre sacar Google del MVP), shell,
 Inicio/Dashboard, Pedidos (grilla, detalle, bultos, revisión y envío),
 Importar Excel (con fecha de entrega obligatoria), Clientes, Zonas y
-choferes, **Embalaje y Despacho** (nueva, 2026-08-17), y Facturación (3
-pestañas: Liquidación, Tarifas, **Zonas tarifarias** — nueva, 2026-08-17).
-PWA instalable con ícono placeholder (reemplazar cuando haya logo real).
-Todo probado en navegador real contra el backend real, no solo con
-typecheck/tests — ver `DOCUMENTO TECNICO.md` sección 7 para el detalle de
-cada QA y los bugs reales encontrados y corregidos en el camino.
+choferes (rediseñada 2026-08-26 — trae todo en vivo de SimpliRoute),
+**Embalaje y Despacho** (2026-08-17), Facturación (4 pestañas: Liquidación,
+Tarifas, Zonas tarifarias, **Transportistas** — nueva, 2026-08-26), y
+**Usuarios** (nueva, 2026-08-26). PWA instalable con ícono placeholder
+(reemplazar cuando haya logo real). Todo probado en navegador real contra
+el backend real, no solo con typecheck/tests — ver `DOCUMENTO TECNICO.md`
+sección 7 para el detalle de cada QA y los bugs reales encontrados y
+corregidos en el camino.
 
 ## Qué falta — ver `TEMAS_PENDIENTES.md` para el detalle completo
 
 Resumen de lo más importante, todo del lado de Leonardo o del cliente final
 (nada técnico bloqueado hoy):
 
-1. Nombre del estado inicial nuevo que se va a agregar en SimpliRoute (bloquea la sincronización de estados).
-2. Tarifa por viaje para la liquidación a transportistas.
-3. Localidades reales por Cordón (la pantalla ya funciona, está vacía).
+1. Nombre del estado inicial nuevo que se va a agregar en SimpliRoute (bloquea la sincronización de estados, y con eso el *cálculo* de liquidación a transportistas — ver `TEMAS_PENDIENTES.md` §4.2).
+2. Asignar Cordón a las 11 zonas reales de SimpliRoute (`Facturación → Zonas tarifarias`) — o cargar localidades a mano si se prefiere el camino viejo.
+3. Definir si se saca el login con Google de este MVP (la pantalla de Usuarios ya no depende de eso para gestionar gente).
 4. Tamaño/impresora real de la etiqueta de bulto (se usó un default de 10×15cm).
 5. Reglas de tratamiento de entregas fallidas/canceladas/reentregas.
-6. Qué cuenta de Google usar para el login, y logo real de MyM.
+6. Logo real de MyM.
 7. Probar alta/edición/baja de Choferes y Vehículos contra la cuenta real de SimpliRoute (construido y probado en mock; las escrituras reales las tiene que correr Leonardo, mismo bloqueo de siempre para el entorno de Claude Code).
 
 ## Decisiones que ya están tomadas — no volver a discutir sin motivo nuevo
