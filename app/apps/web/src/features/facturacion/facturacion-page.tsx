@@ -112,7 +112,7 @@ export function FacturacionPage() {
           <ZonasTarifariasTab />
         </TabsContent>
         <TabsContent value="transportistas" className="pt-4">
-          <TransportistasTab />
+          <TransportistasTab mes={mes} anio={anio} />
         </TabsContent>
       </Tabs>
     </div>

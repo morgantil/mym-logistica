@@ -6,6 +6,7 @@ import { FacturacionService } from "../application/facturacion.service";
 import { CrearPorcentajeDto } from "./dto/crear-porcentaje.dto";
 import { CrearTarifaDto } from "./dto/crear-tarifa.dto";
 import { CrearTarifaTransportistaDto } from "./dto/crear-tarifa-transportista.dto";
+import { MesAnioDto } from "./dto/mes-anio.dto";
 import { PeriodoDto } from "./dto/periodo.dto";
 
 // Todo el módulo queda detrás de Rol.FACTURACION/ADMINISTRACION — a
@@ -37,9 +38,7 @@ export class FacturacionController {
   }
 
   // Liquidación a transportistas — §4 TEMAS_PENDIENTES.md: monto por viaje
-  // configurable, sin clienteId. El cálculo de cuántos viajes hizo cada
-  // chofer todavía no está construido (depende de sincronizar Rutas desde
-  // SimpliRoute) — esto solo administra el valor del monto.
+  // configurable, sin clienteId.
   @Get("tarifa-transportista")
   listarTarifasTransportista() {
     return this.facturacionService.listarTarifasTransportista();
@@ -48,6 +47,14 @@ export class FacturacionController {
   @Post("tarifa-transportista")
   crearTarifaTransportista(@Body() dto: CrearTarifaTransportistaDto) {
     return this.facturacionService.crearTarifaTransportista(dto.monto, dto.vigenciaDesde);
+  }
+
+  // §4.2 TEMAS_PENDIENTES.md: cuántos viajes hizo cada chofer en el mes y
+  // cuánto se le debe pagar — sincroniza estados reales de SimpliRoute antes
+  // de calcular (ver FacturacionService.liquidacionTransportistas).
+  @Get("liquidacion-transportistas")
+  liquidacionTransportistas(@Query() query: MesAnioDto) {
+    return this.facturacionService.liquidacionTransportistas(query.mes, query.anio);
   }
 
   // §21 funcional ("al cierre de cada mes, por cliente"): trae los grupos ya

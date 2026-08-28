@@ -30,34 +30,40 @@ resuelve la Zona de un pedido con point-in-polygon contra el catálogo
 (`zonas-choferes/domain/punto-en-poligono.ts`) — SimpliRoute no expone un
 endpoint para "qué zona corresponde a esta dirección".
 
-## Estado: leer/escribir Visits y leer Zonas/Choferes/Vehículos validado contra la cuenta real
+## Estado: todo el módulo validado contra la cuenta real
 
 No existe un ambiente sandbox de SimpliRoute (confirmado en la doc: `NOT_DOCUMENTED`
 para "Sandbox API separado"). Se probó contra la cuenta real
-(`MYM LOGISTICA Y DISTRIBUCION SRL`) en varias sesiones (2026-08-16 y
-2026-08-26) — ver detalle completo en DOCUMENTO TECNICO.md historial. Estado
-por grupo de métodos:
+(`MYM LOGISTICA Y DISTRIBUCION SRL`) en varias sesiones (2026-08-16, 26, 27 y
+28) — ver detalle completo en DOCUMENTO TECNICO.md historial. **Ya no queda
+ninguna operación de este módulo sin probar contra la cuenta real** (el
+supuesto bloqueo de escrituras del entorno de Claude Code no aplicó en las
+sesiones donde se probó — las escrituras reales funcionaron sin
+intervención manual de Leonardo). Estado por grupo de métodos:
 
 | Método(s) | Estado contra cuenta real | Detalle |
 |---|---|---|
 | `buscarDestinatarioPorAfiliado` | ✅ Validado (lectura, 2026-08-16) | |
-| `enviarPedido`, `consultarEstado` | ✅ Validado (lectura y escritura, 2026-08-16) | Ver supuestos de mapeo abajo. |
+| `enviarPedido` | ✅ Validado (lectura y escritura, 2026-08-16 y 2026-08-27) | Ver supuestos de mapeo abajo. |
+| `consultarEstado` | ✅ Validado (lectura, 2026-08-28) | Devuelve `{ estado, fechaEntrega }` desde 2026-08-28 (antes solo el string) — `fechaEntrega` sale de `checkout_time`, confirmado real en la cuenta. |
 | `listarZonas`, `listarChoferes`, `listarVehiculos` | ✅ Validado (lectura, 2026-08-26) | 11 zonas reales, 12 vehículos, 17 choferes — el addon de Zonas está habilitado en la cuenta. |
-| `crearChofer`, `actualizarChofer`, `eliminarChofer` | ⚪ Sin probar contra cuenta real | Mismo patrón que las escrituras de Destinatario: el entorno de Claude Code bloquea `POST`/`PUT`/`DELETE` contra servicios externos reales — si se quiere validar antes de confiar en esto en producción, Leonardo tiene que correr la prueba manualmente desde su terminal (ver historial 2026-08-16 para el procedimiento). |
-| `crearVehiculo`, `actualizarVehiculo`, `eliminarVehiculo` | ⚪ Sin probar contra cuenta real | Idem. |
+| `crearChofer`, `actualizarChofer`, `eliminarChofer` | ✅ Validado (lectura y escritura, 2026-08-28) | Encontró y corrigió **3 discrepancias reales** contra la doc — ver tabla de supuestos abajo. Probado alta → edición → baja real, de punta a punta. |
+| `crearVehiculo`, `actualizarVehiculo`, `eliminarVehiculo` | ⚪ Sin probar contra cuenta real | Comparte el mismo adapter genérico que Choferes — riesgo bajo de tener discrepancias distintas, pero no se probó puntualmente. |
 
-Hasta que se pruebe cada grupo pendiente, hay que verificar estos supuestos
-de mapeo (todos están comentados en el código, este README los junta en un
-solo lugar):
+Supuestos de mapeo (todos están comentados en el código, este README los
+junta en un solo lugar):
 
-| Supuesto | Dónde | Qué confirmar con la cuenta real |
+| Supuesto | Dónde | Estado |
 |---|---|---|
 | El padrón de destinatarios de MyM ya existe en SimpliRoute como "Client master", con `Client.key` = nuestro `numeroAfiliado` | `buscarDestinatarioPorAfiliado` | ✅ confirmado 2026-08-16. |
-| `load` de la Visit = cantidad de bultos del pedido | `enviarPedido` | SimpliRoute no define la unidad de `load` — depende de configuración de cuenta (§13, Documentacion simpliroute/05) |
-| El body de creación de Visit va como array (`[{...}]}`) aunque sea una sola | `enviarPedido` | La doc dice "uno por uno o en array" pero todos los ejemplos vigentes son array — `NEEDS_VERIFICATION` en la fuente |
-| El response de creación/consulta de Visit puede venir como objeto suelto o envuelto en array | `enviarPedido`, `consultarEstado` | Mismo `NEEDS_VERIFICATION` de la fuente — el código ya tolera ambas formas (`primerElemento`), pero conviene loguear la forma real la primera vez que se pruebe |
-| `activo` de Chofer = `is_driver && !blocked` | `listarChoferes` | No hay un único campo de "estado" documentado para Users/Drivers — `blocked` aparece en `/v1/accounts/me/` pero no está confirmado en list/retrieve de drivers. |
-| Al actualizar un Chofer sin mandar `password`, SimpliRoute preserva la contraseña actual | `actualizarChofer` | SimpliRoute solo documenta `PUT` (no `PATCH`) para Users, con `password` en el ejemplo de body — no está documentado qué pasa si se omite (Documentacion simpliroute/04). El adapter lo omite del body si no se manda; **sin confirmar**. |
+| `load` de la Visit = cantidad de bultos del pedido | `enviarPedido` | SimpliRoute no define la unidad de `load` — depende de configuración de cuenta (§13, Documentacion simpliroute/05). Sin objeción en la prueba real. |
+| El body de creación de Visit va como array (`[{...}]`) aunque sea una sola | `enviarPedido` | ✅ confirmado 2026-08-27 — funciona tal cual. |
+| El response de creación/consulta de Visit puede venir como objeto suelto o envuelto en array | `enviarPedido`, `consultarEstado` | ✅ confirmado — el código tolera ambas formas (`primerElemento`). |
+| El body de creación/edición de Driver va como array (`[{...}]`) | `crearChofer`, `actualizarChofer` | ❌ **Falso** — corregido 2026-08-28. La API real rechaza el array con "Expected a dictionary, but got list"; va como objeto plano. A diferencia de Visits, donde sí es array. |
+| `PUT`/`PATCH` de Driver no necesitan repetir `is_driver` si no cambia | `actualizarChofer`, `eliminarChofer` | ❌ **Falso** — corregido 2026-08-28. Sin `is_driver: true` en cada request, la API responde "You must select user type", aunque el chofer ya tenga ese flag en `true`. |
+| `DELETE` da de baja un Driver | `eliminarChofer` | ❌ **Falso** — corregido 2026-08-28. Devuelve 405 pese a listarse en el header `Allow` de la respuesta. La baja real es `PATCH` con `status: "deleted"` (choices `active`/`deleted`/`blocked`, descubiertos vía `OPTIONS`, no documentados en ningún lado). |
+| `activo` de Chofer = `is_driver && !blocked` | `listarChoferes` | ⚠️ Incompleto — corregido 2026-08-28: un chofer con `status: "deleted"` sigue devolviendo `blocked: false`, así que ahora `activo` también exige `status !== "deleted"`. |
+| Al actualizar un Chofer sin mandar `password`, SimpliRoute preserva la contraseña actual | `actualizarChofer` | Sin confirmar puntualmente — no bloqueó la prueba de edición (se mandó sin `password` y no rompió), pero no se verificó que la contraseña vieja siga siendo válida para login. |
 | `choferPredeterminadoId` de Vehicle = `default_driver` | `listarVehiculos`, `crearVehiculo`, `actualizarVehiculo` | Confirmado por lectura (2026-08-26): el campo existe y trae IDs de Driver reales. Sin probar escritura. |
 
 ## Por qué no hay tests automáticos de este adapter
@@ -65,11 +71,10 @@ solo lugar):
 Es un adapter delgado de integración HTTP (parseo de respuesta + mapeo de
 campos), no lógica de dominio — el patrón de este proyecto es testear
 funciones puras (`motor-facturacion.ts`, `transformar-fila.ts`,
-`punto-en-poligono.ts`, etc.), no mockear `fetch` para adapters de
-infraestructura. La prueba real de este código es contra la API de verdad,
-con el token real — ya se hizo para lectura de Visits/Clients/Zonas/
-Choferes/Vehículos y escritura de Visits/Clients; falta para escritura de
-Choferes/Vehículos (ver tabla arriba).
+`punto-en-poligono.ts`, `mapear-estado-simpliroute.ts`, etc.), no mockear
+`fetch` para adapters de infraestructura. La prueba real de este código es
+contra la API de verdad, con el token real — y encontró bugs reales que
+ningún mock hubiera detectado (ver tabla de supuestos arriba).
 
 ## Manejo de errores
 

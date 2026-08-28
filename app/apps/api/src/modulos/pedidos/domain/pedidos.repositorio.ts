@@ -40,6 +40,16 @@ export interface PaginaPedidos {
   total: number;
 }
 
+// §19 funcional — candidato a sincronizar: ya se mandó a SimpliRoute
+// (estadoSimpliroute=ENVIADO) y todavía no llegó a un estado terminal propio
+// (COORDINADO o EN_TRANSITO, nunca ENTREGADO/ENTREGA_FALLIDA/CANCELADO — una
+// vez ahí no tiene sentido seguir consultando esa Visit).
+export interface PedidoParaSincronizar {
+  id: string;
+  simplirouteId: string;
+  version: number;
+}
+
 export interface PedidosRepositorio {
   listar(filtro: FiltroPedidos, pagina: number, porPagina: number): Promise<PaginaPedidos>;
   contarPorEstado(clienteIds?: string[]): Promise<Record<string, number>>;
@@ -66,6 +76,14 @@ export interface PedidosRepositorio {
   // si `version` no coincide con la fila actual — alguien más lo modificó primero.
   actualizarBultos(id: string, bultos: number, version: number): Promise<Pedido>;
   marcarEnviado(id: string, datos: { simplirouteId: string; version: number }): Promise<Pedido>;
+
+  // §19 funcional — sincronización de estados reales con SimpliRoute.
+  listarPendientesDeSincronizar(): Promise<PedidoParaSincronizar[]>;
+  // Con bloqueo optimista, igual que arriba.
+  actualizarEstadoDesdeProveedor(
+    id: string,
+    datos: { estado: EstadoPedido; fechaEntregaEfectiva: Date | null; version: number },
+  ): Promise<Pedido>;
 
   // Sin bloqueo optimista a propósito: es solo informativo ("¿ya se imprimió
   // alguna etiqueta?"), no hay dato de negocio en juego que se pueda pisar.

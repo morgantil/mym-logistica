@@ -5,6 +5,7 @@ import {
   DatosChofer,
   DatosVehiculo,
   DestinatarioEnProveedor,
+  EstadoVisita,
   LogisticaProviderPort,
   PedidoParaEnviar,
   ResultadoEnvio,
@@ -55,6 +56,10 @@ interface ClientSimpliRoute {
 interface VisitaSimpliRoute {
   id: number | string;
   status: string;
+  // Marca real de cuándo el chofer completó la entrega desde su app — queda
+  // null si el status se cambió a mano (ej. una Visit de prueba) en vez de
+  // por un checkout real. Confirmado vía OPTIONS + PATCH manual 2026-08-28.
+  checkout_time?: string | null;
 }
 
 // GET /v1/zones/ — Documentacion simpliroute/04 §65-71. Solo lectura pública
@@ -69,11 +74,20 @@ interface ZonaSimpliRoute {
   schedules: string[];
 }
 
-// GET/POST/PUT/DELETE /v1/accounts/drivers/ — Documentacion simpliroute/04
-// §44-59. El ejemplo oficial de creación no incluye `is_driver` en el
-// response, pero sí en el request — se asume `activo = is_driver` porque no
-// existe otro campo de estado documentado más confiable ("blocked" aparece
-// en /v1/accounts/me/ pero no está confirmado en list/retrieve de drivers).
+// GET/PUT/PATCH /v1/accounts/drivers/ — Documentacion simpliroute/04 §44-59,
+// pero verificado y corregido contra la cuenta real 2026-08-28 (el doc
+// tenía varios puntos desactualizados/incorrectos):
+// - Create/update van con el body como objeto plano, NO como array (el doc
+//   oficial mostraba un array de un elemento; la API real rechaza eso con
+//   "Expected a dictionary, but got list").
+// - PUT/PATCH exigen re-enviar un flag de "user type" (`is_driver: true`)
+//   aunque no cambie, si no tira "You must select user type".
+// - DELETE no está implementado pese a listarse en el header Allow — devuelve
+//   405. La baja real es un soft-delete: PATCH con `status: "deleted"`.
+// - `status` (choices: active/deleted/blocked, descubierto vía OPTIONS) es la
+//   fuente de verdad de si el chofer está activo — más confiable que
+//   `blocked`, que en la práctica quedó en `false` incluso con status
+//   "deleted".
 interface ChoferSimpliRoute {
   id: number;
   username: string;
@@ -82,6 +96,7 @@ interface ChoferSimpliRoute {
   email: string;
   is_driver: boolean;
   blocked?: boolean;
+  status?: string;
 }
 
 // GET/POST/PATCH/PUT/DELETE /v1/routes/vehicles/ — Documentacion simpliroute/04
@@ -113,7 +128,7 @@ function mapearChofer(chofer: ChoferSimpliRoute): ChoferProveedor {
     username: chofer.username,
     telefono: chofer.phone || null,
     email: chofer.email || null,
-    activo: chofer.is_driver && chofer.blocked !== true,
+    activo: chofer.is_driver && chofer.blocked !== true && chofer.status !== "deleted",
   };
 }
 
@@ -243,12 +258,16 @@ export class SimplirouteHttpAdapter implements LogisticaProviderPort {
 
   // §19 funcional — devuelve el estado crudo tal cual lo informa SimpliRoute;
   // el mapeo a EstadoPedido propio vive en el módulo de pedidos (ver puerto).
-  async consultarEstado(idExterno: string): Promise<string> {
+  async consultarEstado(idExterno: string): Promise<EstadoVisita> {
     const respuesta = await this.solicitar<VisitaSimpliRoute | VisitaSimpliRoute[]>(
       "GET",
       `/v1/routes/visits/${encodeURIComponent(idExterno)}/`,
     );
-    return primerElemento(respuesta).status;
+    const visita = primerElemento(respuesta);
+    return {
+      estado: visita.status,
+      fechaEntrega: visita.checkout_time ? new Date(visita.checkout_time) : null,
+    };
   }
 
   // §12 funcional. Solo lectura pública (Documentacion simpliroute/04 §65-71) —
@@ -264,20 +283,18 @@ export class SimplirouteHttpAdapter implements LogisticaProviderPort {
     return choferes.filter((c) => c.is_driver).map(mapearChofer);
   }
 
-  // Root array según ejemplo oficial (Documentacion simpliroute/04 §48),
-  // aunque se cree un solo chofer.
+  // Body como objeto plano (no array) — verificado contra la cuenta real
+  // 2026-08-28, ver comentario de ChoferSimpliRoute más arriba.
   async crearChofer(datos: DatosChofer): Promise<ChoferProveedor> {
-    const body = [
-      {
-        username: datos.username,
-        name: datos.nombre,
-        phone: datos.telefono ?? "",
-        email: datos.email ?? "",
-        is_admin: false,
-        is_driver: true,
-        password: datos.password,
-      },
-    ];
+    const body = {
+      username: datos.username,
+      name: datos.nombre,
+      phone: datos.telefono ?? "",
+      email: datos.email ?? "",
+      is_admin: false,
+      is_driver: true,
+      password: datos.password,
+    };
     const respuesta = await this.solicitar<ChoferSimpliRoute | ChoferSimpliRoute[]>(
       "POST",
       "/v1/accounts/drivers/",
@@ -286,19 +303,18 @@ export class SimplirouteHttpAdapter implements LogisticaProviderPort {
     return mapearChofer(primerElemento(respuesta));
   }
 
-  // Solo PUT está documentado para Users (no PATCH) — ver DatosChofer.password
-  // en el puerto para la ambigüedad de qué pasa si se omite la contraseña.
+  // `is_driver: true` va siempre, aunque no cambie — sin él la API responde
+  // "You must select user type" (ver comentario de ChoferSimpliRoute).
   async actualizarChofer(id: number, datos: DatosChofer): Promise<ChoferProveedor> {
-    const body = [
-      {
-        username: datos.username,
-        name: datos.nombre,
-        phone: datos.telefono ?? "",
-        email: datos.email ?? "",
-        is_admin: false,
-        ...(datos.password ? { password: datos.password } : {}),
-      },
-    ];
+    const body = {
+      username: datos.username,
+      name: datos.nombre,
+      phone: datos.telefono ?? "",
+      email: datos.email ?? "",
+      is_admin: false,
+      is_driver: true,
+      ...(datos.password ? { password: datos.password } : {}),
+    };
     const respuesta = await this.solicitar<ChoferSimpliRoute | ChoferSimpliRoute[]>(
       "PUT",
       `/v1/accounts/drivers/${id}/`,
@@ -307,8 +323,13 @@ export class SimplirouteHttpAdapter implements LogisticaProviderPort {
     return mapearChofer(primerElemento(respuesta));
   }
 
+  // DELETE real devuelve 405 pese a listarse en Allow — la baja real es un
+  // soft-delete vía PATCH status=deleted (ver comentario de ChoferSimpliRoute).
   async eliminarChofer(id: number): Promise<void> {
-    await this.solicitar<void>("DELETE", `/v1/accounts/drivers/${id}/`);
+    await this.solicitar<void>("PATCH", `/v1/accounts/drivers/${id}/`, {
+      is_driver: true,
+      status: "deleted",
+    });
   }
 
   async listarVehiculos(): Promise<VehiculoProveedor[]> {

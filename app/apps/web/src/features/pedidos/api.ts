@@ -39,3 +39,16 @@ export async function enviarASimpliRoute(pedidoIds: string[]): Promise<Resultado
   });
   return data;
 }
+
+export interface ResultadoSincronizacion {
+  actualizados: number;
+  sinCambios: number;
+  errores: { pedidoId: string; errores: string[] }[];
+}
+
+// §19 funcional: trae de SimpliRoute el estado real de los pedidos en curso
+// y los refleja acá — es lo único que lleva un pedido a Entregado/Fallido.
+export async function sincronizarEstados(): Promise<ResultadoSincronizacion> {
+  const { data } = await apiClient.post<ResultadoSincronizacion>("/pedidos/sincronizar-estados");
+  return data;
+}

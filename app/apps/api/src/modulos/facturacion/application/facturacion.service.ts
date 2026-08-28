@@ -8,6 +8,10 @@ import {
   FacturacionRepositorio,
 } from "../domain/facturacion.repositorio";
 import { PedidoParaFacturar, TarifasPorTipo, calcularFacturacionCliente } from "../domain/motor-facturacion";
+import {
+  ResumenChofer,
+  calcularLiquidacionTransportistas,
+} from "../domain/motor-liquidacion-transportistas";
 import { generarReporteMensualExcel } from "../infrastructure/reporte-mensual-excel.generador";
 
 export interface PedidoExcluido {
@@ -73,6 +77,12 @@ export class FacturacionService {
     if (await this.repositorio.existeGrupoConfirmado(clienteId, mes, anio)) {
       throw new BadRequestException("Este mes ya fue confirmado para este cliente, no se puede recalcular.");
     }
+
+    // Un pedido solo llega a ENTREGADO (lo único que listarFacturables trae)
+    // vía sincronización con SimpliRoute — se dispara acá para que la vista
+    // previa refleje entregas reales recientes sin que el usuario tenga que
+    // acordarse de sincronizar antes por su cuenta (ver PedidosService.sincronizarEstados).
+    await this.pedidosService.sincronizarEstados();
 
     const { fechaDesde, fechaHasta } = rangoDelMes(mes, anio);
     const pedidos = await this.pedidosService.listarFacturables({ clienteId, fechaDesde, fechaHasta });
@@ -180,5 +190,29 @@ export class FacturacionService {
     ]);
 
     return generarReporteMensualExcel({ clienteNombre: cliente.nombre, mes, anio, pedidos, grupos });
+  }
+
+  // §4.2 TEMAS_PENDIENTES.md: cuántos viajes hizo cada chofer en el mes y
+  // cuánto se le debe pagar. Sincroniza estados primero (mismo motivo que
+  // generarVistaPrevia) para no calcular sobre datos viejos. Distinto de la
+  // facturación a clientes: acá no hay clienteId (un chofer reparte para
+  // todos) y la tarifa es un único monto global, no por zona.
+  async liquidacionTransportistas(mes: number, anio: number): Promise<ResumenChofer[]> {
+    await this.pedidosService.sincronizarEstados();
+
+    const { fechaDesde, fechaHasta } = rangoDelMes(mes, anio);
+    const [pedidos, tarifa] = await Promise.all([
+      this.repositorio.listarEntregadosPorChoferEnPeriodo(fechaDesde, fechaHasta),
+      this.repositorio.tarifaTransportistaVigente(new Date()),
+    ]);
+
+    if (pedidos.length === 0) return [];
+    if (!tarifa) {
+      throw new BadRequestException(
+        "No hay una tarifa por viaje configurada — cargala en Facturación → Transportistas antes de calcular la liquidación.",
+      );
+    }
+
+    return calcularLiquidacionTransportistas(pedidos, tarifa.monto);
   }
 }

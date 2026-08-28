@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { listarTarifasTransportista } from "./api";
-import { formatearMonto } from "./formato";
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { liquidacionTransportistas, listarTarifasTransportista } from "./api";
+import { formatearMonto, NOMBRES_MES } from "./formato";
 import { TarifaTransportistaFormSheet } from "./tarifa-transportista-form-sheet";
 
 function formatearFecha(fecha: string): string {
@@ -11,12 +11,12 @@ function formatearFecha(fecha: string): string {
 }
 
 // Liquidación a transportistas — decisión 2026-08-26 (ver DOCUMENTO
-// TECNICO.md historial): en vez de un valor fijo en código, es un monto
-// configurable acá, con historial de vigencia. El *cálculo* de cuántos
-// viajes hizo cada chofer (para multiplicar por este monto) todavía no está
-// construido — depende de sincronizar Rutas/Viajes desde SimpliRoute, que
-// hoy no se sincronizan (ver TEMAS_PENDIENTES.md sección 2).
-export function TransportistasTab() {
+// TECNICO.md historial): monto por viaje configurable, con historial de
+// vigencia. El cálculo de cuántos viajes hizo cada chofer (§4.2
+// TEMAS_PENDIENTES.md, construido 2026-08-28) sincroniza los estados reales
+// desde SimpliRoute antes de traer el resumen — ver
+// FacturacionService.liquidacionTransportistas.
+export function TransportistasTab({ mes, anio }: { mes: number; anio: number }) {
   const [sheetAbierto, setSheetAbierto] = useState(false);
 
   const { data: tarifas, isLoading } = useQuery({
@@ -24,11 +24,24 @@ export function TransportistasTab() {
     queryFn: listarTarifasTransportista,
   });
 
+  const {
+    data: resumen,
+    isLoading: cargandoResumen,
+    isFetching: sincronizando,
+    refetch,
+  } = useQuery({
+    queryKey: ["facturacion", "liquidacion-transportistas", mes, anio],
+    queryFn: () => liquidacionTransportistas(mes, anio),
+  });
+
+  const totalViajes = resumen?.reduce((total, r) => total + r.cantidadViajes, 0) ?? 0;
+  const totalAPagar = resumen?.reduce((total, r) => total + r.totalAPagar, 0) ?? 0;
+
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-muted-foreground">
         Monto que se le paga a un transportista por cada viaje realizado (regla simple: sin 2×1 ni entrega
-        unificada). Solo administra el valor — todavía no calcula cuántos viajes hizo cada chofer.
+        unificada).
       </p>
 
       <div className="flex items-center justify-between">
@@ -69,6 +82,70 @@ export function TransportistasTab() {
             ))
           )}
         </TableBody>
+      </Table>
+
+      <div className="flex items-center justify-between pt-2">
+        <h2 className="font-medium">
+          Liquidación — {NOMBRES_MES[mes - 1]} {anio}
+        </h2>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={sincronizando}
+          onClick={() => refetch()}
+        >
+          {sincronizando ? "Sincronizando…" : "Recalcular"}
+        </Button>
+      </div>
+      <p className="text-sm text-muted-foreground -mt-2">
+        Antes de calcular, se trae de SimpliRoute el estado real de los pedidos en curso — puede tardar unos
+        segundos si hay muchos.
+      </p>
+
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Chofer</TableHead>
+            <TableHead>Viajes</TableHead>
+            <TableHead>Tarifa por viaje</TableHead>
+            <TableHead>Total a pagar</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {cargandoResumen ? (
+            <TableRow>
+              <TableCell colSpan={4} className="text-muted-foreground">
+                {sincronizando ? "Sincronizando con SimpliRoute…" : "Cargando…"}
+              </TableCell>
+            </TableRow>
+          ) : resumen?.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={4} className="text-muted-foreground">
+                Ningún pedido entregado con chofer asignado en este mes todavía.
+              </TableCell>
+            </TableRow>
+          ) : (
+            resumen?.map((r) => (
+              <TableRow key={r.choferId}>
+                <TableCell>{r.choferNombre}</TableCell>
+                <TableCell>{r.cantidadViajes}</TableCell>
+                <TableCell>{formatearMonto(r.tarifaPorViaje)}</TableCell>
+                <TableCell>{formatearMonto(r.totalAPagar)}</TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+        {resumen && resumen.length > 0 && (
+          <TableFooter>
+            <TableRow>
+              <TableCell className="font-medium">Total</TableCell>
+              <TableCell className="font-medium">{totalViajes}</TableCell>
+              <TableCell />
+              <TableCell className="font-medium">{formatearMonto(totalAPagar)}</TableCell>
+            </TableRow>
+          </TableFooter>
+        )}
       </Table>
 
       <TarifaTransportistaFormSheet abierto={sheetAbierto} onOpenChange={setSheetAbierto} />

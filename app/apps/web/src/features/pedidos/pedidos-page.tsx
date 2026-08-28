@@ -1,5 +1,9 @@
 import { useSearchParams } from "react-router-dom";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { sincronizarEstados } from "./api";
 import { PedidosTabla } from "./pedidos-tabla";
 import { RevisionPanel } from "./revision-panel";
 
@@ -13,6 +17,27 @@ export function PedidosPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const vistaParam = searchParams.get("vista");
   const vista: Vista = VISTAS.includes(vistaParam as Vista) ? (vistaParam as Vista) : "grilla";
+  const queryClient = useQueryClient();
+
+  // §19 funcional: trae de SimpliRoute el estado real de los pedidos en curso
+  // (Coordinado/En tránsito) y los pasa a Entregado/Fallido — sin esto ningún
+  // pedido llega nunca a esos estados. También se dispara solo antes de
+  // calcular cualquier facturación (ver FacturacionService), esto es la
+  // versión manual para verlo reflejado acá sin pasar por Facturación.
+  const mutacionSincronizar = useMutation({
+    mutationFn: sincronizarEstados,
+    onSuccess: (resultado) => {
+      queryClient.invalidateQueries({ queryKey: ["pedidos"] });
+      if (resultado.errores.length > 0) {
+        toast.warning(
+          `Sincronizados ${resultado.actualizados}. ${resultado.errores.length} pedido(s) con error.`,
+        );
+      } else {
+        toast.success(`Sincronizados ${resultado.actualizados} pedido(s).`);
+      }
+    },
+    onError: () => toast.error("No se pudo sincronizar. Probá de nuevo en unos segundos."),
+  });
 
   function cambiarVista(valor: string) {
     setSearchParams((actual) => {
@@ -25,7 +50,18 @@ export function PedidosPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold">Pedidos</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold">Pedidos</h1>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={mutacionSincronizar.isPending}
+          onClick={() => mutacionSincronizar.mutate()}
+        >
+          {mutacionSincronizar.isPending ? "Sincronizando…" : "Sincronizar estados"}
+        </Button>
+      </div>
 
       <Tabs value={vista} onValueChange={cambiarVista}>
         <TabsList>

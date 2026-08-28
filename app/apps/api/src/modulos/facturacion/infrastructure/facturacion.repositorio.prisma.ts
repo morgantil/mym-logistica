@@ -9,6 +9,7 @@ import {
   FacturacionRepositorio,
 } from "../domain/facturacion.repositorio";
 import { GrupoFacturacion, PedidoFacturado } from "../domain/grupo-facturacion";
+import { PedidoParaLiquidarTransportista } from "../domain/motor-liquidacion-transportistas";
 import { PorcentajeSegundoServicio, TarifaCliente, TarifaTransportista } from "../domain/tarifa";
 
 const UN_DIA_MS = 24 * 60 * 60 * 1000;
@@ -149,6 +150,25 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
       });
       return mapearTarifaTransportista(creada);
     });
+  }
+
+  async listarEntregadosPorChoferEnPeriodo(
+    fechaDesde: Date,
+    fechaHasta: Date,
+  ): Promise<PedidoParaLiquidarTransportista[]> {
+    const pedidos = await this.prisma.pedido.findMany({
+      where: {
+        estado: "ENTREGADO",
+        choferId: { not: null },
+        fechaEntregaEfectiva: { gte: fechaDesde, lt: fechaHasta },
+      },
+      select: { id: true, choferId: true, choferNombre: true },
+    });
+    return pedidos.map((p) => ({
+      id: p.id,
+      choferId: p.choferId as string,
+      choferNombre: p.choferNombre ?? "(sin nombre)",
+    }));
   }
 
   async existeGrupoConfirmado(clienteId: string, mes: number, anio: number): Promise<boolean> {

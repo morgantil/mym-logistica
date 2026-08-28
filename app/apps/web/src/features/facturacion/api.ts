@@ -3,6 +3,7 @@ import type {
   GrupoFacturacion,
   PorcentajeSegundoServicio,
   ResultadoVistaPrevia,
+  ResumenChofer,
   TarifaCliente,
   TarifaTransportista,
 } from "./tipos";
@@ -51,6 +52,13 @@ export async function crearTarifaTransportista(datos: {
   vigenciaDesde: string;
 }): Promise<TarifaTransportista> {
   const { data } = await apiClient.post<TarifaTransportista>("/facturacion/tarifa-transportista", datos);
+  return data;
+}
+
+export async function liquidacionTransportistas(mes: number, anio: number): Promise<ResumenChofer[]> {
+  const { data } = await apiClient.get<ResumenChofer[]>("/facturacion/liquidacion-transportistas", {
+    params: { mes, anio },
+  });
   return data;
 }
 

@@ -49,6 +49,16 @@ export interface PedidoExcluido {
   motivo: string;
 }
 
+// §4.2 TEMAS_PENDIENTES.md: resumen de cuántos viajes hizo cada chofer en un
+// mes y cuánto se le debe pagar (tarifaPorViaje × cantidadViajes).
+export interface ResumenChofer {
+  choferId: string;
+  choferNombre: string;
+  cantidadViajes: number;
+  tarifaPorViaje: number;
+  totalAPagar: number;
+}
+
 export interface ResultadoVistaPrevia {
   grupos: GrupoFacturacion[];
   excluidos: PedidoExcluido[];

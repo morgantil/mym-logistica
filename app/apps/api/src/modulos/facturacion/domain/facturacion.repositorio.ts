@@ -1,4 +1,5 @@
 import { GrupoFacturacion, PedidoFacturado } from "./grupo-facturacion";
+import { PedidoParaLiquidarTransportista } from "./motor-liquidacion-transportistas";
 import { PorcentajeSegundoServicio, TarifaCliente, TarifaTransportista } from "./tarifa";
 
 export interface DatosCrearTarifa {
@@ -51,6 +52,18 @@ export interface FacturacionRepositorio {
   listarTarifasTransportista(): Promise<TarifaTransportista[]>;
   tarifaTransportistaVigente(fecha: Date): Promise<TarifaTransportista | null>;
   crearTarifaTransportista(datos: DatosCrearTarifaTransportista): Promise<TarifaTransportista>;
+
+  // §4.2 TEMAS_PENDIENTES.md — pedidos ENTREGADO con chofer asignado en el
+  // período, para el cálculo de cuántos viajes hizo cada uno. Por
+  // fechaEntregaEfectiva (la real, de SimpliRoute), no fechaProgramada — a
+  // diferencia de listarFacturables (facturación a clientes), que sigue
+  // usando fechaProgramada porque ahí lo que importa es el mes que se le
+  // factura al cliente, no cuándo se confirmó la entrega. Sin clienteId: un
+  // chofer reparte para todos los clientes en el mismo período.
+  listarEntregadosPorChoferEnPeriodo(
+    fechaDesde: Date,
+    fechaHasta: Date,
+  ): Promise<PedidoParaLiquidarTransportista[]>;
 
   // Grupos de facturación (vista previa / confirmación) — §21, §32 funcional.
   existeGrupoConfirmado(clienteId: string, mes: number, anio: number): Promise<boolean>;

@@ -28,6 +28,17 @@ export interface ResultadoEnvio {
   idExterno: string;
 }
 
+export interface EstadoVisita {
+  // Valor crudo de SimpliRoute: "pending" | "entered" | "completed" | "failed"
+  // (confirmado vía OPTIONS contra la cuenta real 2026-08-28) — el mapeo a
+  // EstadoPedido propio se hace en el módulo de pedidos, no acá.
+  estado: string;
+  // `checkout_time` de la Visit — la marca real de cuándo el chofer completó
+  // la entrega desde su app. Null si todavía no se registró (incluye el caso
+  // de una Visit marcada completed/failed manualmente, sin checkout real).
+  fechaEntrega: Date | null;
+}
+
 // §12 funcional (Zona): "deberá poder consultarse desde la información
 // disponible de SimpliRoute". Decisión 2026-08-25/26 (DOCUMENTO TECNICO.md
 // historial): SimpliRoute es la fuente de verdad para Zonas, Choferes y
@@ -99,7 +110,7 @@ export interface LogisticaProviderPort {
 
   // §19 funcional — el mapeo a EstadoPedido propio se hace en el módulo de pedidos,
   // no acá: este puerto solo devuelve el estado crudo tal cual lo informa el proveedor.
-  consultarEstado(idExterno: string): Promise<string>;
+  consultarEstado(idExterno: string): Promise<EstadoVisita>;
 
   // §12-§13 funcional — catálogos que ZonasChoferesService cachea localmente
   // y refresca periódicamente (nunca se consultan en vivo en cada request).

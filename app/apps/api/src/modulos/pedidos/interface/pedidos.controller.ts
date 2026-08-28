@@ -61,6 +61,16 @@ export class PedidosController {
     return this.pedidosService.enviarASimpliRoute(dto.pedidoIds);
   }
 
+  // §19 funcional: trae de SimpliRoute el estado real de los pedidos en
+  // curso y los refleja en EstadoPedido (única forma de llegar a ENTREGADO/
+  // ENTREGA_FALLIDA) — mismos roles que pueden enviar, más Logística porque
+  // también dispara esto antes de calcular la liquidación a transportistas.
+  @Roles(Rol.OPERACIONES, Rol.LOGISTICA, Rol.ADMINISTRACION)
+  @Post("sincronizar-estados")
+  sincronizarEstados() {
+    return this.pedidosService.sincronizarEstados();
+  }
+
   // §8.2 funcional v6: todas las etiquetas del pedido (una por bulto) —
   // rol Logística, pantalla de Embalaje y Despacho.
   @Roles(Rol.LOGISTICA, Rol.ADMINISTRACION)

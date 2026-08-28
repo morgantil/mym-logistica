@@ -3,6 +3,7 @@ import { PermisosClienteService } from "../../../common/permisos/permisos-client
 import { DestinatariosService } from "../../destinatarios/application/destinatarios.service";
 import { LOGISTICA_PROVIDER, LogisticaProviderPort } from "../../simpliroute/domain/logistica-provider.port";
 import { generarEtiquetasPdf } from "../infrastructure/etiqueta-pdf.generador";
+import { mapearEstadoSimpliRoute } from "../domain/mapear-estado-simpliroute";
 import {
   DatosCrearPedido,
   FiltroPedidos,
@@ -19,6 +20,12 @@ export interface PedidoConErrores {
 
 export interface ResultadoEnvioMasivo {
   enviados: string[];
+  errores: PedidoConErrores[];
+}
+
+export interface ResultadoSincronizacion {
+  actualizados: number;
+  sinCambios: number;
   errores: PedidoConErrores[];
 }
 
@@ -167,6 +174,45 @@ export class PedidosService {
         resultado.errores.push({
           pedidoId,
           errores: [error instanceof Error ? error.message : "Error desconocido al enviar."],
+        });
+      }
+    }
+
+    return resultado;
+  }
+
+  // §19 funcional: trae el estado real de cada pedido ya enviado y todavía en
+  // curso (COORDINADO/EN_TRANSITO) desde SimpliRoute, y lo refleja en
+  // EstadoPedido — es lo único que permite que un pedido llegue a ENTREGADO
+  // o ENTREGA_FALLIDA (nada más en el sistema los setea). Un status crudo sin
+  // mapeo conocido o un error de red en un pedido puntual no frena al resto
+  // (mismo criterio que enviarASimpliRoute). Se llama antes de calcular
+  // cualquier facturación (ver FacturacionService) además de estar disponible
+  // como acción manual.
+  async sincronizarEstados(): Promise<ResultadoSincronizacion> {
+    const pendientes = await this.repositorio.listarPendientesDeSincronizar();
+    const resultado: ResultadoSincronizacion = { actualizados: 0, sinCambios: 0, errores: [] };
+
+    for (const pedido of pendientes) {
+      try {
+        const { estado: estadoCrudo, fechaEntrega } = await this.logisticaProvider.consultarEstado(
+          pedido.simplirouteId,
+        );
+        const estadoMapeado = mapearEstadoSimpliRoute(estadoCrudo);
+        if (estadoMapeado === null) {
+          resultado.sinCambios++;
+          continue;
+        }
+        await this.repositorio.actualizarEstadoDesdeProveedor(pedido.id, {
+          estado: estadoMapeado,
+          fechaEntregaEfectiva: fechaEntrega,
+          version: pedido.version,
+        });
+        resultado.actualizados++;
+      } catch (error) {
+        resultado.errores.push({
+          pedidoId: pedido.id,
+          errores: [error instanceof Error ? error.message : "Error desconocido al sincronizar."],
         });
       }
     }

@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
+import { EstadoPedido } from "@mym/shared-types";
 import { PrismaService } from "../../../common/prisma/prisma.service";
 import { ConflictoVersionError } from "../domain/conflicto-version.error";
 import { Pedido, PedidoListado } from "../domain/pedido";
@@ -8,6 +9,7 @@ import {
   FiltroPedidos,
   FiltroPedidosFacturables,
   PaginaPedidos,
+  PedidoParaSincronizar,
   PedidosRepositorio,
 } from "../domain/pedidos.repositorio";
 
@@ -191,5 +193,35 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
 
   async marcarEtiquetaImpresa(id: string): Promise<void> {
     await this.prisma.pedido.update({ where: { id }, data: { etiquetaImpresaEn: new Date() } });
+  }
+
+  async listarPendientesDeSincronizar(): Promise<PedidoParaSincronizar[]> {
+    const pedidos = await this.prisma.pedido.findMany({
+      where: {
+        estadoSimpliroute: "ENVIADO",
+        estado: { in: ["COORDINADO", "EN_TRANSITO"] },
+        simplirouteId: { not: null },
+      },
+      select: { id: true, simplirouteId: true, version: true },
+    });
+    return pedidos.map((p) => ({ id: p.id, simplirouteId: p.simplirouteId as string, version: p.version }));
+  }
+
+  async actualizarEstadoDesdeProveedor(
+    id: string,
+    datos: { estado: EstadoPedido; fechaEntregaEfectiva: Date | null; version: number },
+  ): Promise<Pedido> {
+    const resultado = await this.prisma.pedido.updateMany({
+      where: { id, version: datos.version },
+      data: {
+        estado: datos.estado,
+        fechaEntregaEfectiva: datos.fechaEntregaEfectiva,
+        version: { increment: 1 },
+      },
+    });
+    if (resultado.count === 0) {
+      return this.fallarSiNoExiste(id);
+    }
+    return this.obtenerPorId(id) as Promise<Pedido>;
   }
 }
