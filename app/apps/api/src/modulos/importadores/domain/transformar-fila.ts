@@ -82,6 +82,7 @@ export function transformarFila(
   const cantidad = aCantidad(leer("cantidad"));
   const codigoProducto = aTexto(leer("codigoProducto"));
   const telefono = aTexto(leer("telefono"));
+  const ticket = aTexto(leer("ticket"));
 
   if (!numeroAfiliado) errores.push("Falta número de afiliado.");
   if (!destinatario) errores.push("Falta destinatario.");
@@ -106,6 +107,7 @@ export function transformarFila(
       telefono,
       fechaEntrega: fechaEntregaLote,
       notaFecha,
+      ticket,
       codigoProducto,
       descripcionProducto: descripcionProducto!,
       cantidad: cantidad!,

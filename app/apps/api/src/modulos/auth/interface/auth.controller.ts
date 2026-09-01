@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req, Res, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Patch, Post, Req, Res, UseGuards } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Request, Response } from "express";
 import { parseDuracionAMs } from "../../../common/utils/duracion";
@@ -8,7 +8,9 @@ import { GoogleAuthGuard } from "../estrategias/google-auth.guard";
 import { Publico } from "../../../common/decorators/publico.decorator";
 import { UsuarioActual, UsuarioAutenticado } from "../../../common/decorators/usuario-actual.decorator";
 import { LoginDto } from "./dto/login.dto";
+import { ActualizarColumnasPedidosDto } from "./dto/actualizar-columnas-pedidos.dto";
 import { UsuarioSinCredenciales } from "../../usuarios/domain/usuario";
+import { UsuariosService } from "../../usuarios/application/usuarios.service";
 
 const COOKIE_REFRESH = "refresh_token";
 
@@ -17,6 +19,7 @@ export class AuthController {
   constructor(
     private authService: AuthService,
     private configService: ConfigService,
+    private usuariosService: UsuariosService,
   ) {}
 
   // Refresh token SIEMPRE en cookie httpOnly, nunca en el body — DOCUMENTO
@@ -115,5 +118,26 @@ export class AuthController {
   @Get("perfil")
   perfil(@UsuarioActual() usuario: UsuarioAutenticado) {
     return usuario;
+  }
+
+  // Preferencia personal de la grilla de Pedidos (columnas fijas a la
+  // izquierda) — decisión 2026-09-01. Self-service: cualquier usuario
+  // autenticado puede leer/guardar la suya propia, sin pasar por el rol
+  // Administración de UsuariosController (eso es para gestionar A OTROS).
+  @Get("perfil/columnas-pedidos")
+  async columnasPedidos(@UsuarioActual() usuario: UsuarioAutenticado): Promise<{ columnas: string[] }> {
+    const usuarioCompleto = await this.usuariosService.buscarPorId(usuario.id);
+    return { columnas: usuarioCompleto?.columnasFijasPedidos ?? [] };
+  }
+
+  @Patch("perfil/columnas-pedidos")
+  async actualizarColumnasPedidos(
+    @UsuarioActual() usuario: UsuarioAutenticado,
+    @Body() dto: ActualizarColumnasPedidosDto,
+  ): Promise<{ columnas: string[] }> {
+    const actualizado = await this.usuariosService.actualizar(usuario.id, usuario.id, {
+      columnasFijasPedidos: dto.columnas,
+    });
+    return { columnas: actualizado.columnasFijasPedidos };
   }
 }

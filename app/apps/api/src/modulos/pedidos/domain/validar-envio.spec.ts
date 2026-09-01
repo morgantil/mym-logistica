@@ -56,17 +56,15 @@ describe("validarPedidoParaEnvio", () => {
     expect(errores).toContain("Chofer sin asignar.");
   });
 
-  it("marca bultos sin cargar, pero 0 bultos no cuenta como faltante", () => {
-    expect(validarPedidoParaEnvio(pedidoListoParaEnviar({ bultos: null }))).toContain(
-      "Bultos sin cargar.",
-    );
+  it("bultos sin cargar no bloquea el envío (se puede cargar después, más cerca del despacho)", () => {
+    expect(validarPedidoParaEnvio(pedidoListoParaEnviar({ bultos: null }))).toEqual([]);
     expect(validarPedidoParaEnvio(pedidoListoParaEnviar({ bultos: 0 }))).toEqual([]);
   });
 
   it("acumula todos los errores a la vez, no se corta en el primero", () => {
     const errores = validarPedidoParaEnvio(
-      pedidoListoParaEnviar({ zonaId: null, choferId: null, bultos: null }),
+      pedidoListoParaEnviar({ zonaId: null, choferId: null }),
     );
-    expect(errores).toHaveLength(3);
+    expect(errores).toHaveLength(2);
   });
 });

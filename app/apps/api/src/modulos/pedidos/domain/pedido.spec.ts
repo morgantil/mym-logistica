@@ -10,6 +10,7 @@ function linea(overrides: Partial<LineaExcelPanales> = {}): LineaExcelPanales {
     telefono: null,
     fechaEntrega: "2026-08-15",
     notaFecha: null,
+    ticket: null,
     codigoProducto: "EAN001",
     descripcionProducto: "Pañal A",
     cantidad: 4,

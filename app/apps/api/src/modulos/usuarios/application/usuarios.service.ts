@@ -112,7 +112,7 @@ export class UsuariosService {
   async actualizar(
     id: string,
     usuarioActualId: string,
-    datos: { nombre?: string; roles?: Rol[]; activo?: boolean },
+    datos: { nombre?: string; roles?: Rol[]; activo?: boolean; columnasFijasPedidos?: string[] },
   ): Promise<UsuarioSinCredenciales> {
     const usuario = await this.repositorio.buscarPorId(id);
     if (!usuario) {

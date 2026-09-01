@@ -10,6 +10,8 @@ export interface Usuario {
   googleId: string | null;
   roles: Rol[];
   activo: boolean;
+  // Preferencia personal de la grilla de Pedidos — ver schema.prisma.
+  columnasFijasPedidos: string[];
 }
 
 export type UsuarioSinCredenciales = Omit<Usuario, "passwordHash">;

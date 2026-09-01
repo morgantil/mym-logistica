@@ -22,7 +22,7 @@ import {
 // falta joinearlas.
 const INCLUDE_LISTADO = {
   cliente: { select: { nombre: true } },
-  destinatario: { select: { nombre: true } },
+  destinatario: { select: { nombre: true, telefono: true } },
   productos: { select: { codigo: true, descripcion: true, cantidad: true } },
 } satisfies Prisma.PedidoInclude;
 
@@ -34,6 +34,7 @@ function mapearListado(fila: FilaPedidoListado): PedidoListado {
     ...(resto as unknown as Pedido),
     clienteNombre: cliente.nombre,
     destinatarioNombre: destinatario.nombre,
+    destinatarioTelefono: destinatario.telefono,
     productos: fila.productos,
   };
 }
@@ -55,6 +56,23 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
               ...(filtro.fechaDesde ? { gte: filtro.fechaDesde } : {}),
               ...(filtro.fechaHasta ? { lte: filtro.fechaHasta } : {}),
             },
+          }
+        : {}),
+      ...(filtro.bultosDesde !== undefined || filtro.bultosHasta !== undefined
+        ? {
+            bultos: {
+              ...(filtro.bultosDesde !== undefined ? { gte: filtro.bultosDesde } : {}),
+              ...(filtro.bultosHasta !== undefined ? { lte: filtro.bultosHasta } : {}),
+            },
+          }
+        : {}),
+      ...(filtro.busqueda
+        ? {
+            OR: [
+              { numeroAfiliado: { contains: filtro.busqueda, mode: "insensitive" } },
+              { direccionUsada: { contains: filtro.busqueda, mode: "insensitive" } },
+              { destinatario: { nombre: { contains: filtro.busqueda, mode: "insensitive" } } },
+            ],
           }
         : {}),
     };

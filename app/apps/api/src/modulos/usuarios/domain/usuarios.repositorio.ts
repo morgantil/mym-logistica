@@ -21,7 +21,7 @@ export interface UsuariosRepositorio {
   listar(): Promise<Usuario[]>;
   actualizar(
     id: string,
-    datos: Partial<Pick<Usuario, "nombre" | "roles" | "activo" | "passwordHash">>,
+    datos: Partial<Pick<Usuario, "nombre" | "roles" | "activo" | "passwordHash" | "columnasFijasPedidos">>,
   ): Promise<Usuario>;
   clientesPermitidosDe(usuarioId: string): Promise<string[]>;
   // Reemplaza el conjunto completo — un array vacío significa "ve todos los

@@ -9,6 +9,9 @@ export interface ParametrosListarPedidos {
   clienteId?: string;
   fechaDesde?: string;
   fechaHasta?: string;
+  bultosDesde?: number;
+  bultosHasta?: number;
+  busqueda?: string;
 }
 
 export async function listarPedidos(parametros: ParametrosListarPedidos): Promise<PaginaPedidos> {
@@ -51,4 +54,17 @@ export interface ResultadoSincronizacion {
 export async function sincronizarEstados(): Promise<ResultadoSincronizacion> {
   const { data } = await apiClient.post<ResultadoSincronizacion>("/pedidos/sincronizar-estados");
   return data;
+}
+
+// Preferencia personal de columnas fijas en la grilla — decisión 2026-09-01.
+export async function obtenerColumnasPedidos(): Promise<string[]> {
+  const { data } = await apiClient.get<{ columnas: string[] }>("/auth/perfil/columnas-pedidos");
+  return data.columnas;
+}
+
+export async function actualizarColumnasPedidos(columnas: string[]): Promise<string[]> {
+  const { data } = await apiClient.patch<{ columnas: string[] }>("/auth/perfil/columnas-pedidos", {
+    columnas,
+  });
+  return data.columnas;
 }

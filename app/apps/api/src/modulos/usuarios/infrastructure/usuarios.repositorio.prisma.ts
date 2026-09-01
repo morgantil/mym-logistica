@@ -39,7 +39,7 @@ export class UsuariosRepositorioPrisma implements UsuariosRepositorio {
 
   actualizar(
     id: string,
-    datos: Partial<Pick<Usuario, "nombre" | "roles" | "activo" | "passwordHash">>,
+    datos: Partial<Pick<Usuario, "nombre" | "roles" | "activo" | "passwordHash" | "columnasFijasPedidos">>,
   ): Promise<Usuario> {
     return this.prisma.usuario.update({ where: { id }, data: datos });
   }

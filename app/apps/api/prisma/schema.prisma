@@ -91,6 +91,12 @@ model Usuario {
   roles        Rol[] // combinables — ver DOCUMENTO TECNICO.md sección 2
   activo       Boolean @default(true)
 
+  // Preferencia personal de la grilla de Pedidos — ids de columna que este
+  // usuario fijó como "importantes" (van primero, el resto sigue en el orden
+  // por defecto). Sin drag-and-drop: el orden dentro de las fijas es el orden
+  // en que las fue marcando. Vacío = usa el orden por defecto de la grilla.
+  columnasFijasPedidos String[] @default([])
+
   creadoEn      DateTime  @default(now())
   actualizadoEn DateTime  @updatedAt
   eliminadoEn   DateTime?

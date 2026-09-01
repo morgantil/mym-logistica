@@ -254,14 +254,18 @@ export class ImportarExcelService {
         zonaId,
       );
 
-      // Dos fuentes posibles de observación, pueden darse juntas: la alerta de
-      // dirección (arriba) y la nota que venía pegada a la fecha en el Excel
-      // (grupo.notaFecha — ver LineaExcelPanales). Ninguna se pisa a la otra.
+      // Tres fuentes posibles de observación, pueden darse juntas: la alerta de
+      // dirección (arriba), la nota que venía pegada a la fecha en el Excel
+      // (grupo.notaFecha) y el ticket de Farmapal (grupo.ticket) — ver
+      // LineaExcelPanales. Ninguna se pisa a la otra. El ticket se guarda acá
+      // (no en su propio campo) para que salga impreso en la etiqueta sin
+      // tocar el generador de PDF (decisión 2026-09-01).
       const observacionesPartes = [
         alertaDireccion
           ? `Dirección diferente a la registrada en el padrón (padrón: "${alertaDireccion.direccionPadron}"). Pendiente de revisión.`
           : null,
         grupo.notaFecha,
+        grupo.ticket ? `Ticket: ${grupo.ticket}` : null,
       ].filter((parte): parte is string => Boolean(parte));
 
       await this.pedidosService.crear({

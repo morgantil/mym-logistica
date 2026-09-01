@@ -36,6 +36,7 @@ export interface Pedido {
 export interface PedidoListado extends Pedido {
   clienteNombre: string;
   destinatarioNombre: string;
+  destinatarioTelefono: string | null;
   productos: { codigo: string | null; descripcion: string; cantidad: number }[];
 }
 
@@ -52,6 +53,10 @@ export interface LineaExcelPanales {
   // entrega ahí. No es basura: transformarFila lo separa de la fecha, y acá
   // viaja hasta el Pedido como observación (ver ImportarExcelService).
   notaFecha: string | null;
+  // Número de ticket (Farmapal, §4 funcional) — se guarda como observación,
+  // no en su propio campo (decisión 2026-09-01: así sale impreso en la
+  // etiqueta junto con el resto de las observaciones sin tocar el generador).
+  ticket: string | null;
   codigoProducto: string | null;
   descripcionProducto: string;
   cantidad: number;
@@ -66,6 +71,7 @@ export interface PedidoAgrupado {
   telefono: string | null;
   fechaEntrega: string;
   notaFecha: string | null;
+  ticket: string | null;
   productos: { codigo: string | null; descripcion: string; cantidad: number }[];
   totalUnidades: number;
 }
@@ -107,6 +113,7 @@ export function agruparLineasEnPedidos(lineas: LineaExcelPanales[]): PedidoAgrup
         telefono: linea.telefono,
         fechaEntrega: linea.fechaEntrega,
         notaFecha: linea.notaFecha,
+        ticket: linea.ticket,
         productos: [producto],
         totalUnidades: linea.cantidad,
       });

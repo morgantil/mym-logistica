@@ -1,10 +1,21 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { flexRender } from "@tanstack/react-table";
 import { getCoreRowModel, useLegacyTable, type LegacyColumnDef } from "@tanstack/react-table/legacy";
+import { SlidersHorizontal } from "lucide-react";
 import { EstadoPedido } from "@mym/shared-types";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -14,13 +25,15 @@ import {
 } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth-context";
-import { listarPedidos } from "./api";
+import { actualizarColumnasPedidos, listarPedidos, obtenerColumnasPedidos } from "./api";
 import { BultosCelda } from "./bultos-celda";
 import { DetallePedidoSheet } from "./detalle-pedido-sheet";
+import { ordenarColumnas } from "./orden-columnas";
 import { BadgeEstadoPedido, BadgeEstadoSimpliroute, BadgeEstadoValidacion, LABEL_ESTADO_PEDIDO } from "./estado-labels";
 import type { PedidoListado } from "./tipos";
 
 const POR_PAGINA = 20;
+const DEBOUNCE_BUSQUEDA_MS = 400;
 
 const formateadorFecha = new Intl.DateTimeFormat("es-AR", {
   day: "2-digit",
@@ -29,8 +42,49 @@ const formateadorFecha = new Intl.DateTimeFormat("es-AR", {
   timeZone: "UTC",
 });
 
+// Todas las columnas personalizables, en su orden por defecto — "Acciones" no
+// entra acá, siempre va última y no se puede sacar ni mover (ver más abajo).
+const IDS_COLUMNAS_DEFAULT = [
+  "cliente",
+  "estado",
+  "numero",
+  "afiliado",
+  "destinatario",
+  "telefono",
+  "direccion",
+  "localidad",
+  "fecha",
+  "productos",
+  "bultos",
+  "zona",
+  "chofer",
+  "validacion",
+  "simpliroute",
+  "observaciones",
+] as const;
+
+const LABEL_COLUMNA: Record<(typeof IDS_COLUMNAS_DEFAULT)[number], string> = {
+  cliente: "Cliente",
+  estado: "Estado",
+  numero: "Nº Pedido",
+  afiliado: "Nº afiliado",
+  destinatario: "Destinatario",
+  telefono: "Teléfono",
+  direccion: "Dirección",
+  localidad: "Localidad",
+  fecha: "Fecha",
+  productos: "Productos",
+  bultos: "Bultos",
+  zona: "Zona",
+  chofer: "Chofer",
+  validacion: "Validación",
+  simpliroute: "SimpliRoute",
+  observaciones: "Observaciones",
+};
+
 export function PedidosTabla() {
   const { usuario } = useAuth();
+  const queryClient = useQueryClient();
   const puedeEditarBultos = Boolean(
     usuario?.roles.some((rol) => rol === "LOGISTICA" || rol === "ADMINISTRACION"),
   );
@@ -60,35 +114,95 @@ export function PedidosTabla() {
     setPagina(1);
   }
 
+  // Resto de filtros — decisión 2026-09-01, "mayor/menor" + búsqueda libre.
+  // No viven en la URL a propósito: son de uso puntual mientras se busca algo,
+  // no un link que tenga sentido compartir (a diferencia de ?estado=...).
+  const [fechaDesde, setFechaDesde] = useState("");
+  const [fechaHasta, setFechaHasta] = useState("");
+  const [bultosDesde, setBultosDesde] = useState("");
+  const [bultosHasta, setBultosHasta] = useState("");
+  const [busquedaInput, setBusquedaInput] = useState("");
+  const [busqueda, setBusqueda] = useState("");
+
+  useEffect(() => {
+    const temporizador = setTimeout(() => setBusqueda(busquedaInput.trim()), DEBOUNCE_BUSQUEDA_MS);
+    return () => clearTimeout(temporizador);
+  }, [busquedaInput]);
+
+  useEffect(() => {
+    setPagina(1);
+  }, [fechaDesde, fechaHasta, bultosDesde, bultosHasta, busqueda]);
+
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["pedidos", "listado", { pagina, porPagina: POR_PAGINA, estado }],
+    queryKey: [
+      "pedidos",
+      "listado",
+      { pagina, porPagina: POR_PAGINA, estado, fechaDesde, fechaHasta, bultosDesde, bultosHasta, busqueda },
+    ],
     queryFn: () =>
       listarPedidos({
         pagina,
         porPagina: POR_PAGINA,
         estado: estado === "TODOS" ? undefined : estado,
+        fechaDesde: fechaDesde || undefined,
+        fechaHasta: fechaHasta || undefined,
+        bultosDesde: bultosDesde ? Number(bultosDesde) : undefined,
+        bultosHasta: bultosHasta ? Number(bultosHasta) : undefined,
+        busqueda: busqueda || undefined,
       }),
     placeholderData: (data) => data,
   });
 
-  const columnas = useMemo<LegacyColumnDef<PedidoListado>[]>(
-    () => [
-      { id: "cliente", header: "Cliente", cell: ({ row }) => row.original.clienteNombre },
-      {
+  // Personalización de columnas (por usuario, decisión 2026-09-01): fijas
+  // primero en el orden en que se marcaron, el resto sigue en su orden por
+  // defecto — sin drag-and-drop, alcanza con elegir cuáles importan más.
+  const { data: columnasFijas = [] } = useQuery({
+    queryKey: ["pedidos", "columnas-fijas"],
+    queryFn: obtenerColumnasPedidos,
+  });
+
+  const mutacionColumnas = useMutation({
+    mutationFn: actualizarColumnasPedidos,
+    onSuccess: (columnas) => {
+      queryClient.setQueryData(["pedidos", "columnas-fijas"], columnas);
+    },
+  });
+
+  function alternarColumnaFija(id: string) {
+    const siguiente = columnasFijas.includes(id)
+      ? columnasFijas.filter((c) => c !== id)
+      : [...columnasFijas, id];
+    mutacionColumnas.mutate(siguiente);
+  }
+
+  const definicionesColumna: Record<(typeof IDS_COLUMNAS_DEFAULT)[number], LegacyColumnDef<PedidoListado>> = useMemo(
+    () => ({
+      cliente: { id: "cliente", header: "Cliente", cell: ({ row }) => row.original.clienteNombre },
+      estado: {
         id: "estado",
         header: "Estado",
         cell: ({ row }) => <BadgeEstadoPedido estado={row.original.estado} />,
       },
-      { id: "afiliado", header: "Nº afiliado", cell: ({ row }) => row.original.numeroAfiliado },
-      { id: "destinatario", header: "Destinatario", cell: ({ row }) => row.original.destinatarioNombre },
-      { id: "direccion", header: "Dirección", cell: ({ row }) => row.original.direccionUsada },
-      { id: "localidad", header: "Localidad", cell: ({ row }) => row.original.localidad },
-      {
+      numero: { id: "numero", header: "Nº Pedido", cell: ({ row }) => row.original.numero },
+      afiliado: { id: "afiliado", header: "Nº afiliado", cell: ({ row }) => row.original.numeroAfiliado },
+      destinatario: {
+        id: "destinatario",
+        header: "Destinatario",
+        cell: ({ row }) => row.original.destinatarioNombre,
+      },
+      telefono: {
+        id: "telefono",
+        header: "Teléfono",
+        cell: ({ row }) => row.original.destinatarioTelefono ?? "—",
+      },
+      direccion: { id: "direccion", header: "Dirección", cell: ({ row }) => row.original.direccionUsada },
+      localidad: { id: "localidad", header: "Localidad", cell: ({ row }) => row.original.localidad },
+      fecha: {
         id: "fecha",
         header: "Fecha",
         cell: ({ row }) => formateadorFecha.format(new Date(row.original.fechaProgramada)),
       },
-      {
+      productos: {
         id: "productos",
         header: "Productos",
         cell: ({ row }) => {
@@ -96,28 +210,36 @@ export function PedidosTabla() {
           return `${total} u. (${row.original.productos.length} prod.)`;
         },
       },
-      {
+      bultos: {
         id: "bultos",
         header: "Bultos",
         cell: ({ row }) => <BultosCelda pedido={row.original} puedeEditar={puedeEditarBultos} />,
       },
-      { id: "zona", header: "Zona", cell: ({ row }) => row.original.zonaNombre ?? "—" },
-      { id: "chofer", header: "Chofer", cell: ({ row }) => row.original.choferNombre ?? "—" },
-      {
+      zona: { id: "zona", header: "Zona", cell: ({ row }) => row.original.zonaNombre ?? "—" },
+      chofer: { id: "chofer", header: "Chofer", cell: ({ row }) => row.original.choferNombre ?? "—" },
+      validacion: {
         id: "validacion",
         header: "Validación",
         cell: ({ row }) => <BadgeEstadoValidacion estado={row.original.estadoValidacion} />,
       },
-      {
+      simpliroute: {
         id: "simpliroute",
         header: "SimpliRoute",
         cell: ({ row }) => <BadgeEstadoSimpliroute estado={row.original.estadoSimpliroute} />,
       },
-      {
+      observaciones: {
         id: "observaciones",
         header: "Observaciones",
         cell: ({ row }) => row.original.observaciones ?? "—",
       },
+    }),
+    [puedeEditarBultos],
+  );
+
+  const columnas = useMemo<LegacyColumnDef<PedidoListado>[]>(() => {
+    const orden = ordenarColumnas([...IDS_COLUMNAS_DEFAULT], columnasFijas);
+    return [
+      ...orden.map((id) => definicionesColumna[id as (typeof IDS_COLUMNAS_DEFAULT)[number]]),
       {
         id: "acciones",
         header: "Acciones",
@@ -127,9 +249,8 @@ export function PedidosTabla() {
           </Button>
         ),
       },
-    ],
-    [puedeEditarBultos],
-  );
+    ];
+  }, [columnasFijas, definicionesColumna]);
 
   const tabla = useLegacyTable({
     data: data?.datos ?? [],
@@ -142,26 +263,113 @@ export function PedidosTabla() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">Estado:</span>
-          <Select
-            value={estado}
-            onValueChange={(valor) => cambiarEstado(valor as EstadoPedido | "TODOS")}
-          >
-            <SelectTrigger className="w-48">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="TODOS">Todos</SelectItem>
-              {Object.values(EstadoPedido).map((valor) => (
-                <SelectItem key={valor} value={valor}>
-                  {LABEL_ESTADO_PEDIDO[valor]}
-                </SelectItem>
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex min-w-48 flex-1 flex-col gap-1">
+            <Label htmlFor="busqueda-pedidos" className="text-xs text-muted-foreground">
+              Buscar
+            </Label>
+            <Input
+              id="busqueda-pedidos"
+              placeholder="Destinatario, dirección o Nº de afiliado…"
+              value={busquedaInput}
+              onChange={(e) => setBusquedaInput(e.target.value)}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <Label className="text-xs text-muted-foreground">Estado</Label>
+            <Select value={estado} onValueChange={(valor) => cambiarEstado(valor as EstadoPedido | "TODOS")}>
+              <SelectTrigger className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="TODOS">Todos</SelectItem>
+                {Object.values(EstadoPedido).map((valor) => (
+                  <SelectItem key={valor} value={valor}>
+                    {LABEL_ESTADO_PEDIDO[valor]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="fecha-desde-pedidos" className="text-xs text-muted-foreground">
+              Fecha desde
+            </Label>
+            <Input
+              id="fecha-desde-pedidos"
+              type="date"
+              className="w-40"
+              value={fechaDesde}
+              onChange={(e) => setFechaDesde(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="fecha-hasta-pedidos" className="text-xs text-muted-foreground">
+              Fecha hasta
+            </Label>
+            <Input
+              id="fecha-hasta-pedidos"
+              type="date"
+              className="w-40"
+              value={fechaHasta}
+              onChange={(e) => setFechaHasta(e.target.value)}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="bultos-desde-pedidos" className="text-xs text-muted-foreground">
+              Bultos desde
+            </Label>
+            <Input
+              id="bultos-desde-pedidos"
+              type="number"
+              min={0}
+              className="w-24"
+              value={bultosDesde}
+              onChange={(e) => setBultosDesde(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="bultos-hasta-pedidos" className="text-xs text-muted-foreground">
+              Bultos hasta
+            </Label>
+            <Input
+              id="bultos-hasta-pedidos"
+              type="number"
+              min={0}
+              className="w-24"
+              value={bultosHasta}
+              onChange={(e) => setBultosHasta(e.target.value)}
+            />
+          </div>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" variant="outline" className="gap-2">
+                <SlidersHorizontal className="size-4" />
+                Personalizar columnas
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="max-h-96 overflow-y-auto">
+              <DropdownMenuLabel>Fijar a la izquierda</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {IDS_COLUMNAS_DEFAULT.map((id) => (
+                <DropdownMenuCheckboxItem
+                  key={id}
+                  checked={columnasFijas.includes(id)}
+                  onSelect={(e) => e.preventDefault()}
+                  onCheckedChange={() => alternarColumnaFija(id)}
+                >
+                  {LABEL_COLUMNA[id]}
+                </DropdownMenuCheckboxItem>
               ))}
-            </SelectContent>
-          </Select>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
+
         <p className="text-sm text-muted-foreground">{total} pedido{total === 1 ? "" : "s"}</p>
       </div>
 
@@ -170,42 +378,46 @@ export function PedidosTabla() {
           No se pudieron cargar los pedidos. Probá de nuevo en unos segundos.
         </p>
       ) : (
-        <Table>
-          <TableHeader>
-            {tabla.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
-                    {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={columnas.length} className="text-muted-foreground">
-                  Cargando…
-                </TableCell>
-              </TableRow>
-            ) : data?.datos.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={columnas.length} className="text-muted-foreground">
-                  No hay pedidos para este filtro.
-                </TableCell>
-              </TableRow>
-            ) : (
-              tabla.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
+        <div className="overflow-x-auto rounded-md border">
+          <Table>
+            <TableHeader>
+              {tabla.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => (
+                    <TableHead key={header.id} className="whitespace-nowrap">
+                      {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                    </TableHead>
                   ))}
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+              ))}
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={columnas.length} className="text-muted-foreground">
+                    Cargando…
+                  </TableCell>
+                </TableRow>
+              ) : data?.datos.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={columnas.length} className="text-muted-foreground">
+                    No hay pedidos para este filtro.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                tabla.getRowModel().rows.map((row) => (
+                  <TableRow key={row.id}>
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id} className="whitespace-nowrap">
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
       )}
 
       <div className="flex items-center justify-between">

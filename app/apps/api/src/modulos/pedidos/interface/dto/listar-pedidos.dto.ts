@@ -1,5 +1,5 @@
 import { Type } from "class-transformer";
-import { IsDate, IsEnum, IsInt, IsOptional, IsUUID, Max, Min } from "class-validator";
+import { IsDate, IsEnum, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from "class-validator";
 import { EstadoPedido } from "@mym/shared-types";
 
 // `clienteId`/`fechaDesde`/`fechaHasta` los usa la pantalla de Embalaje y
@@ -24,6 +24,23 @@ export class ListarPedidosDto {
   @Type(() => Date)
   @IsDate()
   fechaHasta?: Date;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  bultosDesde?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  bultosHasta?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  busqueda?: string;
 
   @IsOptional()
   @Type(() => Number)

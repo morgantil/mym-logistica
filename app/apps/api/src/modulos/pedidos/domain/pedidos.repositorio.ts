@@ -27,6 +27,13 @@ export interface FiltroPedidos {
   estado?: EstadoPedido;
   fechaDesde?: Date;
   fechaHasta?: Date;
+  // Filtro "mayor/menor" sobre bultos — decisión 2026-09-01. bultos=null
+  // (sin cargar todavía) queda afuera en cuanto se usa cualquiera de los dos.
+  bultosDesde?: number;
+  bultosHasta?: number;
+  // Búsqueda libre — matchea contra destinatario, dirección o Nº de afiliado
+  // (case-insensitive, "contiene"). Decisión 2026-09-01.
+  busqueda?: string;
 }
 
 export interface FiltroPedidosFacturables {

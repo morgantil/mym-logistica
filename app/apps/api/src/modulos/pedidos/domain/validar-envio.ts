@@ -19,9 +19,10 @@ export function validarPedidoParaEnvio(pedido: Pedido): string[] {
   if (!pedido.choferId) {
     errores.push("Chofer sin asignar.");
   }
-  if (pedido.bultos === null || pedido.bultos === undefined) {
-    errores.push("Bultos sin cargar.");
-  }
+  // Bultos NO bloquea el envío a SimpliRoute (decisión 2026-09-01) — se puede
+  // cargar más cerca del despacho. Sigue siendo obligatorio para imprimir
+  // etiquetas (PedidosService.generarEtiquetas), ahí sí hace falta saber el
+  // total para numerarlas.
 
   return errores;
 }

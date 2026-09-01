@@ -45,6 +45,46 @@ describe("transformarFila", () => {
     });
   });
 
+  it("extrae el ticket (Farmapal) cuando el mapeo lo trae — se guarda como observación, no en su propio campo", () => {
+    const resultado = transformarFila(
+      {
+        Afiliado: 12345,
+        Nombre: "Juan Pérez",
+        Domicilio: "Rivadavia 100",
+        Barrio: "Once",
+        Fecha: new Date("2026-08-15"),
+        Producto: "Pañal A",
+        Cantidad: 4,
+        Ticket: "TKT-9876",
+      },
+      { ...MAPEO, ticket: "Ticket" },
+      "cliente-1",
+      FECHA_LOTE,
+    );
+
+    expect(resultado.valida).toBe(true);
+    expect(resultado.linea).toMatchObject({ ticket: "TKT-9876" });
+  });
+
+  it("sin columna de ticket mapeada, queda null (no rompe clientes que no lo traen)", () => {
+    const resultado = transformarFila(
+      {
+        Afiliado: 12345,
+        Nombre: "Juan Pérez",
+        Domicilio: "Rivadavia 100",
+        Barrio: "Once",
+        Fecha: new Date("2026-08-15"),
+        Producto: "Pañal A",
+        Cantidad: 4,
+      },
+      MAPEO,
+      "cliente-1",
+      FECHA_LOTE,
+    );
+
+    expect(resultado.linea).toMatchObject({ ticket: null });
+  });
+
   it("una fila con datos faltantes queda marcada, no explota", () => {
     const resultado = transformarFila(
       { Afiliado: "12345", Nombre: "", Domicilio: "Rivadavia 100" },

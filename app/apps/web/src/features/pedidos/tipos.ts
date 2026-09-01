@@ -32,6 +32,7 @@ export interface PedidoListado {
   version: number;
   clienteNombre: string;
   destinatarioNombre: string;
+  destinatarioTelefono: string | null;
   zonaNombre: string | null;
   choferNombre: string | null;
   productos: ProductoPedido[];
