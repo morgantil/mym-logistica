@@ -48,7 +48,7 @@ documento es el más al día para este tema.
 
 | # | Pendiente | Dueño | Detalle |
 |---|---|---|---|
-| 2.5.1 | Activar modo real (`SIMPLIROUTE_MOCK=false`) | Leonardo decide cuándo | El token ya funciona, probado en lectura y escritura (2026-08-16). Ya no es una duda técnica — es decidir el momento en que el sistema empiece a mandar tráfico real a tu cuenta de SimpliRoute. |
+| 2.5.1 | ~~Activar modo real (`SIMPLIROUTE_MOCK=false`)~~ | ✅ Activado 2026-09-01 | Leonardo lo activó en el ambiente de test (Render) — ver `TEMAS_PENDIENTES.md` §2.8 para el detalle (incluye un gotcha real de config encontrado y corregido en el camino). |
 
 ## 3. Decisiones de negocio pendientes (no técnicas)
 

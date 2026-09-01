@@ -1,6 +1,6 @@
 # ESTADO DEL PROYECTO — leer esto primero si retomás después de una pausa
 
-Última actualización: **2026-08-28**. Este documento es una **foto del momento**, se
+Última actualización: **2026-09-01**. Este documento es una **foto del momento**, se
 reescribe cada vez que cambia el estado — no es un historial (eso vive en
 `DOCUMENTO TECNICO.md` sección 7). Si algo acá contradice el código o
 `DOCUMENTO TECNICO.md`, confiá en esos dos, no en esto — puede haber quedado viejo.
@@ -75,7 +75,7 @@ Repo Git en la raíz de `MYM/`, rama **`develop`**, remoto en
 | Zonas/choferes (logística) | 🟢 completo (rediseñado 2026-08-26, escritura de Choferes validada contra la cuenta real 2026-08-28) | Se trae en vivo de SimpliRoute con cache local (refresco perezoso + "Sincronizar ahora") — Choferes/Vehículos con alta/edición/baja completas contra SimpliRoute, Zonas de solo lectura. La zona de un pedido se resuelve con point-in-polygon contra el destinatario geocodificado. Revierte la decisión del 2026-08-17. La escritura real de Choferes encontró y corrigió 3 discrepancias reales contra la documentación de SimpliRoute (body como objeto no array, `is_driver` siempre requerido, baja real es `PATCH status: "deleted"` — `DELETE` no funciona pese a listarse) — ver `TEMAS_PENDIENTES.md` §2.4. Vehículos comparte el mismo adapter pero no se probó su escritura puntualmente. |
 | Zonas tarifarias (facturación) | 🟢 completo (2026-08-17) | reemplaza el enum fijo CABA/Provincia por un modelo configurable (CABA + Cordón 1/2/3/…) — tabla + pantalla propia, sin código nuevo para agregar una zona |
 | Embalaje y Despacho | 🟢 completo (2026-08-17) | pantalla nueva: filtra por fecha/cliente/estado, carga de bultos, genera/reimprime etiquetas en PDF (una por bulto) |
-| SimpliRoute | 🟢 **validado con la cuenta real, sin pendientes técnicos**, sigue en modo mock por decisión | Token real probado en lectura y escritura contra `MYM LOGISTICA Y DISTRIBUCION SRL` — ya no queda ninguna operación del módulo sin probar contra la cuenta real (Visitas/Clientes desde 2026-08-16/27, Zonas/Choferes/Vehículos desde 2026-08-26/28). `SIMPLIROUTE_MOCK=true` por decisión de timing de Leonardo, no por duda técnica. **Sincronización de estados construida y probada 2026-08-28**: no hizo falta ningún estado nuevo en SimpliRoute (la idea anterior estaba sobredimensionada) — alcanza con los 4 estados que una Visita siempre tiene (`pending`/`entered`/`completed`/`failed`), mapeados a los 4 `EstadoPedido` que ya existían en el schema. `PedidosService.sincronizarEstados()` se dispara sola antes de facturar (cliente o transportistas) y también hay un botón manual en Pedidos. Ver `TEMAS_PENDIENTES.md` sección 2. |
+| SimpliRoute | 🟢 **modo real activo en el ambiente de test** (desde 2026-09-01) | Token real probado en lectura y escritura contra `MYM LOGISTICA Y DISTRIBUCION SRL` desde antes — ya no queda ninguna operación del módulo sin probar contra la cuenta real (Visitas/Clientes desde 2026-08-16/27, Zonas/Choferes/Vehículos desde 2026-08-26/28). **`SIMPLIROUTE_MOCK=false` en Render desde 2026-09-01** — Leonardo decidió pasar a real; el ambiente de test ya no es una simulación, cualquier pedido que se envíe crea una Visita real visible para los choferes. Sincronización de estados construida y probada 2026-08-28: no hizo falta ningún estado nuevo en SimpliRoute — alcanza con los 4 estados que una Visita siempre tiene (`pending`/`entered`/`completed`/`failed`), mapeados a los 4 `EstadoPedido` que ya existían en el schema. `PedidosService.sincronizarEstados()` se dispara sola antes de facturar (cliente o transportistas) y también hay un botón manual en Pedidos. Ver `TEMAS_PENDIENTES.md` sección 2. |
 | Geografía (CABA/Provincia) | 🟢 completo | resuelto con API oficial gratuita `apis.datos.gob.ar/georef` |
 | Dashboard | 🟡 mínimo | pedidos por estado + resumen de revisión — resto de KPIs pendiente, no urgente |
 | **Facturación** | 🟢 **completo, incluida la liquidación a transportistas** | motor de reglas, vista previa/confirmación, tarifas por zona configurable, reporte mensual a Excel, tarifa a transportistas configurable (2026-08-26) **+ cálculo de cuántos viajes hizo cada chofer y cuánto se le debe pagar (2026-08-28, ver `TEMAS_PENDIENTES.md` §4.2)** — sincroniza estados reales de SimpliRoute antes de calcular. La única pregunta de negocio que faltaba (qué servicio se cobra 100% en unificada) se respondió e implementó el 2026-08-17. |
@@ -109,7 +109,7 @@ Resumen de lo más importante, todo del lado de Leonardo o del cliente final
 3. Tamaño/impresora real de la etiqueta de bulto (se usó un default de 10×15cm).
 4. Reglas de tratamiento de entregas fallidas/canceladas/reentregas (el sistema ya sincroniza y muestra `ENTREGA_FALLIDA`, falta definir qué hacer además de mostrarlo).
 5. Logo real de MyM.
-6. Activar `SIMPLIROUTE_MOCK=false` cuando Leonardo decida — ya no queda ninguna duda técnica pendiente, es 100% timing de negocio.
+6. ~~Activar `SIMPLIROUTE_MOCK=false`~~ — ✅ hecho 2026-09-01, ambiente de test conectado en real a SimpliRoute.
 
 ## Decisiones que ya están tomadas — no volver a discutir sin motivo nuevo
 

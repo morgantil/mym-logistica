@@ -1,6 +1,6 @@
 # DEPLOY — cómo está desplegado y cómo volver a hacerlo
 
-Última actualización: **2026-08-12**. Cubre el ambiente de **test** (gratuito,
+Última actualización: **2026-09-01**. Cubre el ambiente de **test** (gratuito,
 para demos). El de **producción real** todavía no existe — cuando se arme, es
 un proyecto nuevo en Render/Vercel/Neon (branch separada), no "ascender" este.
 Ver `PENDIENTES.md` para el estado de esa decisión.
@@ -33,9 +33,11 @@ Instance Type:   Free
 
 Variables de entorno (Render → Environment): `DATABASE_URL` (hoy: la misma
 Neon de desarrollo — ver "Pendiente" abajo), `JWT_SECRET`, `JWT_EXPIRES_IN`,
-`JWT_REFRESH_SECRET`, `JWT_REFRESH_EXPIRES_IN`, `SIMPLIROUTE_MOCK=true`,
-`FRONTEND_URL`, `CORS_ORIGIN` (ambas = URL exacta del frontend, sin barra
-final), `NODE_ENV=production`.
+`JWT_REFRESH_SECRET`, `JWT_REFRESH_EXPIRES_IN`, `SIMPLIROUTE_MOCK=false`
+(**modo real desde 2026-09-01** — antes estaba en `true`, ver gotcha #6 más
+abajo), `SIMPLIROUTE_API_URL`, `SIMPLIROUTE_API_KEY`, `FRONTEND_URL`,
+`CORS_ORIGIN` (ambas = URL exacta del frontend, sin barra final),
+`NODE_ENV=production`.
 
 **Frontend (Vercel, proyecto `mym-web`):**
 
@@ -105,10 +107,24 @@ funcionen si se entra directo por URL, no solo navegando desde adentro).
     el dashboard web o pidiéndole a Leonardo que hiciera clics puntuales —
     no perder tiempo reintentando la API REST sin una pista nueva de por qué
     falla.
+12. **Copiar y pegar un valor de env var desde un mensaje de chat puede
+    arrastrar texto de más** — al activar `SIMPLIROUTE_MOCK=false` (2026-09-01),
+    `SIMPLIROUTE_API_KEY` quedó guardado en Render como
+    `"Value: fff187be...` (con el prefijo "Value: " literal incluido) en vez
+    de solo la clave, porque se copió directo de un mensaje que la mostraba
+    así. El síntoma fue un 500 genérico ("Internal server error", sin
+    detalle — `NODE_ENV=production` no expone el error real) al sincronizar
+    Zonas/Choferes/Vehículos, mientras que la misma clave probada por curl
+    directo contra la API de SimpliRoute y el mismo código corrido en local
+    funcionaban perfecto — eso fue lo que aisló el problema al valor
+    guardado en Render, no al código ni a la clave en sí. Al pasarle un
+    valor para pegar en un campo de config, dejarlo en su propia línea sin
+    ningún prefijo tipo "Value:"/"Key:" que se pueda arrastrar sin querer.
 
 ## Pendiente antes de que esto sea "producción" de verdad
 
 Ver `PENDIENTES.md` — en resumen: separar la base de datos (branch de Neon
 en vez de compartir la de desarrollo), decidir dominio propio, cargar
-credenciales reales de Google/SimpliRoute, y subir de instancia gratuita a
-paga en Render/Neon para evitar el "duerme tras inactividad".
+credenciales reales de Google (SimpliRoute ya está cargado y en modo real
+desde 2026-09-01), y subir de instancia gratuita a paga en Render/Neon para
+evitar el "duerme tras inactividad".
