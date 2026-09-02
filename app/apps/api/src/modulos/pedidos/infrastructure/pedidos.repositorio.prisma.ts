@@ -8,6 +8,7 @@ import {
   DatosCrearPedido,
   FiltroPedidos,
   FiltroPedidosFacturables,
+  OrdenPedidos,
   PaginaPedidos,
   PedidoParaSincronizar,
   PedidosRepositorio,
@@ -78,12 +79,59 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
     };
   }
 
-  async listar(filtro: FiltroPedidos, pagina: number, porPagina: number): Promise<PaginaPedidos> {
+  // Whitelist campo → orderBy de Prisma (nunca un string libre, ver
+  // CampoOrdenPedido). cliente/destinatario/telefono ordenan por un campo de
+  // la relación — Prisma lo soporta anidando el orderBy.
+  private armarOrderBy(orden: OrdenPedidos | undefined): Prisma.PedidoOrderByWithRelationInput {
+    if (!orden) return { fechaProgramada: "desc" };
+    const { campo, direccion } = orden;
+    switch (campo) {
+      case "cliente":
+        return { cliente: { nombre: direccion } };
+      case "destinatario":
+        return { destinatario: { nombre: direccion } };
+      case "telefono":
+        return { destinatario: { telefono: direccion } };
+      case "estado":
+        return { estado: direccion };
+      case "numero":
+        return { numero: direccion };
+      case "afiliado":
+        return { numeroAfiliado: direccion };
+      case "direccion":
+        return { direccionUsada: direccion };
+      case "localidad":
+        return { localidad: direccion };
+      case "fecha":
+        return { fechaProgramada: direccion };
+      case "fechaSubida":
+        return { creadoEn: direccion };
+      case "bultos":
+        return { bultos: direccion };
+      case "zona":
+        return { zonaNombre: direccion };
+      case "chofer":
+        return { choferNombre: direccion };
+      case "validacion":
+        return { estadoValidacion: direccion };
+      case "simpliroute":
+        return { estadoSimpliroute: direccion };
+      case "observaciones":
+        return { observaciones: direccion };
+    }
+  }
+
+  async listar(
+    filtro: FiltroPedidos,
+    pagina: number,
+    porPagina: number,
+    orden?: OrdenPedidos,
+  ): Promise<PaginaPedidos> {
     const where = this.armarWhere(filtro);
     const [datos, total] = await Promise.all([
       this.prisma.pedido.findMany({
         where,
-        orderBy: { fechaProgramada: "desc" },
+        orderBy: this.armarOrderBy(orden),
         skip: (pagina - 1) * porPagina,
         take: porPagina,
         include: INCLUDE_LISTADO,

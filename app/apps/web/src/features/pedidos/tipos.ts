@@ -36,7 +36,29 @@ export interface PedidoListado {
   zonaNombre: string | null;
   choferNombre: string | null;
   productos: ProductoPedido[];
+  creadoEn: string;
 }
+
+// Espejo de CampoOrdenPedido (apps/api) — mismos ids que usan las columnas de
+// la grilla. "productos" queda afuera: es un cálculo agregado, no ordenable
+// con el mismo mecanismo que el resto (ver pedidos.repositorio.ts).
+export type CampoOrdenPedido =
+  | "cliente"
+  | "estado"
+  | "numero"
+  | "afiliado"
+  | "destinatario"
+  | "telefono"
+  | "direccion"
+  | "localidad"
+  | "fecha"
+  | "fechaSubida"
+  | "bultos"
+  | "zona"
+  | "chofer"
+  | "validacion"
+  | "simpliroute"
+  | "observaciones";
 
 export interface PaginaPedidos {
   datos: PedidoListado[];

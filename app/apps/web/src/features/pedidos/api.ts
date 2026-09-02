@@ -1,6 +1,12 @@
 import type { EstadoPedido } from "@mym/shared-types";
 import { apiClient } from "@/lib/api-client";
-import type { PaginaPedidos, PedidoConErroresBloqueantes, PedidoListado, ResultadoEnvioMasivo } from "./tipos";
+import type {
+  CampoOrdenPedido,
+  PaginaPedidos,
+  PedidoConErroresBloqueantes,
+  PedidoListado,
+  ResultadoEnvioMasivo,
+} from "./tipos";
 
 export interface ParametrosListarPedidos {
   pagina: number;
@@ -12,6 +18,8 @@ export interface ParametrosListarPedidos {
   bultosDesde?: number;
   bultosHasta?: number;
   busqueda?: string;
+  ordenarPor?: CampoOrdenPedido;
+  direccionOrden?: "asc" | "desc";
 }
 
 export async function listarPedidos(parametros: ParametrosListarPedidos): Promise<PaginaPedidos> {

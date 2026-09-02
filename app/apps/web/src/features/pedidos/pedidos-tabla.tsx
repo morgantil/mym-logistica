@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { flexRender } from "@tanstack/react-table";
 import { getCoreRowModel, useLegacyTable, type LegacyColumnDef } from "@tanstack/react-table/legacy";
-import { SlidersHorizontal } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, SlidersHorizontal } from "lucide-react";
 import { EstadoPedido } from "@mym/shared-types";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,7 +30,7 @@ import { BultosCelda } from "./bultos-celda";
 import { DetallePedidoSheet } from "./detalle-pedido-sheet";
 import { ordenarColumnas } from "./orden-columnas";
 import { BadgeEstadoPedido, BadgeEstadoSimpliroute, BadgeEstadoValidacion, LABEL_ESTADO_PEDIDO } from "./estado-labels";
-import type { PedidoListado } from "./tipos";
+import type { CampoOrdenPedido, PedidoListado } from "./tipos";
 
 const POR_PAGINA = 20;
 const DEBOUNCE_BUSQUEDA_MS = 400;
@@ -40,6 +40,20 @@ const formateadorFecha = new Intl.DateTimeFormat("es-AR", {
   month: "2-digit",
   year: "numeric",
   timeZone: "UTC",
+});
+
+// Fecha de subida sí tiene hora real (a diferencia de "Fecha", que es la
+// entrega elegida a mano antes de importar, sin componente de hora) — se
+// muestra en horario de Argentina, no UTC, porque acá sí importa "a qué hora
+// de mi día se subió esto".
+const formateadorFechaHora = new Intl.DateTimeFormat("es-AR", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+  timeZone: "America/Argentina/Buenos_Aires",
 });
 
 // Todas las columnas personalizables, en su orden por defecto — "Acciones" no
@@ -54,6 +68,7 @@ const IDS_COLUMNAS_DEFAULT = [
   "direccion",
   "localidad",
   "fecha",
+  "fechaSubida",
   "productos",
   "bultos",
   "zona",
@@ -73,6 +88,7 @@ const LABEL_COLUMNA: Record<(typeof IDS_COLUMNAS_DEFAULT)[number], string> = {
   direccion: "Dirección",
   localidad: "Localidad",
   fecha: "Fecha",
+  fechaSubida: "Fecha de subida",
   productos: "Productos",
   bultos: "Bultos",
   zona: "Zona",
@@ -81,6 +97,11 @@ const LABEL_COLUMNA: Record<(typeof IDS_COLUMNAS_DEFAULT)[number], string> = {
   simpliroute: "SimpliRoute",
   observaciones: "Observaciones",
 };
+
+// "productos" es un cálculo agregado (suma de varios renglones), no una
+// columna guardada — ordenar por eso necesitaría un query aparte, no se
+// implementó (ver CampoOrdenPedido). Todas las demás sí son ordenables.
+const NO_ORDENABLES = new Set<(typeof IDS_COLUMNAS_DEFAULT)[number]>(["productos"]);
 
 export function PedidosTabla() {
   const { usuario } = useAuth();
@@ -124,6 +145,22 @@ export function PedidosTabla() {
   const [busquedaInput, setBusquedaInput] = useState("");
   const [busqueda, setBusqueda] = useState("");
 
+  // Orden de la grilla — decisión 2026-09-01. Un solo campo a la vez (no
+  // orden múltiple): alcanza para el caso de uso y evita una UI más compleja
+  // de "prioridad de columnas".
+  const [orden, setOrden] = useState<{ campo: CampoOrdenPedido; direccion: "asc" | "desc" } | null>(null);
+
+  function alternarOrden(id: string) {
+    if (NO_ORDENABLES.has(id as (typeof IDS_COLUMNAS_DEFAULT)[number])) return;
+    const campo = id as CampoOrdenPedido;
+    setOrden((actual) => {
+      if (!actual || actual.campo !== campo) return { campo, direccion: "asc" };
+      if (actual.direccion === "asc") return { campo, direccion: "desc" };
+      return null; // tercer click: vuelve al orden por defecto
+    });
+    setPagina(1);
+  }
+
   useEffect(() => {
     const temporizador = setTimeout(() => setBusqueda(busquedaInput.trim()), DEBOUNCE_BUSQUEDA_MS);
     return () => clearTimeout(temporizador);
@@ -137,7 +174,7 @@ export function PedidosTabla() {
     queryKey: [
       "pedidos",
       "listado",
-      { pagina, porPagina: POR_PAGINA, estado, fechaDesde, fechaHasta, bultosDesde, bultosHasta, busqueda },
+      { pagina, porPagina: POR_PAGINA, estado, fechaDesde, fechaHasta, bultosDesde, bultosHasta, busqueda, orden },
     ],
     queryFn: () =>
       listarPedidos({
@@ -149,6 +186,8 @@ export function PedidosTabla() {
         bultosDesde: bultosDesde ? Number(bultosDesde) : undefined,
         bultosHasta: bultosHasta ? Number(bultosHasta) : undefined,
         busqueda: busqueda || undefined,
+        ordenarPor: orden?.campo,
+        direccionOrden: orden?.direccion,
       }),
     placeholderData: (data) => data,
   });
@@ -201,6 +240,11 @@ export function PedidosTabla() {
         id: "fecha",
         header: "Fecha",
         cell: ({ row }) => formateadorFecha.format(new Date(row.original.fechaProgramada)),
+      },
+      fechaSubida: {
+        id: "fechaSubida",
+        header: "Fecha de subida",
+        cell: ({ row }) => formateadorFechaHora.format(new Date(row.original.creadoEn)),
       },
       productos: {
         id: "productos",
@@ -383,11 +427,36 @@ export function PedidosTabla() {
             <TableHeader>
               {tabla.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => (
-                    <TableHead key={header.id} className="whitespace-nowrap">
-                      {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
-                    </TableHead>
-                  ))}
+                  {headerGroup.headers.map((header) => {
+                    const ordenable =
+                      header.id !== "acciones" &&
+                      !NO_ORDENABLES.has(header.id as (typeof IDS_COLUMNAS_DEFAULT)[number]);
+                    const activo = orden?.campo === header.id;
+                    return (
+                      <TableHead key={header.id} className="whitespace-nowrap">
+                        {header.isPlaceholder ? null : ordenable ? (
+                          <button
+                            type="button"
+                            className="flex items-center gap-1 hover:text-foreground"
+                            onClick={() => alternarOrden(header.id)}
+                          >
+                            {flexRender(header.column.columnDef.header, header.getContext())}
+                            {activo ? (
+                              orden!.direccion === "asc" ? (
+                                <ArrowUp className="size-3.5" />
+                              ) : (
+                                <ArrowDown className="size-3.5" />
+                              )
+                            ) : (
+                              <ArrowUpDown className="size-3.5 opacity-30" />
+                            )}
+                          </button>
+                        ) : (
+                          flexRender(header.column.columnDef.header, header.getContext())
+                        )}
+                      </TableHead>
+                    );
+                  })}
                 </TableRow>
               ))}
             </TableHeader>

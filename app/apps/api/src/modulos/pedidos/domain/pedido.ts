@@ -22,6 +22,7 @@ export interface Pedido {
   observaciones: string | null;
   etiquetaImpresaEn: Date | null;
   version: number;
+  creadoEn: Date; // momento real de creación del registro — distinto de fechaProgramada (la de entrega, elegida a mano)
 }
 
 // Proyección de Pedido para la grilla principal (§14 funcional) y la revisión

@@ -1,6 +1,29 @@
 import { Type } from "class-transformer";
-import { IsDate, IsEnum, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from "class-validator";
+import { IsDate, IsEnum, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from "class-validator";
 import { EstadoPedido } from "@mym/shared-types";
+import { CampoOrdenPedido } from "../../domain/pedidos.repositorio";
+
+// Whitelist explícita para el DTO — mismos valores que CampoOrdenPedido, acá
+// duplicados como array porque @IsIn necesita un valor en tiempo de
+// ejecución, no solo un tipo.
+const CAMPOS_ORDEN: CampoOrdenPedido[] = [
+  "cliente",
+  "estado",
+  "numero",
+  "afiliado",
+  "destinatario",
+  "telefono",
+  "direccion",
+  "localidad",
+  "fecha",
+  "fechaSubida",
+  "bultos",
+  "zona",
+  "chofer",
+  "validacion",
+  "simpliroute",
+  "observaciones",
+];
 
 // `clienteId`/`fechaDesde`/`fechaHasta` los usa la pantalla de Embalaje y
 // Despacho (§8.1 funcional v6) — el filtrado por "qué clientes puede ver
@@ -41,6 +64,14 @@ export class ListarPedidosDto {
   @IsString()
   @MaxLength(200)
   busqueda?: string;
+
+  @IsOptional()
+  @IsIn(CAMPOS_ORDEN)
+  ordenarPor?: CampoOrdenPedido;
+
+  @IsOptional()
+  @IsIn(["asc", "desc"])
+  direccionOrden?: "asc" | "desc";
 
   @IsOptional()
   @Type(() => Number)

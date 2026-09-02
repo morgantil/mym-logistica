@@ -8,6 +8,7 @@ import {
   DatosCrearPedido,
   FiltroPedidos,
   FiltroPedidosFacturables,
+  OrdenPedidos,
   PEDIDOS_REPOSITORIO,
   PedidosRepositorio,
 } from "../domain/pedidos.repositorio";
@@ -47,6 +48,7 @@ export class PedidosService {
     filtro: Omit<FiltroPedidos, "clienteIds"> & { clienteId?: string },
     pagina: number,
     porPagina: number,
+    orden?: OrdenPedidos,
   ) {
     const { clienteId, ...resto } = filtro;
     const clientesPermitidos = await this.permisosCliente.clientesPermitidosPara(usuarioId);
@@ -63,7 +65,7 @@ export class PedidosService {
       clienteIds = clientesPermitidos ?? undefined;
     }
 
-    return this.repositorio.listar({ ...resto, clienteIds }, pagina, porPagina);
+    return this.repositorio.listar({ ...resto, clienteIds }, pagina, porPagina, orden);
   }
 
   async contarPorEstadoParaUsuario(usuarioId: string) {

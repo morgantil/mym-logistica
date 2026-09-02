@@ -1,6 +1,6 @@
 # TEMAS PENDIENTES — vista consolidada de todo lo que falta
 
-Última actualización: **2026-09-01**. Documento vivo, separado de `PENDIENTES.md`
+Última actualización: **2026-09-02**. Documento vivo, separado de `PENDIENTES.md`
 (ese sigue con el detalle histórico de despliegue/credenciales). Este junta
 **todo** lo que queda para terminar el proyecto — técnico, de negocio y de
 assets — en un solo lugar.
@@ -116,5 +116,7 @@ fecha/cliente/estado, carga de bultos, imprime/reimprime etiquetas en PDF
 | 10.2 | ~~Filtros y búsqueda en la grilla de Pedidos~~ | ✅ Construido | Fecha desde/hasta, Bultos desde/hasta (mayor/menor) y búsqueda libre (destinatario, dirección o Nº de afiliado) — todos combinables. |
 | 10.3 | ~~Ticket de Farmapal se perdía al importar~~ | ✅ Corregido | Se capturaba en la vista previa pero nunca se guardaba en ningún lado — bug real encontrado al revisar el pedido de Leonardo. Ahora se agrega al texto de Observaciones (sale impreso en la etiqueta, sin tocar el generador de PDF). |
 | 10.4 | ~~Mostrar todas las columnas en la grilla de Pedidos + personalización~~ | ✅ Construido | Se agregaron Nº de Pedido y Teléfono (existían en la base pero no se mostraban). Botón "Personalizar columnas": cada usuario elige cuáles fijar a la izquierda, en el orden que las va marcando — preferencia guardada por usuario (nueva columna `Usuario.columnasFijasPedidos`), no por navegador. |
+| 10.5 | ~~Ordenar la grilla al tocar una columna~~ | ✅ Construido | Click en el encabezado ordena ascendente, otro click descendente, un tercero vuelve al orden por defecto — con flechita indicando el sentido. Server-side (la grilla pagina de a 20, ordenar solo en el navegador hubiera ordenado nada más la página visible) — nueva whitelist `CampoOrdenPedido` en el backend, nunca un string libre. Única excepción: la columna "Productos" no es ordenable, es un cálculo agregado sobre varios renglones, no una columna guardada. |
+| 10.6 | ~~Columna "Fecha de subida" (con hora)~~ | ✅ Construido | Nueva columna separada de "Fecha" (que es la fecha de *entrega* elegida a mano antes de importar, sin hora real) — muestra `creadoEn` con fecha y hora (`dd/mm/aaaa hh:mm`, horario de Argentina), el momento real en que se creó el pedido en el sistema. |
 
 **Hallazgo real en el camino, no relacionado con lo construido:** existe un cliente real llamado **"PR"** (creado hoy, ya con 5 pedidos reales) con patrones de detección `PR, PABLO, RENZO` — "PR" es un patrón peligrosamente genérico: cualquier archivo Excel futuro cuyo nombre simplemente *contenga* las letras "PR" (parte de un nombre de empresa, por ejemplo) se le va a asignar a este cliente por error, con su mapeo de columnas — no es un problema de esta sesión, pero conviene que Leonardo lo revise y le ponga un patrón más específico antes de que cause una importación mal asignada con datos reales.

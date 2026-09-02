@@ -36,6 +36,34 @@ export interface FiltroPedidos {
   busqueda?: string;
 }
 
+// Ordenamiento de la grilla — decisión 2026-09-01. Whitelist explícita (no un
+// string libre) para no exponer un campo interno o permitir una inyección de
+// orderBy vía query param. "productos" queda afuera a propósito: es un
+// cálculo agregado sobre la relación, no una columna — ordenar por eso
+// necesitaría un query bastante más pesado, se dejó sin implementar.
+export type CampoOrdenPedido =
+  | "cliente"
+  | "estado"
+  | "numero"
+  | "afiliado"
+  | "destinatario"
+  | "telefono"
+  | "direccion"
+  | "localidad"
+  | "fecha"
+  | "fechaSubida"
+  | "bultos"
+  | "zona"
+  | "chofer"
+  | "validacion"
+  | "simpliroute"
+  | "observaciones";
+
+export interface OrdenPedidos {
+  campo: CampoOrdenPedido;
+  direccion: "asc" | "desc";
+}
+
 export interface FiltroPedidosFacturables {
   clienteId: string;
   fechaDesde: Date;
@@ -58,7 +86,7 @@ export interface PedidoParaSincronizar {
 }
 
 export interface PedidosRepositorio {
-  listar(filtro: FiltroPedidos, pagina: number, porPagina: number): Promise<PaginaPedidos>;
+  listar(filtro: FiltroPedidos, pagina: number, porPagina: number, orden?: OrdenPedidos): Promise<PaginaPedidos>;
   contarPorEstado(clienteIds?: string[]): Promise<Record<string, number>>;
   crear(datos: DatosCrearPedido): Promise<Pedido>;
   obtenerPorId(id: string): Promise<Pedido | null>;

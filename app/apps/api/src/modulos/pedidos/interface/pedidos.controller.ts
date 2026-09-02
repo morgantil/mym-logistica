@@ -39,6 +39,7 @@ export class PedidosController {
       },
       query.pagina,
       query.porPagina,
+      query.ordenarPor ? { campo: query.ordenarPor, direccion: query.direccionOrden ?? "asc" } : undefined,
     );
   }
 
