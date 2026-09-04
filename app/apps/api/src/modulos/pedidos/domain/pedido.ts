@@ -18,6 +18,18 @@ export interface Pedido {
   zonaNombre: string | null;
   choferId: string | null;
   choferNombre: string | null;
+  // Snapshot de la zona/chofer pre-envío, solo si el recálculo con la
+  // coordenada real de la entrega dio distinto y se corrigió zonaId/choferId
+  // de arriba — ver PedidosService.enviarASimpliRoute.
+  zonaPreEnvioId: string | null;
+  zonaPreEnvioNombre: string | null;
+  choferPreEnvioId: string | null;
+  choferPreEnvioNombre: string | null;
+  // Coordenada real de la entrega, geocodificada por SimpliRoute al enviar
+  // (null hasta el envío, o si SimpliRoute no pudo geocodificar nada).
+  latitudEntrega: number | null;
+  longitudEntrega: number | null;
+  geocodeAlert: string | null;
   bultos: number | null;
   observaciones: string | null;
   etiquetaImpresaEn: Date | null;

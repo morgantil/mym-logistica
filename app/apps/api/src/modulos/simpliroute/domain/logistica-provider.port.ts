@@ -26,6 +26,17 @@ export interface PedidoParaEnviar {
 
 export interface ResultadoEnvio {
   idExterno: string;
+  // SimpliRoute geocodifica la Visit con la dirección enviada en el mismo
+  // momento de crearla (confirmado con pruebas reales 2026-09-03) — estas
+  // coordenadas son la ubicación real de la entrega, independiente de las
+  // que tenga guardadas el Client (que puede estar desactualizado). Null si
+  // SimpliRoute no pudo geocodificar nada.
+  latitud: number | null;
+  longitud: number | null;
+  // Confianza de esa geocodificación tal cual la informa SimpliRoute (ej.
+  // "no alert" | "medium") — sin catálogo cerrado documentado, se guarda tal
+  // cual viene.
+  geocodeAlert: string | null;
 }
 
 export interface EstadoVisita {

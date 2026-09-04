@@ -241,13 +241,36 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
     return this.obtenerPorId(id) as Promise<Pedido>;
   }
 
-  async marcarEnviado(id: string, datos: { simplirouteId: string; version: number }): Promise<Pedido> {
+  async marcarEnviado(
+    id: string,
+    datos: {
+      simplirouteId: string;
+      version: number;
+      latitudEntrega: number | null;
+      longitudEntrega: number | null;
+      geocodeAlert: string | null;
+      correccionZonaChofer?: {
+        zonaId: string | null;
+        zonaNombre: string | null;
+        choferId: string | null;
+        choferNombre: string | null;
+        zonaPreEnvioId: string | null;
+        zonaPreEnvioNombre: string | null;
+        choferPreEnvioId: string | null;
+        choferPreEnvioNombre: string | null;
+      };
+    },
+  ): Promise<Pedido> {
     const resultado = await this.prisma.pedido.updateMany({
       where: { id, version: datos.version },
       data: {
         simplirouteId: datos.simplirouteId,
         estadoSimpliroute: "ENVIADO",
         estado: "COORDINADO",
+        latitudEntrega: datos.latitudEntrega,
+        longitudEntrega: datos.longitudEntrega,
+        geocodeAlert: datos.geocodeAlert,
+        ...(datos.correccionZonaChofer ?? {}),
         version: { increment: 1 },
       },
     });

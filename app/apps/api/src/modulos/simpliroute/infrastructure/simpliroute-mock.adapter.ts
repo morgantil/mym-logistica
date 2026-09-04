@@ -30,7 +30,7 @@ export class SimplirouteMockAdapter implements LogisticaProviderPort {
 
   async enviarPedido(pedido: PedidoParaEnviar): Promise<ResultadoEnvio> {
     this.logger.warn(`[MOCK] enviarPedido(${pedido.pedidoId}) — sin API real configurada.`);
-    return { idExterno: `mock-${pedido.pedidoId}` };
+    return { idExterno: `mock-${pedido.pedidoId}`, latitud: null, longitud: null, geocodeAlert: null };
   }
 
   async consultarEstado(idExterno: string): Promise<EstadoVisita> {

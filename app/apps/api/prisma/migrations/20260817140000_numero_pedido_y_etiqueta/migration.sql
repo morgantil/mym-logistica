@@ -20,8 +20,13 @@ FROM numerados n
 WHERE n."id" = p."id";
 
 -- Secuencia para los pedidos nuevos, arrancando después del máximo ya usado
+-- (o desde 1 si la tabla está vacía — setval no admite 0 como valor).
 CREATE SEQUENCE "pedidos_numero_seq";
-SELECT setval('pedidos_numero_seq', COALESCE((SELECT MAX("numero") FROM "pedidos"), 0));
+SELECT setval(
+  'pedidos_numero_seq',
+  COALESCE((SELECT MAX("numero") FROM "pedidos"), 1),
+  (SELECT MAX("numero") FROM "pedidos") IS NOT NULL
+);
 ALTER TABLE "pedidos" ALTER COLUMN "numero" SET DEFAULT nextval('pedidos_numero_seq');
 ALTER SEQUENCE "pedidos_numero_seq" OWNED BY "pedidos"."numero";
 

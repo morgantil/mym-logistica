@@ -475,7 +475,17 @@ export function PedidosTabla() {
                 </TableRow>
               ) : (
                 tabla.getRowModel().rows.map((row) => (
-                  <TableRow key={row.id}>
+                  <TableRow
+                    key={row.id}
+                    className={
+                      // SimpliRoute no tuvo confianza geolocalizando la
+                      // dirección del Excel al enviar este pedido — riesgo
+                      // real de mandar al chofer a un lugar equivocado.
+                      row.original.geocodeAlert && row.original.geocodeAlert !== "no alert"
+                        ? "bg-amber-50 dark:bg-amber-500/10"
+                        : undefined
+                    }
+                  >
                     {row.getVisibleCells().map((cell) => (
                       <TableCell key={cell.id} className="whitespace-nowrap">
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}

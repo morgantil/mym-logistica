@@ -2,6 +2,7 @@ import { BadRequestException, Inject, Injectable, NotFoundException } from "@nes
 import { PermisosClienteService } from "../../../common/permisos/permisos-cliente.service";
 import { DestinatariosService } from "../../destinatarios/application/destinatarios.service";
 import { LOGISTICA_PROVIDER, LogisticaProviderPort } from "../../simpliroute/domain/logistica-provider.port";
+import { ZonasChoferesService } from "../../zonas-choferes/application/zonas-choferes.service";
 import { generarEtiquetasPdf } from "../infrastructure/etiqueta-pdf.generador";
 import { mapearEstadoSimpliRoute } from "../domain/mapear-estado-simpliroute";
 import {
@@ -37,6 +38,7 @@ export class PedidosService {
     @Inject(LOGISTICA_PROVIDER) private readonly logisticaProvider: LogisticaProviderPort,
     private permisosCliente: PermisosClienteService,
     private destinatariosService: DestinatariosService,
+    private zonasChoferesService: ZonasChoferesService,
   ) {}
 
   // La grilla principal (§14 funcional) y Embalaje y Despacho (§8.1, con
@@ -167,9 +169,43 @@ export class PedidosService {
           bultos: pedido.bultos,
           observaciones: pedido.observaciones,
         });
+
+        // SimpliRoute geocodifica la Visit con la dirección real (la del
+        // Excel) recién al crearla — antes de esto, la zona/chofer del
+        // pedido se había resuelto con la coordenada que el Client tenía
+        // guardada en SimpliRoute, que puede estar desactualizada. Acá se
+        // recalcula con la coordenada real y, si da distinto, se corrige
+        // (impacta directo en la liquidación a transportistas, que agrupa
+        // por choferId) dejando el valor anterior como snapshot para poder
+        // medir cuántas veces pasó esto — ver DOCUMENTO TECNICO.md.
+        let correccionZonaChofer: Parameters<PedidosRepositorio["marcarEnviado"]>[1]["correccionZonaChofer"];
+        if (envio.latitud !== null && envio.longitud !== null) {
+          const resuelto = await this.zonasChoferesService.resolverZonaChofer(
+            envio.latitud,
+            envio.longitud,
+            pedido.localidad,
+          );
+          if (resuelto.zonaId !== pedido.zonaId || resuelto.choferId !== pedido.choferId) {
+            correccionZonaChofer = {
+              zonaId: resuelto.zonaId,
+              zonaNombre: resuelto.zonaNombre,
+              choferId: resuelto.choferId,
+              choferNombre: resuelto.choferNombre,
+              zonaPreEnvioId: pedido.zonaId,
+              zonaPreEnvioNombre: pedido.zonaNombre,
+              choferPreEnvioId: pedido.choferId,
+              choferPreEnvioNombre: pedido.choferNombre,
+            };
+          }
+        }
+
         await this.repositorio.marcarEnviado(pedidoId, {
           simplirouteId: envio.idExterno,
           version: pedido.version,
+          latitudEntrega: envio.latitud,
+          longitudEntrega: envio.longitud,
+          geocodeAlert: envio.geocodeAlert,
+          correccionZonaChofer,
         });
         resultado.enviados.push(pedidoId);
       } catch (error) {

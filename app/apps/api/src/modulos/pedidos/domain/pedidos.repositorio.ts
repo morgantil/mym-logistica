@@ -110,7 +110,29 @@ export interface PedidosRepositorio {
   // Ambos con bloqueo optimista: lanzan ConflictoVersionError (ver ese archivo)
   // si `version` no coincide con la fila actual — alguien más lo modificó primero.
   actualizarBultos(id: string, bultos: number, version: number): Promise<Pedido>;
-  marcarEnviado(id: string, datos: { simplirouteId: string; version: number }): Promise<Pedido>;
+  // `correccionZonaChofer` solo se completa cuando el recálculo con la
+  // coordenada real de la entrega (post-envío) dio una zona/chofer distinta
+  // a la asignada antes de enviar — ver PedidosService.enviarASimpliRoute.
+  marcarEnviado(
+    id: string,
+    datos: {
+      simplirouteId: string;
+      version: number;
+      latitudEntrega: number | null;
+      longitudEntrega: number | null;
+      geocodeAlert: string | null;
+      correccionZonaChofer?: {
+        zonaId: string | null;
+        zonaNombre: string | null;
+        choferId: string | null;
+        choferNombre: string | null;
+        zonaPreEnvioId: string | null;
+        zonaPreEnvioNombre: string | null;
+        choferPreEnvioId: string | null;
+        choferPreEnvioNombre: string | null;
+      };
+    },
+  ): Promise<Pedido>;
 
   // §19 funcional — sincronización de estados reales con SimpliRoute.
   listarPendientesDeSincronizar(): Promise<PedidoParaSincronizar[]>;

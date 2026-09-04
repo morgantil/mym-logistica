@@ -60,6 +60,11 @@ interface VisitaSimpliRoute {
   // null si el status se cambió a mano (ej. una Visit de prueba) en vez de
   // por un checkout real. Confirmado vía OPTIONS + PATCH manual 2026-08-28.
   checkout_time?: string | null;
+  // Geocodificadas por SimpliRoute al crear la Visit, con la dirección que
+  // le mandamos — confirmado con pruebas reales 2026-09-03.
+  latitude?: string | number | null;
+  longitude?: string | number | null;
+  geocode_alert?: string | null;
 }
 
 // GET /v1/zones/ — Documentacion simpliroute/04 §65-71. Solo lectura pública
@@ -253,7 +258,12 @@ export class SimplirouteHttpAdapter implements LogisticaProviderPort {
       body,
     );
     const visita = primerElemento(respuesta);
-    return { idExterno: String(visita.id) };
+    return {
+      idExterno: String(visita.id),
+      latitud: aNumero(visita.latitude),
+      longitud: aNumero(visita.longitude),
+      geocodeAlert: visita.geocode_alert ?? null,
+    };
   }
 
   // §19 funcional — devuelve el estado crudo tal cual lo informa SimpliRoute;

@@ -314,10 +314,10 @@ model ZonaTarifaria {
 
   eliminadoEn DateTime?
 
-  localidades       LocalidadZonaTarifaria[]
-  zonasSimpliRoute  ZonaSimpliRouteZonaTarifaria[]
-  tarifas           TarifaCliente[]
-  pedidos           Pedido[]
+  localidades      LocalidadZonaTarifaria[]
+  zonasSimpliRoute ZonaSimpliRouteZonaTarifaria[]
+  tarifas          TarifaCliente[]
+  pedidos          Pedido[]
 
   @@map("zonas_tarifarias")
 }
@@ -415,19 +415,36 @@ model Pedido {
   // adelante. Pedidos anteriores al 2026-08-26 tienen acá `null` (el ID
   // apuntaba a las tablas Zona/Chofer manuales ya eliminadas) pero conservan
   // el nombre en el snapshot — ver migración `zonas_choferes_desde_simpliroute`.
-  zonaId            String?
-  zonaNombre        String?
-  choferId          String?
-  choferNombre      String?
-  bultos            Int?
-  remito            String?
-  ticket            String? // opcional — Farmapal (§4 funcional)
-  simplirouteId     String?
-  observaciones     String?
+  zonaId               String?
+  zonaNombre           String?
+  choferId             String?
+  choferNombre         String?
+  // Snapshot de la zona/chofer que se había asignado ANTES de enviar (con las
+  // coordenadas del Client que SimpliRoute tenía guardadas, potencialmente
+  // desactualizadas) — solo se completan si el recálculo post-envío con la
+  // coordenada real (ver latitudEntrega) dio una zona distinta y se corrigió
+  // `zonaId`/`choferId` de arriba. Sirven para medir cuántas veces pasó esto
+  // (liquidación a transportistas §31/§4.2) — no se tocan si coincidió.
+  zonaPreEnvioId       String?
+  zonaPreEnvioNombre   String?
+  choferPreEnvioId     String?
+  choferPreEnvioNombre String?
+  // Coordenada real de la entrega, geocodificada por SimpliRoute al crear la
+  // Visit con `direccionUsada` (confirmado con pruebas reales 2026-09-03) —
+  // independiente de las coordenadas que tenga guardadas el Client. Null
+  // hasta que el pedido se envía, o si SimpliRoute no pudo geocodificar nada.
+  latitudEntrega       Float?
+  longitudEntrega      Float?
+  geocodeAlert         String?
+  bultos               Int?
+  remito               String?
+  ticket               String? // opcional — Farmapal (§4 funcional)
+  simplirouteId        String?
+  observaciones        String?
   // Cuándo se imprimió por última vez alguna etiqueta de este pedido — null =
   // nunca. §8.1 funcional v6: "estado de impresión de la etiqueta" en la
   // pantalla de Embalaje y Despacho. No impide reimprimir, solo informa.
-  etiquetaImpresaEn DateTime?
+  etiquetaImpresaEn    DateTime?
 
   grupoFacturacionId String?
   reglaAplicada      String? // "2x1" | "UNIFICADA" | "INDIVIDUAL" — informativo, el detalle vive en GrupoFacturacion

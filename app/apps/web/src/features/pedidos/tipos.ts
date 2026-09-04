@@ -37,6 +37,9 @@ export interface PedidoListado {
   choferNombre: string | null;
   productos: ProductoPedido[];
   creadoEn: string;
+  // SimpliRoute geocodificó la Visit con baja confianza (ej. "medium") al
+  // enviar — null hasta el envío, o "no alert" si geocodificó bien.
+  geocodeAlert: string | null;
 }
 
 // Espejo de CampoOrdenPedido (apps/api) — mismos ids que usan las columnas de
