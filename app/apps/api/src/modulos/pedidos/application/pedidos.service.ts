@@ -5,6 +5,7 @@ import { LOGISTICA_PROVIDER, LogisticaProviderPort } from "../../simpliroute/dom
 import { ZonasChoferesService } from "../../zonas-choferes/application/zonas-choferes.service";
 import { generarEtiquetasPdf } from "../infrastructure/etiqueta-pdf.generador";
 import { mapearEstadoSimpliRoute } from "../domain/mapear-estado-simpliroute";
+import { estaDentroDeBuenosAires } from "../domain/validar-coordenada-buenos-aires";
 import {
   DatosCrearPedido,
   FiltroPedidos,
@@ -159,16 +160,50 @@ export class PedidosService {
       }
 
       try {
+        // La localidad va concatenada a la dirección para que SimpliRoute
+        // tenga contexto al geocodificar — sin ella, una calle que existe en
+        // más de una ciudad (ej. "Balcarce", que es una calle real de CABA
+        // Y de San Luis) puede geocodificar en cualquier lugar del país con
+        // confianza alta ("no alert") pese a estar completamente mal. Caso
+        // real 2026-09-04, ver DOCUMENTO TECNICO.md.
         const envio = await this.logisticaProvider.enviarPedido({
           pedidoId: pedido.id,
           destinatarioIdExterno: destinatario.simplirouteId,
           destinatarioNombre: destinatario.nombre,
           destinatarioTelefono: destinatario.telefono,
-          direccion: pedido.direccionUsada,
+          direccion: `${pedido.direccionUsada}, ${pedido.localidad}`,
           fechaProgramada: pedido.fechaProgramada,
           bultos: pedido.bultos,
           observaciones: pedido.observaciones,
         });
+
+        // El cliente confirmó que ninguna entrega sale nunca de Buenos Aires
+        // — cualquier coordenada afuera es un error de geocodificación
+        // garantizado (SimpliRoute no tiene forma de saber esto, solo
+        // nosotros). La Visit ya quedó creada en SimpliRoute (no se puede
+        // evitar, geocodifica al crearla) pero acá no se la trata como un
+        // envío exitoso: queda en ERROR para revisión manual, sin recalcular
+        // zona/chofer con una coordenada que ya sabemos que está mal.
+        if (
+          envio.latitud !== null &&
+          envio.longitud !== null &&
+          !estaDentroDeBuenosAires(envio.latitud, envio.longitud)
+        ) {
+          await this.repositorio.marcarErrorGeocodificacion(pedidoId, {
+            simplirouteId: envio.idExterno,
+            version: pedido.version,
+            latitudEntrega: envio.latitud,
+            longitudEntrega: envio.longitud,
+            geocodeAlert: envio.geocodeAlert,
+          });
+          resultado.errores.push({
+            pedidoId,
+            errores: [
+              `Geocodificación fuera de Buenos Aires (lat ${envio.latitud}, lon ${envio.longitud}) — revisar la dirección. Se creó la Visita ${envio.idExterno} en SimpliRoute, requiere revisión manual.`,
+            ],
+          });
+          continue;
+        }
 
         // SimpliRoute geocodifica la Visit con la dirección real (la del
         // Excel) recién al crearla — antes de esto, la zona/chofer del

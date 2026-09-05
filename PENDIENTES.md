@@ -1,6 +1,6 @@
 # PENDIENTES — todo lo que falta y de quién depende
 
-Última actualización: **2026-08-25**. Documento vivo — se actualiza cada vez
+Última actualización: **2026-09-04**. Documento vivo — se actualiza cada vez
 que se resuelve o aparece un pendiente nuevo. Si algo de acá ya se resolvió y
 este archivo no lo refleja, confiá en `ESTADO_DEL_PROYECTO.md`/`DOCUMENTO
 TECNICO.md`, no en esto.
@@ -33,7 +33,7 @@ Cómo leer la columna "Dueño":
 | # | Pendiente | Dueño | Qué hace falta concretamente |
 |---|---|---|---|
 | 2.1 | Login con Google (`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`) | Leonardo decide la cuenta, nosotros lo configuramos | Es **gratis**, no hace falta facturación. Sí importa qué cuenta de Google la crea (queda como dueña del proyecto OAuth) — mejor una que controle MyM de verdad, no una al azar. Falta: que Leonardo diga qué cuenta usar. |
-| 2.2 | Token real de la API de SimpliRoute | ✅ **Resuelto (2026-08-16)** | Conseguido desde la pantalla de Perfil de la cuenta real (`MYM LOGISTICA Y DISTRIBUCION SRL`) y probado contra la API real: lectura (`GET /v1/accounts/me/`, búsqueda de destinatario, estados reales) **y** escritura (crear/actualizar/borrar un destinatario de prueba, ciclo completo verificado sin dejar rastro en la cuenta real). Guardado en `app/apps/api/.env` (nunca en Git). **Sigue en `SIMPLIROUTE_MOCK="true"`** — de las 10 validaciones técnicas del §36 funcional, 9 ya están confirmadas contra la API real; solo falta decidir con Leonardo cuándo pasar a real (decisión de negocio/timing, ya no de riesgo técnico) y la arquitectura webhook vs. polling. Ver detalle en `DOCUMENTO TECNICO.md` sección 4 e historial 2026-08-16. |
+| 2.2 | Token real de la API de SimpliRoute | ✅ **Resuelto (2026-08-16), en real desde 2026-09-01** | Conseguido desde la pantalla de Perfil de la cuenta real (`MYM LOGISTICA Y DISTRIBUCION SRL`). `SIMPLIROUTE_MOCK=false` en el ambiente de test desde 2026-09-01 — cualquier pedido enviado crea una Visita real. Guardado en `app/apps/api/.env` y en Render (nunca en Git). Ver `TEMAS_PENDIENTES.md` sección 2 para el estado más al día. |
 | 2.3 | Storage de archivos Excel (Cloudflare R2) | Leonardo crea la cuenta (si no existe una de MyM) | No bloquea nada — los Excel se procesan igual, solo no se archivan para poder "descargar el original" después. Baja prioridad. |
 
 ## 2.5 SimpliRoute — Zonas/Choferes/Vehículos construido el 2026-08-26 (revierte lo del 2026-08-17)

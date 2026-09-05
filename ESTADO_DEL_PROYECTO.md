@@ -1,6 +1,6 @@
 # ESTADO DEL PROYECTO — leer esto primero si retomás después de una pausa
 
-Última actualización: **2026-09-01**. Este documento es una **foto del momento**, se
+Última actualización: **2026-09-04**. Este documento es una **foto del momento**, se
 reescribe cada vez que cambia el estado — no es un historial (eso vive en
 `DOCUMENTO TECNICO.md` sección 7). Si algo acá contradice el código o
 `DOCUMENTO TECNICO.md`, confiá en esos dos, no en esto — puede haber quedado viejo.
@@ -24,21 +24,30 @@ contra el código el 2026-08-17).
   necesariamente Leonardo) del que siguen faltando algunas definiciones de
   negocio — ver `TEMAS_PENDIENTES.md`.
 
-## Ambiente de test — desplegado (2026-08-12, al día 2026-08-18)
+## Ambiente de test — desplegado (2026-08-12, al día 2026-09-04)
 
 **https://mym-web-pi.vercel.app** (front) + **https://mym-n7bh.onrender.com**
 (API) — probado de punta a punta, login real funcionando. Ambos en free
 tier: se duermen tras inactividad, el primer request tarda ~50s, normal.
-Desde el 2026-08-18 corre ahí todo lo construido hasta esa fecha: Zonas
-tarifarias, Embalaje y Despacho, Facturación completa y la fecha de
-entrega informada por el usuario — verificado en navegador real contra
-las URLs desplegadas, no solo en local. Nota: la PWA cachea el frontend
-con un service worker (Workbox) que actualiza en segundo plano, no al
-instante — quien ya tenía la app abierta puede seguir viendo la versión
-anterior hasta que su navegador la renueve solo. Detalle completo (config
-exacta, gotchas encontrados) en **`DEPLOY.md`**. Producción real todavía
-no existe — proyecto separado a armar cuando haga falta, ver
-`TEMAS_PENDIENTES.md`.
+Corre ahí todo lo construido hasta la fecha de arriba — verificado en
+navegador real contra las URLs desplegadas, no solo en local. Desde
+2026-09-01 el ambiente manda tráfico real a SimpliRoute (`SIMPLIROUTE_MOCK=false`):
+cualquier pedido enviado crea una Visita real. **Primer cierre de
+facturación real de punta a punta confirmado el 2026-09-04** (Excel →
+pedido → envío a SimpliRoute → entrega marcada → sincronización → vista
+previa → confirmación), con datos de prueba (cliente "PR"). Nota: la PWA
+cachea el frontend con un service worker (Workbox) que actualiza en
+segundo plano, no al instante — quien ya tenía la app abierta puede
+seguir viendo la versión anterior hasta que su navegador la renueve solo.
+Detalle completo (config exacta, gotchas encontrados) en **`DEPLOY.md`**.
+Producción real todavía no existe — proyecto separado a armar cuando
+haga falta, ver `TEMAS_PENDIENTES.md`.
+
+**La base de pedidos se vació varias veces durante septiembre para hacer
+pruebas limpias** (con backup CSV antes de cada borrado) — si volvés y ves
+pocos pedidos, es intencional, no se perdió nada sin querer. Sí quedan
+datos reales de importaciones (Biosíntesis/Farmapal/Bella Vista) y del
+cliente real "PR" de Leonardo.
 
 ## Dónde está todo
 
@@ -70,7 +79,7 @@ Repo Git en la raíz de `MYM/`, rama **`develop`**, remoto en
 | Auth (local + Google), roles, permisos por cliente | 🟢 completo | refresh token en cookie httpOnly con rotación + revocación real de sesiones |
 | Clientes | 🟢 completo | detección automática por nombre de Excel, editar y activar/desactivar |
 | Destinatarios | 🟢 completo | padrón, detección de diferencia de dirección, sync con SimpliRoute |
-| Pedidos | 🟢 completo | grilla paginada, N.º de pedido interno, bultos, revisión antes de enviar, envío a SimpliRoute, bloqueo optimista |
+| Pedidos | 🟢 completo | grilla paginada (ordenable por columna, con "Fecha de subida" real), N.º de pedido interno, bultos, revisión antes de enviar, envío a SimpliRoute, bloqueo optimista. Desde 2026-09-03: al enviar, recalcula zona/chofer con la coordenada real que devuelve SimpliRoute (corrige la liquidación a transportistas si la coordenada vieja del Client estaba desactualizada) y resalta en ámbar los pedidos con baja confianza de geocodificación. Desde 2026-09-04: la dirección que se manda a SimpliRoute incluye la localidad, y se rechaza (`estadoSimpliroute: ERROR`) cualquier coordenada devuelta que caiga fuera de Buenos Aires. |
 | Importadores | 🟢 completo | mapeo de columnas genérico, agrupación. **Fecha de entrega ahora la informa el usuario antes de subir el Excel** (2026-08-17, no se extrae más del archivo). Probado con los 3 Excel reales: 207 pedidos, 0 errores |
 | Zonas/choferes (logística) | 🟢 completo (rediseñado 2026-08-26, escritura de Choferes validada contra la cuenta real 2026-08-28) | Se trae en vivo de SimpliRoute con cache local (refresco perezoso + "Sincronizar ahora") — Choferes/Vehículos con alta/edición/baja completas contra SimpliRoute, Zonas de solo lectura. La zona de un pedido se resuelve con point-in-polygon contra el destinatario geocodificado. Revierte la decisión del 2026-08-17. La escritura real de Choferes encontró y corrigió 3 discrepancias reales contra la documentación de SimpliRoute (body como objeto no array, `is_driver` siempre requerido, baja real es `PATCH status: "deleted"` — `DELETE` no funciona pese a listarse) — ver `TEMAS_PENDIENTES.md` §2.4. Vehículos comparte el mismo adapter pero no se probó su escritura puntualmente. |
 | Zonas tarifarias (facturación) | 🟢 completo (2026-08-17) | reemplaza el enum fijo CABA/Provincia por un modelo configurable (CABA + Cordón 1/2/3/…) — tabla + pantalla propia, sin código nuevo para agregar una zona |
@@ -101,10 +110,18 @@ corregidos en el camino.
 
 ## Qué falta — ver `TEMAS_PENDIENTES.md` para el detalle completo
 
-Resumen de lo más importante, todo del lado de Leonardo o del cliente final
-(nada técnico bloqueado hoy):
+✅ **Resuelto 2026-09-04, mismo día que se encontró**: el bug de
+geocodificación (dirección sin localidad → un pedido real geocodificó a
+600km, en San Luis en vez de CABA) — corregido concatenando `localidad`
+al `address`, más una validación nueva que rechaza cualquier coordenada
+fuera de Buenos Aires (`estadoSimpliroute: ERROR`), ya que el cliente
+final confirmó que ninguna entrega sale de ahí. Ver TEMAS_PENDIENTES.md
+§11.4/§11.5. **No deployado todavía** — solo en el working tree.
 
-1. Asignar Cordón a las 11 zonas reales de SimpliRoute (`Facturación → Zonas tarifarias`) — o cargar localidades a mano si se prefiere el camino viejo.
+Resto, todo del lado de Leonardo o del cliente final (nada técnico
+bloqueado hoy):
+
+1. ⏳ En progreso: terminar de asignar Cordón a las 11 zonas reales de SimpliRoute (`Facturación → Zonas tarifarias`) — Leonardo ya confirmó que pañales cobra distinto por Cordón y arrancó cargando uno ("Primer Cordon") el 2026-09-04, falta completar el resto.
 2. Definir si se saca el login con Google de este MVP (la pantalla de Usuarios ya no depende de eso para gestionar gente).
 3. Tamaño/impresora real de la etiqueta de bulto (se usó un default de 10×15cm).
 4. Reglas de tratamiento de entregas fallidas/canceladas/reentregas (el sistema ya sincroniza y muestra `ENTREGA_FALLIDA`, falta definir qué hacer además de mostrarlo).

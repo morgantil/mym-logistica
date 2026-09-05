@@ -280,6 +280,33 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
     return this.obtenerPorId(id) as Promise<Pedido>;
   }
 
+  async marcarErrorGeocodificacion(
+    id: string,
+    datos: {
+      simplirouteId: string;
+      version: number;
+      latitudEntrega: number | null;
+      longitudEntrega: number | null;
+      geocodeAlert: string | null;
+    },
+  ): Promise<Pedido> {
+    const resultado = await this.prisma.pedido.updateMany({
+      where: { id, version: datos.version },
+      data: {
+        simplirouteId: datos.simplirouteId,
+        estadoSimpliroute: "ERROR",
+        latitudEntrega: datos.latitudEntrega,
+        longitudEntrega: datos.longitudEntrega,
+        geocodeAlert: datos.geocodeAlert,
+        version: { increment: 1 },
+      },
+    });
+    if (resultado.count === 0) {
+      return this.fallarSiNoExiste(id);
+    }
+    return this.obtenerPorId(id) as Promise<Pedido>;
+  }
+
   async marcarEtiquetaImpresa(id: string): Promise<void> {
     await this.prisma.pedido.update({ where: { id }, data: { etiquetaImpresaEn: new Date() } });
   }

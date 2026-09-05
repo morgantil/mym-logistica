@@ -134,6 +134,24 @@ export interface PedidosRepositorio {
     },
   ): Promise<Pedido>;
 
+  // SimpliRoute ya creó la Visit (no se puede evitar, la geocodificación pasa
+  // en ese mismo momento) pero la coordenada devuelta cayó fuera de Buenos
+  // Aires — error de geocodificación garantizado (ver
+  // validar-coordenada-buenos-aires.ts). Deja `estadoSimpliroute: ERROR` y
+  // NO avanza `estado` a COORDINADO, para que no se vea como un envío
+  // normal. Guarda igual `simplirouteId`/coordenadas para poder revisar la
+  // Visita a mano en SimpliRoute.
+  marcarErrorGeocodificacion(
+    id: string,
+    datos: {
+      simplirouteId: string;
+      version: number;
+      latitudEntrega: number | null;
+      longitudEntrega: number | null;
+      geocodeAlert: string | null;
+    },
+  ): Promise<Pedido>;
+
   // §19 funcional — sincronización de estados reales con SimpliRoute.
   listarPendientesDeSincronizar(): Promise<PedidoParaSincronizar[]>;
   // Con bloqueo optimista, igual que arriba.
