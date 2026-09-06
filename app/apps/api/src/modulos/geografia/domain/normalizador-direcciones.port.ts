@@ -1,5 +1,17 @@
 import { CabaProvincia } from "@mym/shared-types";
 
+// Resultado de clasificar una localidad — `partido` (ej. "Tres de Febrero",
+// "Vicente López") solo aplica a Provincia: dentro del conurbano hay
+// muchos municipios con calles homónimas entre sí (y a veces homónimas al
+// propio nombre del partido, ej. "Av. San Martín" existe en Caseros Y en
+// Munro, y el partido "San Martín" es otro lugar más) — agregar el partido
+// ayuda a que SimpliRoute desambigüe. CABA no lo necesita: sus barrios no
+// se repiten entre sí.
+export interface ClasificacionLocalidad {
+  clasificacion: CabaProvincia;
+  partido: string | null;
+}
+
 // Puerto para clasificar una localidad como CABA o Provincia — DOCUMENTO
 // TECNICO.md: se resuelve con la API oficial y gratuita de datos.gob.ar
 // (georef-ar-api) en vez de pedirle al cliente un catálogo cargado a mano.
@@ -9,7 +21,7 @@ import { CabaProvincia } from "@mym/shared-types";
 // georef-ar.adapter.ts), buscar el nombre de una localidad es un universo
 // mucho más chico y confiable.
 export interface NormalizadorDireccionesPort {
-  clasificarCabaProvincia(localidad: string): Promise<CabaProvincia | null>;
+  clasificarCabaProvincia(localidad: string): Promise<ClasificacionLocalidad | null>;
 }
 
 export const NORMALIZADOR_DIRECCIONES = Symbol("NORMALIZADOR_DIRECCIONES");

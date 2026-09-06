@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { CabaProvincia } from "@mym/shared-types";
-import { NormalizadorDireccionesPort } from "../domain/normalizador-direcciones.port";
+import { ClasificacionLocalidad, NormalizadorDireccionesPort } from "../domain/normalizador-direcciones.port";
 
 const BASE_URL = "https://apis.datos.gob.ar/georef/api";
 
@@ -12,7 +12,7 @@ const NOMBRE_A_ENUM: Record<string, CabaProvincia> = {
 
 interface RespuestaLocalidades {
   cantidad: number;
-  localidades: { nombre: string; provincia: { nombre: string } }[];
+  localidades: { nombre: string; provincia: { nombre: string }; departamento: { nombre: string } }[];
 }
 
 // Sin acentos ni mayúsculas para comparar — encontrado 2026-09-06: el
@@ -45,7 +45,7 @@ export class GeorefArAdapter implements NormalizadorDireccionesPort {
   // Aires) — si hay cero, o si hay más de una distinta (ambigüedad real,
   // ej. una localidad homónima en otra provincia), se devuelve null en vez
   // de un dato falso.
-  async clasificarCabaProvincia(localidad: string): Promise<CabaProvincia | null> {
+  async clasificarCabaProvincia(localidad: string): Promise<ClasificacionLocalidad | null> {
     try {
       const url = new URL(`${BASE_URL}/localidades`);
       url.searchParams.set("nombre", localidad);
@@ -59,15 +59,12 @@ export class GeorefArAdapter implements NormalizadorDireccionesPort {
 
       const datos = (await respuesta.json()) as RespuestaLocalidades;
       const normalizado = normalizarParaComparar(localidad);
-      const coincidenciasExactas = datos.localidades.filter(
-        (l) => normalizarParaComparar(l.nombre) === normalizado,
+      const coincidenciasEnNuestraArea = datos.localidades.filter(
+        (l) =>
+          normalizarParaComparar(l.nombre) === normalizado && NOMBRE_A_ENUM[l.provincia.nombre] !== undefined,
       );
 
-      const clasificaciones = new Set(
-        coincidenciasExactas
-          .map((l) => NOMBRE_A_ENUM[l.provincia.nombre])
-          .filter((clasificacion): clasificacion is CabaProvincia => clasificacion !== undefined),
-      );
+      const clasificaciones = new Set(coincidenciasEnNuestraArea.map((l) => NOMBRE_A_ENUM[l.provincia.nombre]));
 
       if (clasificaciones.size !== 1) {
         if (clasificaciones.size > 1) {
@@ -78,7 +75,22 @@ export class GeorefArAdapter implements NormalizadorDireccionesPort {
         return null;
       }
 
-      return [...clasificaciones][0];
+      const clasificacion = [...clasificaciones][0];
+
+      // El partido (ej. "Tres de Febrero", "Vicente López") solo importa
+      // para Provincia — dentro del conurbano hay calles que se repiten
+      // entre partidos, y a veces coinciden con el nombre de otro partido
+      // (ej. "Av. San Martín" existe en Caseros Y en Munro — comprobado
+      // 2026-09-06 con la misma coordenada devuelta para las dos direcciones
+      // reales). Mismo criterio defensivo: solo se usa si todas las
+      // coincidencias en nuestra área comparten el mismo partido.
+      let partido: string | null = null;
+      if (clasificacion === CabaProvincia.PROVINCIA) {
+        const partidos = new Set(coincidenciasEnNuestraArea.map((l) => l.departamento.nombre));
+        partido = partidos.size === 1 ? [...partidos][0] : null;
+      }
+
+      return { clasificacion, partido };
     } catch (error) {
       this.logger.warn(
         `No se pudo clasificar CABA/Provincia para la localidad "${localidad}": ${error instanceof Error ? error.message : error}`,

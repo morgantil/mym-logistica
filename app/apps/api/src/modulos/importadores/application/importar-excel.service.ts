@@ -244,11 +244,9 @@ export class ImportarExcelService {
       // siempre. Nunca fija en código, nunca frena la importación si no se
       // puede resolver: el pedido queda sin zona tarifaria asignada, para
       // revisión manual.
-      const clasificacionCabaProvincia = await this.normalizadorDirecciones.clasificarCabaProvincia(
-        grupo.localidad,
-      );
+      const clasificacionLocalidad = await this.normalizadorDirecciones.clasificarCabaProvincia(grupo.localidad);
       const zonaTarifariaId = await this.zonasTarifariasService.resolverParaPedido(
-        clasificacionCabaProvincia,
+        clasificacionLocalidad?.clasificacion ?? null,
         grupo.localidad,
         zonaId,
       );
