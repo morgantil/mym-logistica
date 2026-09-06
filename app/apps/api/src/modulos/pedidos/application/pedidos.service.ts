@@ -2,10 +2,15 @@ import { BadRequestException, Inject, Injectable, NotFoundException } from "@nes
 import { PermisosClienteService } from "../../../common/permisos/permisos-cliente.service";
 import { DestinatariosService } from "../../destinatarios/application/destinatarios.service";
 import { LOGISTICA_PROVIDER, LogisticaProviderPort } from "../../simpliroute/domain/logistica-provider.port";
+import {
+  NORMALIZADOR_DIRECCIONES,
+  NormalizadorDireccionesPort,
+} from "../../geografia/domain/normalizador-direcciones.port";
 import { ZonasChoferesService } from "../../zonas-choferes/application/zonas-choferes.service";
 import { generarEtiquetasPdf } from "../infrastructure/etiqueta-pdf.generador";
 import { mapearEstadoSimpliRoute } from "../domain/mapear-estado-simpliroute";
 import { estaDentroDeBuenosAires } from "../domain/validar-coordenada-buenos-aires";
+import { armarDireccionParaSimpliRoute } from "../domain/armar-direccion-para-simpliroute";
 import {
   DatosCrearPedido,
   FiltroPedidos,
@@ -40,6 +45,7 @@ export class PedidosService {
     private permisosCliente: PermisosClienteService,
     private destinatariosService: DestinatariosService,
     private zonasChoferesService: ZonasChoferesService,
+    @Inject(NORMALIZADOR_DIRECCIONES) private readonly normalizadorDirecciones: NormalizadorDireccionesPort,
   ) {}
 
   // La grilla principal (§14 funcional) y Embalaje y Despacho (§8.1, con
@@ -160,18 +166,23 @@ export class PedidosService {
       }
 
       try {
-        // La localidad va concatenada a la dirección para que SimpliRoute
-        // tenga contexto al geocodificar — sin ella, una calle que existe en
-        // más de una ciudad (ej. "Balcarce", que es una calle real de CABA
-        // Y de San Luis) puede geocodificar en cualquier lugar del país con
-        // confianza alta ("no alert") pese a estar completamente mal. Caso
-        // real 2026-09-04, ver DOCUMENTO TECNICO.md.
+        // La localidad sola no siempre alcanza para que SimpliRoute
+        // desambigüe bien (caso real 2026-09-04: "Balcarce 594, Monserrat"
+        // igual geocodificó en San Luis) — se reutiliza la clasificación
+        // CABA/Provincia que ya resuelve GeorefArAdapter (la misma que usa
+        // la zona tarifaria) para agregar "CABA, Argentina" o "Provincia de
+        // Buenos Aires, Argentina" según corresponda. Ver DOCUMENTO
+        // TECNICO.md y armar-direccion-para-simpliroute.ts.
+        const clasificacion = await this.normalizadorDirecciones.clasificarCabaProvincia(
+          pedido.direccionUsada,
+          pedido.localidad,
+        );
         const envio = await this.logisticaProvider.enviarPedido({
           pedidoId: pedido.id,
           destinatarioIdExterno: destinatario.simplirouteId,
           destinatarioNombre: destinatario.nombre,
           destinatarioTelefono: destinatario.telefono,
-          direccion: `${pedido.direccionUsada}, ${pedido.localidad}`,
+          direccion: armarDireccionParaSimpliRoute(pedido.direccionUsada, pedido.localidad, clasificacion),
           fechaProgramada: pedido.fechaProgramada,
           bultos: pedido.bultos,
           observaciones: pedido.observaciones,

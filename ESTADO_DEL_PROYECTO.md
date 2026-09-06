@@ -110,13 +110,15 @@ corregidos en el camino.
 
 ## Qué falta — ver `TEMAS_PENDIENTES.md` para el detalle completo
 
-✅ **Resuelto 2026-09-04, mismo día que se encontró**: el bug de
-geocodificación (dirección sin localidad → un pedido real geocodificó a
-600km, en San Luis en vez de CABA) — corregido concatenando `localidad`
-al `address`, más una validación nueva que rechaza cualquier coordenada
-fuera de Buenos Aires (`estadoSimpliroute: ERROR`), ya que el cliente
-final confirmó que ninguna entrega sale de ahí. Ver TEMAS_PENDIENTES.md
-§11.4/§11.5. **No deployado todavía** — solo en el working tree.
+✅ **Resuelto, verificado contra la cuenta real y deployado — 2026-09-04**:
+el bug de geocodificación (un pedido real geocodificó a 600km, en San
+Luis en vez de CABA). Un primer intento (concatenar solo la localidad) no
+alcanzó — probado y descartado. Solución final: reusar la clasificación
+CABA/Provincia oficial (`georef-ar-api`, la misma que resuelve la zona
+tarifaria) para armar la dirección con el contexto completo que
+SimpliRoute necesita, más una validación de respaldo que rechaza
+cualquier coordenada fuera de Buenos Aires (`estadoSimpliroute: ERROR`).
+Ver TEMAS_PENDIENTES.md §11.4/§11.5.
 
 Resto, todo del lado de Leonardo o del cliente final (nada técnico
 bloqueado hoy):
