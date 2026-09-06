@@ -15,6 +15,17 @@ interface RespuestaLocalidades {
   localidades: { nombre: string; provincia: { nombre: string } }[];
 }
 
+// Sin acentos ni mayúsculas para comparar — encontrado 2026-09-06: el
+// Excel traía "Villa Pueyrredon" (sin acento) contra el nombre oficial
+// "Villa Pueyrredón" (con acento), la comparación exacta anterior fallaba
+// en silencio y la clasificación se perdía. Escribir sin tildes es muy
+// común en datos reales de negocio, no es un caso raro a ignorar.
+const RANGO_DIACRITICOS = new RegExp("[\\u0300-\\u036f]", "g");
+
+function normalizarParaComparar(texto: string): string {
+  return texto.trim().toLowerCase().normalize("NFD").replace(RANGO_DIACRITICOS, "");
+}
+
 @Injectable()
 export class GeorefArAdapter implements NormalizadorDireccionesPort {
   private readonly logger = new Logger(GeorefArAdapter.name);
@@ -47,8 +58,10 @@ export class GeorefArAdapter implements NormalizadorDireccionesPort {
       }
 
       const datos = (await respuesta.json()) as RespuestaLocalidades;
-      const normalizado = localidad.trim().toLowerCase();
-      const coincidenciasExactas = datos.localidades.filter((l) => l.nombre.trim().toLowerCase() === normalizado);
+      const normalizado = normalizarParaComparar(localidad);
+      const coincidenciasExactas = datos.localidades.filter(
+        (l) => normalizarParaComparar(l.nombre) === normalizado,
+      );
 
       const clasificaciones = new Set(
         coincidenciasExactas
