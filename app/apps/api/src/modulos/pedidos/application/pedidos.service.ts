@@ -173,10 +173,7 @@ export class PedidosService {
         // la zona tarifaria) para agregar "CABA, Argentina" o "Provincia de
         // Buenos Aires, Argentina" según corresponda. Ver DOCUMENTO
         // TECNICO.md y armar-direccion-para-simpliroute.ts.
-        const clasificacion = await this.normalizadorDirecciones.clasificarCabaProvincia(
-          pedido.direccionUsada,
-          pedido.localidad,
-        );
+        const clasificacion = await this.normalizadorDirecciones.clasificarCabaProvincia(pedido.localidad);
         const envio = await this.logisticaProvider.enviarPedido({
           pedidoId: pedido.id,
           destinatarioIdExterno: destinatario.simplirouteId,

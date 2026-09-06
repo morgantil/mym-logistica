@@ -10,53 +10,65 @@ const NOMBRE_A_ENUM: Record<string, CabaProvincia> = {
   "Buenos Aires": CabaProvincia.PROVINCIA,
 };
 
-interface RespuestaDirecciones {
+interface RespuestaLocalidades {
   cantidad: number;
-  direcciones: { provincia: { nombre: string } }[];
+  localidades: { nombre: string; provincia: { nombre: string } }[];
 }
 
 @Injectable()
 export class GeorefArAdapter implements NormalizadorDireccionesPort {
   private readonly logger = new Logger(GeorefArAdapter.name);
 
-  // Busca por calle+altura contra la API oficial de datos.gob.ar. OJO: una
-  // calle+altura sola puede ser ambigua a nivel país (ej. "Rivadavia 100"
-  // existe en 341 lugares de Argentina — lo comprobamos a mano antes de
-  // programar esto). Por eso NO se confía en cualquier resultado: solo se
-  // acepta si la provincia devuelta es CABA o Buenos Aires, que es donde
-  // opera MyM. Si el resultado cae fuera de esa región, es señal de un
-  // match ambiguo/equivocado y se devuelve null en vez de un dato falso.
-  async clasificarCabaProvincia(direccion: string, localidad: string): Promise<CabaProvincia | null> {
+  // Busca por NOMBRE de localidad contra la API oficial de datos.gob.ar.
+  // Se cambió de buscar por dirección completa (calle+altura) a buscar por
+  // localidad el 2026-09-04: una calle+altura sola puede ser ambigua a
+  // nivel país (ej. "Rivadavia 100" existe en 341 lugares de Argentina,
+  // "Balcarce 594" resuelve a Rosario en vez de CABA) — comprobado a mano
+  // más de una vez. El nombre de una localidad ("Monserrat", "Avellaneda")
+  // es un universo mucho más chico y confiable.
+  //
+  // `nombre=` en este endpoint hace matching parcial (buscar "Avellaneda"
+  // también trae "Parque Avellaneda"), así que se filtra a coincidencias
+  // exactas de nombre antes de clasificar. Solo se acepta si TODAS las
+  // coincidencias exactas caen en la misma clasificación (CABA o Buenos
+  // Aires) — si hay cero, o si hay más de una distinta (ambigüedad real,
+  // ej. una localidad homónima en otra provincia), se devuelve null en vez
+  // de un dato falso.
+  async clasificarCabaProvincia(localidad: string): Promise<CabaProvincia | null> {
     try {
-      const url = new URL(`${BASE_URL}/direcciones`);
-      url.searchParams.set("direccion", direccion);
-      url.searchParams.set("max", "1");
+      const url = new URL(`${BASE_URL}/localidades`);
+      url.searchParams.set("nombre", localidad);
+      url.searchParams.set("max", "15");
 
       const respuesta = await fetch(url, { signal: AbortSignal.timeout(5000) });
       if (!respuesta.ok) {
-        this.logger.warn(`georef-ar-api respondió ${respuesta.status} para "${direccion}, ${localidad}".`);
+        this.logger.warn(`georef-ar-api respondió ${respuesta.status} para la localidad "${localidad}".`);
         return null;
       }
 
-      const datos = (await respuesta.json()) as RespuestaDirecciones;
-      if (datos.cantidad === 0) {
+      const datos = (await respuesta.json()) as RespuestaLocalidades;
+      const normalizado = localidad.trim().toLowerCase();
+      const coincidenciasExactas = datos.localidades.filter((l) => l.nombre.trim().toLowerCase() === normalizado);
+
+      const clasificaciones = new Set(
+        coincidenciasExactas
+          .map((l) => NOMBRE_A_ENUM[l.provincia.nombre])
+          .filter((clasificacion): clasificacion is CabaProvincia => clasificacion !== undefined),
+      );
+
+      if (clasificaciones.size !== 1) {
+        if (clasificaciones.size > 1) {
+          this.logger.warn(
+            `La localidad "${localidad}" es ambigua: existe tanto en CABA como en Buenos Aires — se descarta por baja confianza.`,
+          );
+        }
         return null;
       }
 
-      const nombreProvincia = datos.direcciones[0].provincia.nombre;
-      const clasificacion = NOMBRE_A_ENUM[nombreProvincia];
-
-      if (!clasificacion) {
-        this.logger.warn(
-          `"${direccion}, ${localidad}" resolvió a provincia "${nombreProvincia}", fuera del área de operación esperada (CABA/Buenos Aires) — se descarta el match por baja confianza.`,
-        );
-        return null;
-      }
-
-      return clasificacion;
+      return [...clasificaciones][0];
     } catch (error) {
       this.logger.warn(
-        `No se pudo clasificar CABA/Provincia para "${direccion}, ${localidad}": ${error instanceof Error ? error.message : error}`,
+        `No se pudo clasificar CABA/Provincia para la localidad "${localidad}": ${error instanceof Error ? error.message : error}`,
       );
       return null;
     }

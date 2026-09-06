@@ -245,7 +245,6 @@ export class ImportarExcelService {
       // puede resolver: el pedido queda sin zona tarifaria asignada, para
       // revisión manual.
       const clasificacionCabaProvincia = await this.normalizadorDirecciones.clasificarCabaProvincia(
-        direccionUsada,
         grupo.localidad,
       );
       const zonaTarifariaId = await this.zonasTarifariasService.resolverParaPedido(
