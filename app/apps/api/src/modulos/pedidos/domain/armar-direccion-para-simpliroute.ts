@@ -16,17 +16,34 @@ import { ClasificacionLocalidad } from "../../geografia/domain/normalizador-dire
 // partido homónimo "San Martín". Se agrega también el partido (ej. "Tres
 // de Febrero", "Vicente López") cuando se conoce, para Provincia — CABA no
 // lo necesita, sus barrios no se repiten entre sí.
+//
+// Se usa `localidadOficial` (nombre bien escrito, con acentos, resuelto
+// por GeorefArAdapter), no la localidad cruda del Excel — encontrado el
+// mismo día: mandar la localidad tal cual vino ("Vte. Lopez") junto al
+// partido ya resuelto ("Vicente López") es una mezcla rara que confundió
+// más al geocodificador que ayudar (terminó en CABA en vez de Vicente
+// López). El nombre oficial reemplaza abreviaturas y acentos faltantes.
 export function armarDireccionParaSimpliRoute(
   direccionUsada: string,
   localidad: string,
   clasificacion: ClasificacionLocalidad | null,
 ): string {
   if (clasificacion?.clasificacion === CabaProvincia.CABA) {
-    return `${direccionUsada}, ${localidad}, CABA, Argentina`;
+    // El sinónimo directo de la ciudad entera ("CABA", "Capital Federal")
+    // ya resuelve `localidadOficial` como "CABA" — no repetirlo dos veces.
+    if (clasificacion.localidadOficial.toUpperCase() === "CABA") {
+      return `${direccionUsada}, CABA, Argentina`;
+    }
+    return `${direccionUsada}, ${clasificacion.localidadOficial}, CABA, Argentina`;
   }
   if (clasificacion?.clasificacion === CabaProvincia.PROVINCIA) {
-    const partido = clasificacion.partido ? `${clasificacion.partido}, ` : "";
-    return `${direccionUsada}, ${localidad}, ${partido}Provincia de Buenos Aires, Argentina`;
+    // Localidad y partido a veces se llaman igual (ej. "Vicente López") —
+    // no repetirlo dos veces seguidas.
+    const partido =
+      clasificacion.partido && clasificacion.partido !== clasificacion.localidadOficial
+        ? `${clasificacion.partido}, `
+        : "";
+    return `${direccionUsada}, ${clasificacion.localidadOficial}, ${partido}Provincia de Buenos Aires, Argentina`;
   }
   // Sin clasificación posible (API caída, dirección no reconocida): se
   // mantiene el comportamiento anterior, mejor que nada.

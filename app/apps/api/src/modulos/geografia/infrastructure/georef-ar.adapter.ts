@@ -23,7 +23,42 @@ interface RespuestaLocalidades {
 const RANGO_DIACRITICOS = new RegExp("[\\u0300-\\u036f]", "g");
 
 function normalizarParaComparar(texto: string): string {
-  return texto.trim().toLowerCase().normalize("NFD").replace(RANGO_DIACRITICOS, "");
+  return texto
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(RANGO_DIACRITICOS, "")
+    .replace(/\.\s*/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Sinónimos de la ciudad entera, no de un barrio puntual — encontrado
+// 2026-09-06: es común que el Excel traiga "CABA" o "Capital Federal" en la
+// columna Localidad en vez de un barrio específico. `/localidades` busca
+// barrios, no le pega a esto (son nombres de la ciudad, no de una entidad
+// dentro de ella), así que se resuelve directo, sin llamar a la API.
+const SINONIMOS_CABA = new Set(
+  ["CABA", "Capital Federal", "Cap Fed", "Ciudad Autónoma de Buenos Aires", "Ciudad de Buenos Aires"].map(
+    normalizarParaComparar,
+  ),
+);
+
+// Abreviaturas estándar de nomenclatura argentina — no son nombres de
+// lugares (eso sería un diccionario a mantener), son convenciones de
+// escritura genéricas que aplican a cualquier localidad ("Vte. López",
+// "Gral. Pacheco", "V. Urquiza"). `/localidades` busca el nombre completo,
+// no las expande solo. Encontrado 2026-09-06 probando casos reales.
+const ABREVIATURAS: [RegExp, string][] = [
+  [/\bVte\.?(?=\s|$)/gi, "Vicente"],
+  [/\bGral\.?(?=\s|$)/gi, "General"],
+  [/\bV\.\s/gi, "Villa "],
+  [/\bSta\.?(?=\s|$)/gi, "Santa"],
+  [/\bSto\.?(?=\s|$)/gi, "Santo"],
+];
+
+function expandirAbreviaturas(localidad: string): string {
+  return ABREVIATURAS.reduce((texto, [patron, reemplazo]) => texto.replace(patron, reemplazo), localidad);
 }
 
 @Injectable()
@@ -46,9 +81,15 @@ export class GeorefArAdapter implements NormalizadorDireccionesPort {
   // ej. una localidad homónima en otra provincia), se devuelve null en vez
   // de un dato falso.
   async clasificarCabaProvincia(localidad: string): Promise<ClasificacionLocalidad | null> {
+    if (SINONIMOS_CABA.has(normalizarParaComparar(localidad))) {
+      return { clasificacion: CabaProvincia.CABA, localidadOficial: "CABA", partido: null };
+    }
+
+    const localidadExpandida = expandirAbreviaturas(localidad);
+
     try {
       const url = new URL(`${BASE_URL}/localidades`);
-      url.searchParams.set("nombre", localidad);
+      url.searchParams.set("nombre", localidadExpandida);
       url.searchParams.set("max", "15");
 
       const respuesta = await fetch(url, { signal: AbortSignal.timeout(5000) });
@@ -58,7 +99,7 @@ export class GeorefArAdapter implements NormalizadorDireccionesPort {
       }
 
       const datos = (await respuesta.json()) as RespuestaLocalidades;
-      const normalizado = normalizarParaComparar(localidad);
+      const normalizado = normalizarParaComparar(localidadExpandida);
       const coincidenciasEnNuestraArea = datos.localidades.filter(
         (l) =>
           normalizarParaComparar(l.nombre) === normalizado && NOMBRE_A_ENUM[l.provincia.nombre] !== undefined,
@@ -90,7 +131,13 @@ export class GeorefArAdapter implements NormalizadorDireccionesPort {
         partido = partidos.size === 1 ? [...partidos][0] : null;
       }
 
-      return { clasificacion, partido };
+      // Nombre oficial (bien escrito, con acentos) tal cual lo devuelve la
+      // API — reemplaza la variante que vino en el Excel al armar la
+      // dirección, en vez de repetir una abreviatura o un nombre sin
+      // acento junto al partido ya resuelto (ver comentario en el puerto).
+      const localidadOficial = coincidenciasEnNuestraArea[0].nombre;
+
+      return { clasificacion, localidadOficial, partido };
     } catch (error) {
       this.logger.warn(
         `No se pudo clasificar CABA/Provincia para la localidad "${localidad}": ${error instanceof Error ? error.message : error}`,

@@ -9,6 +9,13 @@ import { CabaProvincia } from "@mym/shared-types";
 // se repiten entre sí.
 export interface ClasificacionLocalidad {
   clasificacion: CabaProvincia;
+  // Nombre oficial tal cual lo devuelve la API — reemplaza cualquier
+  // abreviatura/variante sin acento que haya venido en el Excel (ej. "Vte.
+  // Lopez" → "Vicente López") al armar la dirección para SimpliRoute.
+  // Encontrado 2026-09-06: mandar la localidad cruda mezclada con el
+  // partido resuelto ("Vte. Lopez, Vicente López") confundía al
+  // geocodificador más que ayudar.
+  localidadOficial: string;
   partido: string | null;
 }
 
