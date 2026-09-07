@@ -478,6 +478,15 @@ model Producto {
   codigo      String? // EAN
   descripcion String
   cantidad    Int
+  // Nº de orden/ticket del sistema de origen (ej. Farmanet) para ESTA línea
+  // puntual — antes se guardaba uno solo a nivel del pedido entero (la
+  // primera línea del grupo pisaba a las demás si dos líneas venían de
+  // órdenes de origen distintas, aunque se agruparan en el mismo pedido
+  // por misma dirección/fecha). Decisión 2026-09-07: agrupar por pedido
+  // sigue siendo correcto para facturación (documento funcional §7), pero
+  // la trazabilidad de a qué orden de origen corresponde cada línea no se
+  // puede perder.
+  ticket      String?
 
   eliminadoEn DateTime?
 

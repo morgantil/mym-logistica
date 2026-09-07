@@ -24,7 +24,7 @@ import {
 const INCLUDE_LISTADO = {
   cliente: { select: { nombre: true } },
   destinatario: { select: { nombre: true, telefono: true } },
-  productos: { select: { codigo: true, descripcion: true, cantidad: true } },
+  productos: { select: { codigo: true, descripcion: true, cantidad: true, ticket: true } },
 } satisfies Prisma.PedidoInclude;
 
 type FilaPedidoListado = Prisma.PedidoGetPayload<{ include: typeof INCLUDE_LISTADO }>;
@@ -179,6 +179,7 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
             codigo: producto.codigo,
             descripcion: producto.descripcion,
             cantidad: producto.cantidad,
+            ticket: producto.ticket,
           })),
         },
       },

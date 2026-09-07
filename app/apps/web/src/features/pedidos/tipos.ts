@@ -4,6 +4,10 @@ export interface ProductoPedido {
   codigo: string | null;
   descripcion: string;
   cantidad: number;
+  // Nº de orden/ticket del sistema de origen (ej. Farmanet) para esta línea
+  // puntual — puede diferir entre productos de un mismo pedido si vinieron
+  // de órdenes de origen distintas agrupadas en la misma entrega.
+  ticket: string | null;
 }
 
 // Espejo de PedidoListado (apps/api/src/modulos/pedidos/domain/pedido.ts) — lo

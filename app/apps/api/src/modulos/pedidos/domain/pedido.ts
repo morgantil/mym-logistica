@@ -50,7 +50,7 @@ export interface PedidoListado extends Pedido {
   clienteNombre: string;
   destinatarioNombre: string;
   destinatarioTelefono: string | null;
-  productos: { codigo: string | null; descripcion: string; cantidad: number }[];
+  productos: { codigo: string | null; descripcion: string; cantidad: number; ticket: string | null }[];
 }
 
 export interface LineaExcelPanales {
@@ -84,8 +84,7 @@ export interface PedidoAgrupado {
   telefono: string | null;
   fechaEntrega: string;
   notaFecha: string | null;
-  ticket: string | null;
-  productos: { codigo: string | null; descripcion: string; cantidad: number }[];
+  productos: { codigo: string | null; descripcion: string; cantidad: number; ticket: string | null }[];
   totalUnidades: number;
 }
 
@@ -93,6 +92,16 @@ export interface PedidoAgrupado {
 // Se agrupan por MISMO cliente + MISMO afiliado + MISMA dirección + MISMA fecha.
 // destinatario/localidad/telefono son los mismos dentro de un mismo grupo (misma
 // persona, mismo envío) — se toman de la primera línea que arma el grupo.
+//
+// El ticket/número de orden del sistema de origen (ej. Farmanet) se guarda
+// por PRODUCTO, no una sola vez por pedido — decisión 2026-09-07: si dos
+// líneas del mismo afiliado+dirección+fecha vienen de órdenes de origen
+// distintas (dos números de ticket distintos), agruparlas en un pedido
+// sigue siendo correcto (es una sola entrega/viaje, así lo pide el
+// documento funcional y así lo necesita la facturación), pero antes se
+// perdía el ticket de todas las líneas menos la primera. Guardarlo por
+// producto no pierde ningún dato de trazabilidad sin tocar cómo se arma
+// el pedido ni cómo se factura.
 export function agruparLineasEnPedidos(lineas: LineaExcelPanales[]): PedidoAgrupado[] {
   const grupos = new Map<string, PedidoAgrupado>();
 
@@ -111,6 +120,7 @@ export function agruparLineasEnPedidos(lineas: LineaExcelPanales[]): PedidoAgrup
       codigo: linea.codigoProducto,
       descripcion: linea.descripcionProducto,
       cantidad: linea.cantidad,
+      ticket: linea.ticket,
     };
 
     if (grupoExistente) {
@@ -126,7 +136,6 @@ export function agruparLineasEnPedidos(lineas: LineaExcelPanales[]): PedidoAgrup
         telefono: linea.telefono,
         fechaEntrega: linea.fechaEntrega,
         notaFecha: linea.notaFecha,
-        ticket: linea.ticket,
         productos: [producto],
         totalUnidades: linea.cantidad,
       });

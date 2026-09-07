@@ -253,16 +253,26 @@ export class ImportarExcelService {
 
       // Tres fuentes posibles de observación, pueden darse juntas: la alerta de
       // dirección (arriba), la nota que venía pegada a la fecha en el Excel
-      // (grupo.notaFecha) y el ticket de Farmapal (grupo.ticket) — ver
+      // (grupo.notaFecha) y el/los ticket(s) de las líneas agrupadas — ver
       // LineaExcelPanales. Ninguna se pisa a la otra. El ticket se guarda acá
-      // (no en su propio campo) para que salga impreso en la etiqueta sin
-      // tocar el generador de PDF (decisión 2026-09-01).
+      // (no en el campo `Pedido.ticket`, sin usar) para que salga impreso en
+      // la etiqueta sin tocar el generador de PDF (decisión 2026-09-01).
+      // Cada producto guarda su propio ticket (decisión 2026-09-07: si dos
+      // líneas agrupadas vienen de órdenes de origen distintas, no se pierde
+      // ninguna) — acá solo se resumen los valores *distintos* para no
+      // repetir el mismo ticket una vez por producto cuando todos son iguales
+      // (el caso más común).
+      const ticketsDistintos = [...new Set(grupo.productos.map((producto) => producto.ticket).filter(Boolean))];
       const observacionesPartes = [
         alertaDireccion
           ? `Dirección diferente a la registrada en el padrón (padrón: "${alertaDireccion.direccionPadron}"). Pendiente de revisión.`
           : null,
         grupo.notaFecha,
-        grupo.ticket ? `Ticket: ${grupo.ticket}` : null,
+        ticketsDistintos.length === 1
+          ? `Ticket: ${ticketsDistintos[0]}`
+          : ticketsDistintos.length > 1
+            ? `Tickets: ${ticketsDistintos.join(", ")}`
+            : null,
       ].filter((parte): parte is string => Boolean(parte));
 
       await this.pedidosService.crear({

@@ -11,6 +11,9 @@ export function DetallePedidoSheet({
   onOpenChange: (abierto: boolean) => void;
 }) {
   const totalUnidades = pedido?.productos.reduce((total, p) => total + p.cantidad, 0) ?? 0;
+  // Solo se muestra la columna si algún producto trae ticket — la mayoría
+  // de los clientes no usa este campo, no tiene sentido una columna vacía.
+  const mostrarColumnaTicket = pedido?.productos.some((p) => p.ticket) ?? false;
 
   return (
     <Sheet open={pedido !== null} onOpenChange={onOpenChange}>
@@ -31,6 +34,7 @@ export function DetallePedidoSheet({
                     <TableHead>Producto</TableHead>
                     <TableHead>Código</TableHead>
                     <TableHead className="text-right">Cantidad</TableHead>
+                    {mostrarColumnaTicket && <TableHead>Ticket</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -39,6 +43,7 @@ export function DetallePedidoSheet({
                       <TableCell>{producto.descripcion}</TableCell>
                       <TableCell>{producto.codigo ?? "—"}</TableCell>
                       <TableCell className="text-right">{producto.cantidad}</TableCell>
+                      {mostrarColumnaTicket && <TableCell>{producto.ticket ?? "—"}</TableCell>}
                     </TableRow>
                   ))}
                 </TableBody>

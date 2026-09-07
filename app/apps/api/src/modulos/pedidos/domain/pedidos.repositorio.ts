@@ -13,7 +13,7 @@ export interface DatosCrearPedido {
   fechaProgramada: Date;
   tipoServicio: TipoServicio;
   observaciones: string | null;
-  productos: { codigo: string | null; descripcion: string; cantidad: number }[];
+  productos: { codigo: string | null; descripcion: string; cantidad: number; ticket: string | null }[];
   zonaId: string | null;
   zonaNombre: string | null;
   choferId: string | null;
