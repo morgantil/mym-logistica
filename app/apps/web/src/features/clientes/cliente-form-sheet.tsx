@@ -2,9 +2,11 @@ import { useEffect, useState, type FormEvent } from "react";
 import { AxiosError } from "axios";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { TipoServicioCliente } from "@mym/shared-types";
 import { Button } from "@/components/ui/button";
 import { FilaFormulario, TablaFormulario } from "@/components/shell/fila-formulario";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Sheet,
   SheetContent,
@@ -15,6 +17,12 @@ import {
 } from "@/components/ui/sheet";
 import { actualizarCliente, crearCliente } from "./api";
 import type { Cliente } from "./tipos";
+
+const ETIQUETAS_TIPO_SERVICIO: Record<TipoServicioCliente, string> = {
+  [TipoServicioCliente.PANAL]: "Pañales",
+  [TipoServicioCliente.MEDICAMENTO]: "Medicamentos",
+  [TipoServicioCliente.AMBOS]: "Ambos",
+};
 
 function mensajeError(error: unknown): string {
   if (error instanceof AxiosError && error.response?.data?.message) {
@@ -37,14 +45,17 @@ export function ClienteFormSheet({
 
   const [nombre, setNombre] = useState("");
   const [patrones, setPatrones] = useState("");
+  const [tipoServicio, setTipoServicio] = useState<TipoServicioCliente>(TipoServicioCliente.PANAL);
 
   useEffect(() => {
     if (editando) {
       setNombre(cliente.nombre);
       setPatrones(cliente.patronesDeteccion.join(", "));
+      setTipoServicio(cliente.tipoServicio);
     } else {
       setNombre("");
       setPatrones("");
+      setTipoServicio(TipoServicioCliente.PANAL);
     }
   }, [cliente, editando]);
 
@@ -56,9 +67,9 @@ export function ClienteFormSheet({
         .map((p) => p.trim())
         .filter(Boolean);
       if (editando) {
-        return actualizarCliente(cliente.id, { nombre, patronesDeteccion });
+        return actualizarCliente(cliente.id, { nombre, patronesDeteccion, tipoServicio });
       }
-      return crearCliente({ nombre, patronesDeteccion });
+      return crearCliente({ nombre, patronesDeteccion, tipoServicio });
     },
     onSuccess: () => {
       toast.success(editando ? "Cliente actualizado." : "Cliente creado.");
@@ -110,6 +121,30 @@ export function ClienteFormSheet({
                 required
                 disabled={mutacion.isPending}
               />
+            </FilaFormulario>
+
+            <FilaFormulario
+              label="Tipo de servicio"
+              htmlFor="tipo-servicio-cliente"
+              anchoEtiqueta="140px"
+              descripcion="Determina qué reglas de facturación aplican (ej. Bolsa/Bulto es solo para medicamentos)."
+            >
+              <Select
+                value={tipoServicio}
+                onValueChange={(valor) => setTipoServicio(valor as TipoServicioCliente)}
+                disabled={mutacion.isPending}
+              >
+                <SelectTrigger id="tipo-servicio-cliente">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.values(TipoServicioCliente).map((valor) => (
+                    <SelectItem key={valor} value={valor}>
+                      {ETIQUETAS_TIPO_SERVICIO[valor]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </FilaFormulario>
           </TablaFormulario>
 

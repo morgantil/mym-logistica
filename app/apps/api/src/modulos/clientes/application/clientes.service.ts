@@ -1,4 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
+import { TipoServicioCliente } from "@mym/shared-types";
 import { Cliente, detectarClientePorNombreArchivo } from "../domain/cliente";
 import {
   CLIENTES_REPOSITORIO,
@@ -31,7 +32,11 @@ export class ClientesService {
     return detectarClientePorNombreArchivo(nombreArchivo, clientes);
   }
 
-  crear(datos: { nombre: string; patronesDeteccion: string[] }): Promise<Cliente> {
+  crear(datos: {
+    nombre: string;
+    patronesDeteccion: string[];
+    tipoServicio: TipoServicioCliente;
+  }): Promise<Cliente> {
     return this.repositorio.crear(datos);
   }
 

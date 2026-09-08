@@ -13,6 +13,15 @@ export enum TipoServicio {
   MEDICAMENTO = "MEDICAMENTO",
 }
 
+// Qué tipo de servicio maneja un Cliente (farmacia) — distinto de
+// TipoServicio (siempre uno solo por Pedido): un Cliente puede manejar
+// los dos (ej. Bella Vista importa tanto pañales como medicamentos).
+export enum TipoServicioCliente {
+  PANAL = "PANAL",
+  MEDICAMENTO = "MEDICAMENTO",
+  AMBOS = "AMBOS",
+}
+
 // Clasificación geográfica simple (CABA vs. interior/provincia) que devuelve
 // GeorefArAdapter al resolver una dirección — NO refleja un enum de Prisma
 // (a partir de 2026-08-17 la unidad de facturación es ZonaTarifaria, una

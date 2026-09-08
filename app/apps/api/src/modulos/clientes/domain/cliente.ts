@@ -1,8 +1,11 @@
+import { TipoServicioCliente } from "@mym/shared-types";
+
 export interface Cliente {
   id: string;
   nombre: string;
   patronesDeteccion: string[];
   activo: boolean;
+  tipoServicio: TipoServicioCliente;
 }
 
 // DOCUMENTO FUNCIONAL.md §5: el sistema intenta identificar el cliente a partir

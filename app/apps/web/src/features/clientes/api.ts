@@ -1,3 +1,4 @@
+import type { TipoServicioCliente } from "@mym/shared-types";
 import { apiClient } from "@/lib/api-client";
 import type { Cliente } from "./tipos";
 
@@ -16,6 +17,7 @@ export async function listarTodosLosClientes(): Promise<Cliente[]> {
 export interface DatosCliente {
   nombre: string;
   patronesDeteccion: string[];
+  tipoServicio: TipoServicioCliente;
 }
 
 export async function crearCliente(datos: DatosCliente): Promise<Cliente> {

@@ -149,3 +149,18 @@ TECNICO.md historial 2026-09-07 para el análisis completo.
 | # | Pendiente | Dueño | Detalle |
 |---|---|---|---|
 | 12.1 | ~~Bug real — el ticket/número de orden se perdía si dos líneas agrupadas traían valores distintos~~ | ✅ Corregido 2026-09-07 | `agruparLineasEnPedidos` guardaba el ticket una sola vez por pedido, tomado de la primera línea — un segundo ticket distinto se perdía en silencio, sin fallback (el Excel original tampoco se archiva, R2 sin configurar). Corregido: `ticket` pasa a ser un campo de cada producto, no del pedido — ninguna línea agrupada pierde su dato. La agrupación en sí **no cambia** (sigue siendo correcta para facturación y 2×1, que cuentan viajes por domicilio/fecha, no órdenes de origen). Observaciones/etiqueta muestran "Ticket: X" si todos los productos comparten el mismo (caso común, sin cambios visibles) o "Tickets: X, Y" si difieren. Columna "Ticket" nueva en el detalle del pedido del frontend, solo visible si aplica. |
+
+## 13. Guía de facturación Arbet (`Guia_Desarrollo_Logica_Facturacion_Arbet.docx`) — revisión "de a poco"
+
+Documento nuevo, pero **idéntico en contenido** al ya analizado en la
+conversación (mismas reglas de zona/Cordón, Bolsa/Bulto, 2×1, unificados —
+ver el repaso punto por punto ya hecho). Se revisa de a poco, no todo de
+una — Leonardo pidió avanzar en bloques chicos en vez de encarar toda la
+guía junta.
+
+| # | Pendiente | Dueño | Detalle |
+|---|---|---|---|
+| 13.1 | ~~Categoría de cliente (Pañales/Medicamentos/Ambos)~~ | ✅ Construido 2026-09-08 | Primer bloque: no existía forma de saber qué tipo de servicio maneja cada Cliente — dato que la guía asume implícito. Nuevo campo `Cliente.tipoServicio`, selector en el formulario, columna en el listado. Bella Vista ya cargado como "Ambos" (dato real, confirmado con Leonardo, no asumido). Sienta la base para lo que sigue (13.2, 13.3). |
+| 13.2 | 🔲 Bolsa/Bulto para medicamentos | A definir alcance | Sigue sin existir en el schema — bloqueado hasta que arranque Etapa 2 en los hechos (medicamentos todavía no se importa). No es urgente mientras no haya un pedido real de medicamentos. |
+| 13.3 | 🔲 Unificación entre Clientes distintos (Farmaet↔Biosíntesis/Farmapal, Bella Vista↔OSDE/Previvax) | Nosotros | Verificado: `generarVistaPrevia` calcula por un solo Cliente a la vez — no hay forma de cruzar pedidos de dos Clientes distintos hoy. Falta la lógica de agrupación entre clientes, no solo cargar qué combinaciones están habilitadas (ver §1.2). Tampoco urgente mientras medicamentos no tenga pedidos reales. |
+| 13.4 | 🔲 Confirmar si pañales necesita más de un Cordón AMBA | Leonardo/Cliente final | Ya resuelto el mecanismo (§1.4: "Primer Cordon" cargado) — falta terminar de asignar las 11 zonas de SimpliRoute y decidir si hacen falta más Cordones. |

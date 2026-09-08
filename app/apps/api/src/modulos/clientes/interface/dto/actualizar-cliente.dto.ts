@@ -1,4 +1,5 @@
-import { ArrayNotEmpty, IsArray, IsBoolean, IsOptional, IsString } from "class-validator";
+import { TipoServicioCliente } from "@mym/shared-types";
+import { ArrayNotEmpty, IsArray, IsBoolean, IsEnum, IsOptional, IsString } from "class-validator";
 
 export class ActualizarClienteDto {
   @IsOptional()
@@ -14,4 +15,8 @@ export class ActualizarClienteDto {
   @IsOptional()
   @IsBoolean()
   activo?: boolean;
+
+  @IsOptional()
+  @IsEnum(TipoServicioCliente)
+  tipoServicio?: TipoServicioCliente;
 }

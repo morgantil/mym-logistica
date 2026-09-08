@@ -1,9 +1,28 @@
+import { TipoServicioCliente } from "@mym/shared-types";
 import { Cliente, detectarClientePorNombreArchivo } from "./cliente";
 
 const CLIENTES: Cliente[] = [
-  { id: "1", nombre: "Biosíntesis", patronesDeteccion: ["BIOSINTESIS"], activo: true },
-  { id: "2", nombre: "Bella Vista", patronesDeteccion: ["BELLA VISTA"], activo: true },
-  { id: "3", nombre: "Farmapal", patronesDeteccion: ["FARMAPAL"], activo: true },
+  {
+    id: "1",
+    nombre: "Biosíntesis",
+    patronesDeteccion: ["BIOSINTESIS"],
+    activo: true,
+    tipoServicio: TipoServicioCliente.PANAL,
+  },
+  {
+    id: "2",
+    nombre: "Bella Vista",
+    patronesDeteccion: ["BELLA VISTA"],
+    activo: true,
+    tipoServicio: TipoServicioCliente.AMBOS,
+  },
+  {
+    id: "3",
+    nombre: "Farmapal",
+    patronesDeteccion: ["FARMAPAL"],
+    activo: true,
+    tipoServicio: TipoServicioCliente.PANAL,
+  },
 ];
 
 describe("detectarClientePorNombreArchivo", () => {

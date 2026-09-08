@@ -1,12 +1,19 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { TipoServicioCliente } from "@mym/shared-types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { actualizarCliente, listarTodosLosClientes } from "./api";
 import { ClienteFormSheet } from "./cliente-form-sheet";
 import type { Cliente } from "./tipos";
+
+const ETIQUETAS_TIPO_SERVICIO: Record<TipoServicioCliente, string> = {
+  [TipoServicioCliente.PANAL]: "Pañales",
+  [TipoServicioCliente.MEDICAMENTO]: "Medicamentos",
+  [TipoServicioCliente.AMBOS]: "Ambos",
+};
 
 export function ClientesPage() {
   const [clienteEnEdicion, setClienteEnEdicion] = useState<Cliente | null | "nuevo">(null);
@@ -44,6 +51,7 @@ export function ClientesPage() {
             <TableRow>
               <TableHead>Nombre</TableHead>
               <TableHead>Patrones de detección</TableHead>
+              <TableHead>Tipo de servicio</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Acciones</TableHead>
             </TableRow>
@@ -51,13 +59,13 @@ export function ClientesPage() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-muted-foreground">
+                <TableCell colSpan={5} className="text-muted-foreground">
                   Cargando…
                 </TableCell>
               </TableRow>
             ) : clientes?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-muted-foreground">
+                <TableCell colSpan={5} className="text-muted-foreground">
                   Todavía no hay clientes cargados.
                 </TableCell>
               </TableRow>
@@ -68,6 +76,7 @@ export function ClientesPage() {
                   <TableCell className="whitespace-normal">
                     {cliente.patronesDeteccion.join(", ")}
                   </TableCell>
+                  <TableCell>{ETIQUETAS_TIPO_SERVICIO[cliente.tipoServicio]}</TableCell>
                   <TableCell>
                     {cliente.activo ? (
                       <Badge

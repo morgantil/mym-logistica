@@ -36,6 +36,15 @@ enum TipoServicio {
   MEDICAMENTO
 }
 
+// Qué tipo de servicio maneja un Cliente (farmacia) — distinto de
+// TipoServicio (siempre uno solo por Pedido): un Cliente puede manejar
+// los dos (ej. Bella Vista importa tanto pañales como medicamentos).
+enum TipoServicioCliente {
+  PANAL
+  MEDICAMENTO
+  AMBOS
+}
+
 // DOCUMENTO FUNCIONAL.md §19
 enum EstadoPedido {
   SIN_ASIGNAR
@@ -146,12 +155,18 @@ model UsuarioCliente {
 // ---------------------------------------------------------------------------
 
 model Cliente {
-  id                String   @id @default(uuid())
+  id                String              @id @default(uuid())
   nombre            String
   // patrones de texto para detectar el cliente en el nombre del archivo Excel
   // (§5 funcional, ej. "BIOSINTESIS", "BELLA VISTA", "FARMAPAL")
   patronesDeteccion String[]
-  activo            Boolean  @default(true)
+  activo            Boolean             @default(true)
+  // Qué tipo de servicio maneja este cliente — determina reglas de
+  // facturación (ej. Bolsa/Bulto solo aplica a medicamentos). Default
+  // PANAL porque hoy todos los clientes reales son de pañales (Etapa 1);
+  // clientes que también manejen medicamentos (ej. Bella Vista) se marcan
+  // "AMBOS" a mano desde esta pantalla, no se asume.
+  tipoServicio      TipoServicioCliente @default(PANAL)
 
   creadoEn         DateTime  @default(now())
   actualizadoEn    DateTime  @updatedAt
