@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post } from "@nestjs/common";
 import { Rol } from "@prisma/client";
 import { Roles } from "../../../common/decorators/roles.decorator";
 import { ZonasTarifariasService } from "../application/zonas-tarifarias.service";
@@ -6,7 +6,6 @@ import {
   ActualizarZonaTarifariaDto,
   AsignarLocalidadDto,
   AsignarPartidoDto,
-  AsignarZonaSimpliRouteDto,
   CrearZonaTarifariaDto,
 } from "./dto/zona-tarifaria.dto";
 
@@ -49,29 +48,10 @@ export class ZonasTarifariasController {
     return this.service.quitarLocalidad(id);
   }
 
-  // Mapeo Zona de SimpliRoute → Cordón — decisión 2026-08-26 (ver DOCUMENTO
-  // TECNICO.md historial): alternativa más liviana al mapeo por localidad,
-  // 11 zonas reales en vez de cientos de localidades.
-  @Get("zonas-simpliroute")
-  listarMapeoZonasSimpliRoute() {
-    return this.service.listarMapeoZonasSimpliRoute();
-  }
-
-  @Roles(Rol.ADMINISTRACION, Rol.FACTURACION)
-  @Post("zonas-simpliroute")
-  asignarZonaSimpliRoute(@Body() dto: AsignarZonaSimpliRouteDto) {
-    return this.service.asignarZonaSimpliRoute(dto.zonaSimpliRouteId, dto.zonaTarifariaId);
-  }
-
-  @Roles(Rol.ADMINISTRACION, Rol.FACTURACION)
-  @Delete("zonas-simpliroute/:zonaSimpliRouteId")
-  quitarZonaSimpliRoute(@Param("zonaSimpliRouteId", ParseIntPipe) zonaSimpliRouteId: number) {
-    return this.service.quitarZonaSimpliRoute(zonaSimpliRouteId);
-  }
-
   // Mapeo Partido/Municipio → Cordón — decisión 2026-09-08 (ver DOCUMENTO
-  // TECNICO.md historial): más preciso que el de zonas de SimpliRoute
-  // (esas cruzan varios partidos reales cada una).
+  // TECNICO.md historial): reemplazó al mapeo por Zona de SimpliRoute que
+  // existía antes (sacado el mismo día — esas zonas cruzan varios partidos
+  // reales cada una, daban resultados imprecisos).
   @Get("partidos")
   listarMapeoPartidos() {
     return this.service.listarMapeoPartidos();

@@ -9,13 +9,6 @@ export interface LocalidadZonaTarifaria {
   zonaTarifaria: { nombre: string };
 }
 
-// Mapeo Zona de SimpliRoute → ZonaTarifaria (Cordón) — decisión 2026-08-26.
-export interface ZonaSimpliRouteZonaTarifaria {
-  zonaSimpliRouteId: number;
-  zonaTarifariaId: string;
-  zonaTarifaria: { nombre: string };
-}
-
 // Mapeo Partido/Municipio → ZonaTarifaria (Cordón) — decisión 2026-09-08,
 // más preciso que el de zonas de SimpliRoute (esas cruzan varios partidos
 // reales cada una). El backend ya devuelve la lista completa de partidos

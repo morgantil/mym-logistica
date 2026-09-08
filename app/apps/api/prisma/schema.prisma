@@ -348,11 +348,10 @@ model ZonaTarifaria {
 
   eliminadoEn DateTime?
 
-  localidades      LocalidadZonaTarifaria[]
-  zonasSimpliRoute ZonaSimpliRouteZonaTarifaria[]
-  partidos         PartidoZonaTarifaria[]
-  tarifas          TarifaCliente[]
-  pedidos          Pedido[]
+  localidades LocalidadZonaTarifaria[]
+  partidos    PartidoZonaTarifaria[]
+  tarifas     TarifaCliente[]
+  pedidos     Pedido[]
 
   @@map("zonas_tarifarias")
 }
@@ -371,37 +370,19 @@ model LocalidadZonaTarifaria {
   @@map("localidades_zonas_tarifarias")
 }
 
-// Mapeo Zona de SimpliRoute → ZonaTarifaria (Cordón) — decisión 2026-08-26
-// (ver DOCUMENTO TECNICO.md historial): en vez de depender solo del mapeo
-// Localidad → Cordón de arriba (manual, localidad por localidad), se puede
-// aprovechar que las Zonas de SimpliRoute ya tienen un polígono geográfico
-// real, dibujado por el equipo de operaciones. Solo 11 zonas reales hoy —
-// mapear cada una a un Cordón es mucho menos trabajo que cargar cada
-// localidad a mano. Se prioriza sobre LocalidadZonaTarifaria al resolver un
-// pedido (ver ZonasTarifariasService.resolverPorZonaSimpliRoute), pero no lo
-// reemplaza: sigue siendo fallback si la zona de SimpliRoute no está
-// mapeada o el destinatario no tiene coordenadas todavía.
-model ZonaSimpliRouteZonaTarifaria {
-  zonaSimpliRouteId Int    @id
-  zonaTarifariaId   String
-
-  zonaTarifaria ZonaTarifaria @relation(fields: [zonaTarifariaId], references: [id])
-
-  @@map("zonas_simpliroute_zonas_tarifarias")
-}
-
 // Mapeo Partido/Municipio (GBA) → ZonaTarifaria (Cordón) — decisión
 // 2026-09-08: las Zonas de SimpliRoute cruzan varios partidos reales cada
 // una (comprobado geocodificando los vértices de sus polígonos contra la
 // API oficial — "Sur Lanús" cae en 5 partidos distintos, "Oeste largo" en
 // 9 — están dibujadas para logística, no para separar zonas de precio), así
-// que asignarles un Cordón único da resultados imprecisos. El partido en
-// cambio es un límite administrativo exacto, y ya lo devuelve
-// GeorefArAdapter (el mismo que resuelve CABA/Provincia) — mapear por
-// partido (~29 en todo el conurbano) es mucho más preciso que por zona de
-// SimpliRoute, y mucho menos trabajo que cargar cada localidad suelta. Se
-// prioriza sobre ambos mapeos anteriores al resolver un pedido (ver
-// ZonasTarifariasService.resolverParaPedido).
+// que asignarles un Cordón único da resultados imprecisos (por eso se sacó
+// del sistema el mapeo Zona de SimpliRoute → Cordón que existía antes, ver
+// DOCUMENTO TECNICO.md historial 2026-09-08). El partido en cambio es un
+// límite administrativo exacto, y ya lo devuelve GeorefArAdapter (el mismo
+// que resuelve CABA/Provincia) — mapear por partido (~29 en todo el
+// conurbano) es mucho más preciso, y mucho menos trabajo que cargar cada
+// localidad suelta. Se prioriza sobre el mapeo por Localidad al resolver un
+// pedido (ver ZonasTarifariasService.resolverParaPedido).
 model PartidoZonaTarifaria {
   partido         String @id
   zonaTarifariaId String
