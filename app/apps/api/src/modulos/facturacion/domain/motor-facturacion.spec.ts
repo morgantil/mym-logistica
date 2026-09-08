@@ -1,10 +1,12 @@
-import { TipoServicio } from "@mym/shared-types";
+import { TipoEnvase, TipoServicio } from "@mym/shared-types";
 import {
   PedidoParaFacturar,
+  TarifasPorTipo,
   agruparPorClienteFechaDireccion,
   aplicarDosPorUno,
   buscarUnificaciones,
   calcularFacturacionCliente,
+  construirClaveTarifa,
   separarPorTipoServicio,
 } from "./motor-facturacion";
 
@@ -12,13 +14,37 @@ import {
 // solo agrupa por id (ver comentario de TarifasPorTipo en motor-facturacion.ts).
 const ZONA_CABA = "zona-caba";
 const ZONA_PROVINCIA = "zona-provincia";
-const TARIFAS = { [ZONA_CABA]: 1000, [ZONA_PROVINCIA]: 1500 };
-const PORCENTAJE_SEGUNDO_SERVICIO = 50;
+
+const TARIFAS: TarifasPorTipo = {
+  [construirClaveTarifa({ zonaTarifariaId: ZONA_CABA, tipoServicio: TipoServicio.PANAL, tipoEnvase: null })]: 1000,
+  [construirClaveTarifa({
+    zonaTarifariaId: ZONA_PROVINCIA,
+    tipoServicio: TipoServicio.PANAL,
+    tipoEnvase: null,
+  })]: 1500,
+  [construirClaveTarifa({
+    zonaTarifariaId: ZONA_CABA,
+    tipoServicio: TipoServicio.MEDICAMENTO,
+    tipoEnvase: TipoEnvase.BOLSA,
+  })]: 800,
+  [construirClaveTarifa({
+    zonaTarifariaId: ZONA_CABA,
+    tipoServicio: TipoServicio.MEDICAMENTO,
+    tipoEnvase: TipoEnvase.BULTO,
+  })]: 1200,
+};
+
+// Reproduce el caso "tal cual viene del documento Arbet": pañal 100% + un %
+// adicional de medicamento. Los tests que quieren el % configurable de ambos
+// lados (regla real del negocio, ver DOCUMENTO TECNICO.md 2026-09-08) usan
+// PORCENTAJES_CONFIGURABLES en su lugar.
+const PORCENTAJES_DOCUMENTO_ARBET = { panal: 100, medicamento: 50 };
 
 function pedido(overrides: Partial<PedidoParaFacturar> & { id: string }): PedidoParaFacturar {
   return {
     clienteId: "cliente-1",
     tipoServicio: TipoServicio.PANAL,
+    tipoEnvase: null,
     fechaProgramada: "2026-08-01",
     direccionUsada: "Av. Siempre Viva 123",
     zonaTarifariaId: ZONA_CABA,
@@ -30,9 +56,9 @@ function pedidos(cantidad: number, overrides: Partial<PedidoParaFacturar> = {}):
   return Array.from({ length: cantidad }, (_, i) => pedido({ id: `p${i}`, ...overrides }));
 }
 
-describe("motor-facturacion — casos de ejemplo del §28 funcional", () => {
+describe("motor-facturacion — casos de ejemplo del §28 funcional / Guia Arbet §9", () => {
   it("caso 1: 10 pedidos de pañales, mismo cliente/fecha/dirección → 5 viajes 2x1, sin unificación", () => {
-    const viajes = calcularFacturacionCliente(pedidos(10), TARIFAS, PORCENTAJE_SEGUNDO_SERVICIO);
+    const viajes = calcularFacturacionCliente(pedidos(10), TARIFAS, PORCENTAJES_DOCUMENTO_ARBET);
 
     expect(viajes).toHaveLength(5);
     expect(viajes.every((v) => v.reglaAplicada === "2x1")).toBe(true);
@@ -40,53 +66,63 @@ describe("motor-facturacion — casos de ejemplo del §28 funcional", () => {
     expect(viajes.reduce((total, v) => total + v.pedidoIds.length, 0)).toBe(10);
   });
 
-  it("caso 2: 3 pedidos de medicamentos → 2 viajes (1 par 2x1 + 1 individual)", () => {
+  it("caso 2: 3 pedidos de medicamentos (mismo Bolsa/Bulto) → 2 viajes (1 par 2x1 + 1 individual)", () => {
     const viajes = calcularFacturacionCliente(
-      pedidos(3, { tipoServicio: TipoServicio.MEDICAMENTO }),
+      pedidos(3, { tipoServicio: TipoServicio.MEDICAMENTO, tipoEnvase: TipoEnvase.BOLSA }),
       TARIFAS,
-      PORCENTAJE_SEGUNDO_SERVICIO,
+      PORCENTAJES_DOCUMENTO_ARBET,
     );
 
     expect(viajes).toHaveLength(2);
     expect(viajes.filter((v) => v.reglaAplicada === "2x1")).toHaveLength(1);
     expect(viajes.filter((v) => v.reglaAplicada === "INDIVIDUAL")).toHaveLength(1);
-    expect(viajes.every((v) => v.importeCalculado === 1000)).toBe(true);
+    expect(viajes.every((v) => v.importeCalculado === 800)).toBe(true);
   });
 
-  it("caso 3: 1 pañal + 1 medicamento → 1 entrega unificada (100% + porcentaje)", () => {
+  it("caso 3: 1 pañal + 1 medicamento → 1 entrega unificada (100% + porcentaje), documento Arbet", () => {
     const viajes = calcularFacturacionCliente(
-      [pedido({ id: "panal" }), pedido({ id: "medicamento", tipoServicio: TipoServicio.MEDICAMENTO })],
+      [
+        pedido({ id: "panal" }),
+        pedido({ id: "medicamento", tipoServicio: TipoServicio.MEDICAMENTO, tipoEnvase: TipoEnvase.BOLSA }),
+      ],
       TARIFAS,
-      PORCENTAJE_SEGUNDO_SERVICIO,
+      PORCENTAJES_DOCUMENTO_ARBET,
     );
 
     expect(viajes).toHaveLength(1);
     expect(viajes[0].reglaAplicada).toBe("UNIFICADA");
     expect(viajes[0].pedidoIds).toEqual(expect.arrayContaining(["panal", "medicamento"]));
-    expect(viajes[0].porcentajeAplicado).toBe(50);
-    expect(viajes[0].importeCalculado).toBe(1500); // 1000 (100%) + 500 (50%)
+    expect(viajes[0].importeCalculado).toBe(1400); // 1000 (100% panal) + 400 (50% de 800 bolsa)
+    expect(viajes[0].detalleUnificacion).toEqual({
+      tarifaPanal: 1000,
+      porcentajePanal: 100,
+      importePanal: 1000,
+      tarifaMedicamento: 800,
+      porcentajeMedicamento: 50,
+      importeMedicamento: 400,
+    });
   });
 
   it("caso 4: 3 pañales + 1 medicamento → 1 unificada + 1 viaje 2x1 con los 2 pañales restantes", () => {
     const viajes = calcularFacturacionCliente(
       [
         ...pedidos(3, { id: "panal" }).map((p, i) => ({ ...p, id: `panal-${i}` })),
-        pedido({ id: "medicamento", tipoServicio: TipoServicio.MEDICAMENTO }),
+        pedido({ id: "medicamento", tipoServicio: TipoServicio.MEDICAMENTO, tipoEnvase: TipoEnvase.BOLSA }),
       ],
       TARIFAS,
-      PORCENTAJE_SEGUNDO_SERVICIO,
+      PORCENTAJES_DOCUMENTO_ARBET,
     );
 
     expect(viajes).toHaveLength(2);
     const unificada = viajes.find((v) => v.reglaAplicada === "UNIFICADA");
     const dosPorUno = viajes.find((v) => v.reglaAplicada === "2x1");
-    expect(unificada?.importeCalculado).toBe(1500);
+    expect(unificada?.importeCalculado).toBe(1400);
     expect(unificada?.pedidoIds).toContain("medicamento");
     expect(dosPorUno?.pedidoIds).toHaveLength(2);
     expect(dosPorUno?.importeCalculado).toBe(1000);
 
     const totalFacturado = viajes.reduce((total, v) => total + v.importeCalculado, 0);
-    expect(totalFacturado).toBe(2500); // 1 viaje completo + 50% del segundo servicio + 1 viaje adicional
+    expect(totalFacturado).toBe(2400); // 1 unificada (1000 + 400) + 1 viaje 2x1 (1000)
   });
 
   it("caso 29: clientes diferentes en mismo domicilio/fecha nunca se cruzan", () => {
@@ -96,13 +132,68 @@ describe("motor-facturacion — casos de ejemplo del §28 funcional", () => {
         ...pedidos(4, { clienteId: "farmacia-b" }).map((p, i) => ({ ...p, id: `b${i}` })),
       ],
       TARIFAS,
-      PORCENTAJE_SEGUNDO_SERVICIO,
+      PORCENTAJES_DOCUMENTO_ARBET,
     );
 
     const viajesA = viajes.filter((v) => v.clienteId === "farmacia-a");
     const viajesB = viajes.filter((v) => v.clienteId === "farmacia-b");
     expect(viajesA).toHaveLength(5);
     expect(viajesB).toHaveLength(2);
+  });
+});
+
+describe("motor-facturacion — Bolsa/Bulto (Guia Arbet paso 2 y 5)", () => {
+  it("cobra tarifa distinta a Bolsa y Bulto en la misma zona", () => {
+    const viajes = calcularFacturacionCliente(
+      [
+        pedido({ id: "bolsa", tipoServicio: TipoServicio.MEDICAMENTO, tipoEnvase: TipoEnvase.BOLSA }),
+        pedido({ id: "bulto", tipoServicio: TipoServicio.MEDICAMENTO, tipoEnvase: TipoEnvase.BULTO }),
+      ],
+      TARIFAS,
+      PORCENTAJES_DOCUMENTO_ARBET,
+    );
+
+    // Bolsa y Bulto en el mismo grupo fecha+dirección no pueden compartir
+    // viaje 2x1 (tarifa distinta) — cada uno queda como INDIVIDUAL.
+    expect(viajes).toHaveLength(2);
+    const viajeBolsa = viajes.find((v) => v.pedidoIds.includes("bolsa"));
+    const viajeBulto = viajes.find((v) => v.pedidoIds.includes("bulto"));
+    expect(viajeBolsa?.importeCalculado).toBe(800);
+    expect(viajeBulto?.importeCalculado).toBe(1200);
+  });
+
+  it("Bolsa + Bulto en un mismo pedido de medicamentos se unifica igual con pañales, usando la tarifa de Bulto", () => {
+    // La clasificación Bolsa+Bulto→Bulto ocurre antes (determinarClasificacionMedicamento);
+    // acá el pedido ya llega con tipoEnvase=BULTO.
+    const viajes = calcularFacturacionCliente(
+      [
+        pedido({ id: "panal" }),
+        pedido({ id: "medicamento", tipoServicio: TipoServicio.MEDICAMENTO, tipoEnvase: TipoEnvase.BULTO }),
+      ],
+      TARIFAS,
+      PORCENTAJES_DOCUMENTO_ARBET,
+    );
+
+    expect(viajes[0].detalleUnificacion?.tarifaMedicamento).toBe(1200);
+  });
+});
+
+describe("motor-facturacion — porcentaje configurable de ambos lados (decisión 2026-09-08)", () => {
+  it("aplica un % distinto de 100 también al lado de pañales cuando así se configura", () => {
+    const porcentajes = { panal: 80, medicamento: 30 };
+    const viajes = calcularFacturacionCliente(
+      [
+        pedido({ id: "panal" }),
+        pedido({ id: "medicamento", tipoServicio: TipoServicio.MEDICAMENTO, tipoEnvase: TipoEnvase.BOLSA }),
+      ],
+      TARIFAS,
+      porcentajes,
+    );
+
+    // 1000 * 0.8 = 800 (panal) + 800 * 0.3 = 240 (medicamento) = 1040
+    expect(viajes[0].importeCalculado).toBe(1040);
+    expect(viajes[0].detalleUnificacion?.porcentajePanal).toBe(80);
+    expect(viajes[0].detalleUnificacion?.porcentajeMedicamento).toBe(30);
   });
 });
 
@@ -199,7 +290,7 @@ describe("calcularFacturacionCliente — tarifa por zona tarifaria", () => {
         }),
       ],
       TARIFAS,
-      PORCENTAJE_SEGUNDO_SERVICIO,
+      PORCENTAJES_DOCUMENTO_ARBET,
     );
 
     const viajeCaba = viajes.find((v) => v.pedidoIds.includes("caba"));

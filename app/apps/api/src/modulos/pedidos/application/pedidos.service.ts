@@ -106,6 +106,10 @@ export class PedidosService {
     return this.repositorio.listarFacturables(filtro);
   }
 
+  listarEntregadosEnPeriodo(filtro: FiltroPedidosFacturables) {
+    return this.repositorio.listarEntregadosEnPeriodo(filtro);
+  }
+
   // §16 funcional: carga de bultos desde la grilla. Bloqueo optimista — ver
   // ConflictoVersionError, que el controller traduce a HTTP 409.
   async actualizarBultos(pedidoId: string, bultos: number, version: number) {

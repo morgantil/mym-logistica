@@ -1,10 +1,12 @@
-import { EstadoGrupoFacturacion } from "@mym/shared-types";
+import { EstadoGrupoFacturacion, TipoEnvase, TipoServicio } from "@mym/shared-types";
 
 export interface TarifaCliente {
   id: string;
   clienteId: string;
   zonaTarifariaId: string;
   zonaTarifariaNombre?: string;
+  tipoServicio: TipoServicio;
+  tipoEnvase: TipoEnvase | null;
   monto: number;
   vigenciaDesde: string;
   vigenciaHasta: string | null;
@@ -13,9 +15,21 @@ export interface TarifaCliente {
 export interface PorcentajeSegundoServicio {
   id: string;
   clienteId: string;
-  porcentaje: number;
+  porcentajePanal: number;
+  porcentajeMedicamento: number;
   vigenciaDesde: string;
   vigenciaHasta: string | null;
+}
+
+// Guia Arbet paso 4/8: combinación habilitada de unificación ENTRE dos
+// clientes distintos.
+export interface CombinacionUnificacionClientes {
+  id: string;
+  clienteMedicamentoId: string;
+  clienteMedicamentoNombre?: string;
+  clientePanalId: string;
+  clientePanalNombre?: string;
+  activa: boolean;
 }
 
 // Liquidación a transportistas — monto por viaje, configurable con vigencia,
@@ -38,6 +52,10 @@ export interface GrupoFacturacion {
   reglaAplicada: ReglaAplicada;
   tarifaUtilizada: number | null;
   porcentajeAplicado: number | null;
+  porcentajePanalAplicado: number | null;
+  porcentajeMedicamentoAplicado: number | null;
+  pedidoSocioId: string | null;
+  clienteSocioId: string | null;
   importeCalculado: number;
   confirmadoEn: string | null;
   confirmadoPorId: string | null;

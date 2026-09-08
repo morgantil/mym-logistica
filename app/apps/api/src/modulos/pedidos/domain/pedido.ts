@@ -1,4 +1,4 @@
-import { EstadoPedido, EstadoSimpliroute, EstadoValidacion, TipoServicio } from "@mym/shared-types";
+import { EstadoPedido, EstadoSimpliroute, EstadoValidacion, TipoEnvase, TipoServicio } from "@mym/shared-types";
 
 export interface Pedido {
   id: string;
@@ -51,6 +51,15 @@ export interface PedidoListado extends Pedido {
   destinatarioNombre: string;
   destinatarioTelefono: string | null;
   productos: { codigo: string | null; descripcion: string; cantidad: number; ticket: string | null }[];
+}
+
+// Proyección de Pedido para el motor de facturación (facturacion/domain/
+// motor-facturacion.ts): necesita el tipoEnvase de cada línea para clasificar
+// el pedido como Bolsa/Bulto (determinarClasificacionMedicamento) — a
+// diferencia de PedidoListado (que trae más datos de exhibición, para la
+// grilla), acá solo lo mínimo que ese cálculo necesita.
+export interface PedidoFacturable extends Pedido {
+  productos: { tipoEnvase: TipoEnvase | null }[];
 }
 
 export interface LineaExcelPanales {

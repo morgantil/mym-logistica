@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { AxiosError } from "axios";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { TipoEnvase, TipoServicio } from "@mym/shared-types";
 import { Button } from "@/components/ui/button";
 import { FilaFormulario, TablaFormulario } from "@/components/shell/fila-formulario";
 import { Input } from "@/components/ui/input";
@@ -9,6 +10,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { listarZonasTarifarias } from "@/features/zonas-tarifarias/api";
 import { crearTarifa } from "./api";
+
+const ETIQUETAS_TIPO_SERVICIO: Record<TipoServicio, string> = {
+  [TipoServicio.PANAL]: "Pañales",
+  [TipoServicio.MEDICAMENTO]: "Medicamentos",
+};
+
+const ETIQUETAS_TIPO_ENVASE: Record<TipoEnvase, string> = {
+  [TipoEnvase.BOLSA]: "Bolsa",
+  [TipoEnvase.BULTO]: "Bulto",
+};
 
 function mensajeError(error: unknown): string {
   if (error instanceof AxiosError && error.response?.data?.message) {
@@ -40,13 +51,25 @@ export function TarifaFormSheet({
   const zonasActivas = (zonas ?? []).filter((zona) => zona.activa);
 
   const [zonaTarifariaId, setZonaTarifariaId] = useState("");
+  const [tipoServicio, setTipoServicio] = useState<TipoServicio>(TipoServicio.PANAL);
+  const [tipoEnvase, setTipoEnvase] = useState<TipoEnvase | "">("");
   const [monto, setMonto] = useState("");
   const [vigenciaDesde, setVigenciaDesde] = useState(HOY);
   const [error, setError] = useState<string | null>(null);
 
+  const esMedicamento = tipoServicio === TipoServicio.MEDICAMENTO;
+
   const queryClient = useQueryClient();
   const mutacion = useMutation({
-    mutationFn: () => crearTarifa({ clienteId, zonaTarifariaId, monto: Number(monto), vigenciaDesde }),
+    mutationFn: () =>
+      crearTarifa({
+        clienteId,
+        zonaTarifariaId,
+        tipoServicio,
+        tipoEnvase: esMedicamento && tipoEnvase ? tipoEnvase : undefined,
+        monto: Number(monto),
+        vigenciaDesde,
+      }),
     onSuccess: () => {
       toast.success("Tarifa cargada.");
       queryClient.invalidateQueries({ queryKey: ["facturacion", "tarifas", clienteId] });
@@ -99,6 +122,44 @@ export function TarifaFormSheet({
               </Select>
             </FilaFormulario>
 
+            <FilaFormulario label="Tipo de servicio" htmlFor="tipo-servicio-tarifa" anchoEtiqueta="140px">
+              <Select
+                value={tipoServicio}
+                onValueChange={(valor) => {
+                  setTipoServicio(valor as TipoServicio);
+                  setTipoEnvase("");
+                }}
+              >
+                <SelectTrigger id="tipo-servicio-tarifa">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.values(TipoServicio).map((valor) => (
+                    <SelectItem key={valor} value={valor}>
+                      {ETIQUETAS_TIPO_SERVICIO[valor]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilaFormulario>
+
+            {esMedicamento && (
+              <FilaFormulario label="Bolsa / Bulto" htmlFor="tipo-envase-tarifa" anchoEtiqueta="140px">
+                <Select value={tipoEnvase} onValueChange={(valor) => setTipoEnvase(valor as TipoEnvase)}>
+                  <SelectTrigger id="tipo-envase-tarifa">
+                    <SelectValue placeholder="Elegir" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.values(TipoEnvase).map((valor) => (
+                      <SelectItem key={valor} value={valor}>
+                        {ETIQUETAS_TIPO_ENVASE[valor]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FilaFormulario>
+            )}
+
             <FilaFormulario label="Monto" htmlFor="monto-tarifa" anchoEtiqueta="140px">
               <Input
                 id="monto-tarifa"
@@ -125,7 +186,10 @@ export function TarifaFormSheet({
           </TablaFormulario>
 
           <SheetFooter className="px-0">
-            <Button type="submit" disabled={mutacion.isPending || !zonaTarifariaId}>
+            <Button
+              type="submit"
+              disabled={mutacion.isPending || !zonaTarifariaId || (esMedicamento && !tipoEnvase)}
+            >
               {mutacion.isPending ? "Guardando…" : "Guardar"}
             </Button>
           </SheetFooter>

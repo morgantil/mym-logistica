@@ -22,6 +22,16 @@ export enum TipoServicioCliente {
   AMBOS = "AMBOS",
 }
 
+// Clasificación de un pedido de medicamentos para facturación (Guia_Desarrollo_
+// Logica_Facturacion_Arbet.docx, paso 2): Bolsa o Bulto tienen tarifa propia
+// por cliente+zona. Un pedido nunca es "los dos" a nivel de facturación — si
+// sus líneas mezclan Bolsa y Bulto, se factura como Bulto (regla simple del
+// documento). Null = no es un pedido de medicamentos (pañales no la usan).
+export enum TipoEnvase {
+  BOLSA = "BOLSA",
+  BULTO = "BULTO",
+}
+
 // Clasificación geográfica simple (CABA vs. interior/provincia) que devuelve
 // GeorefArAdapter al resolver una dirección — NO refleja un enum de Prisma
 // (a partir de 2026-08-17 la unidad de facturación es ZonaTarifaria, una

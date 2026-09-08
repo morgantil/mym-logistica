@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import { EstadoPedido } from "@mym/shared-types";
 import { PrismaService } from "../../../common/prisma/prisma.service";
 import { ConflictoVersionError } from "../domain/conflicto-version.error";
-import { Pedido, PedidoListado } from "../domain/pedido";
+import { Pedido, PedidoFacturable, PedidoListado } from "../domain/pedido";
 import {
   DatosCrearPedido,
   FiltroPedidos,
@@ -209,7 +209,7 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
     return pedidos.map(mapearListado);
   }
 
-  async listarFacturables(filtro: FiltroPedidosFacturables): Promise<Pedido[]> {
+  async listarFacturables(filtro: FiltroPedidosFacturables): Promise<PedidoFacturable[]> {
     const pedidos = await this.prisma.pedido.findMany({
       where: {
         clienteId: filtro.clienteId,
@@ -217,9 +217,23 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
         grupoFacturacionId: null,
         fechaProgramada: { gte: filtro.fechaDesde, lt: filtro.fechaHasta },
       },
+      include: { productos: { select: { tipoEnvase: true } } },
       orderBy: { fechaProgramada: "asc" },
     });
-    return pedidos as unknown as Pedido[];
+    return pedidos as unknown as PedidoFacturable[];
+  }
+
+  async listarEntregadosEnPeriodo(filtro: FiltroPedidosFacturables): Promise<PedidoFacturable[]> {
+    const pedidos = await this.prisma.pedido.findMany({
+      where: {
+        clienteId: filtro.clienteId,
+        estado: "ENTREGADO",
+        fechaProgramada: { gte: filtro.fechaDesde, lt: filtro.fechaHasta },
+      },
+      include: { productos: { select: { tipoEnvase: true } } },
+      orderBy: { fechaProgramada: "asc" },
+    });
+    return pedidos as unknown as PedidoFacturable[];
   }
 
   // count===0 en el updateMany puede significar "no existe" o "cambió la

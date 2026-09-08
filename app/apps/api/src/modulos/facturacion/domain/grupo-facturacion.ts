@@ -12,6 +12,15 @@ export interface GrupoFacturacion {
   reglaAplicada: string;
   tarifaUtilizada: number | null;
   porcentajeAplicado: number | null;
+  // Solo en UNIFICADA (ver ViajeFacturable.detalleUnificacion en el motor):
+  // reemplaza a porcentajeAplicado cuando pañal y medicamento tienen cada uno
+  // su propio % — ver DOCUMENTO TECNICO.md historial 2026-09-08.
+  porcentajePanalAplicado: number | null;
+  porcentajeMedicamentoAplicado: number | null;
+  // Solo en una unificación ENTRE clientes distintos — trazabilidad del
+  // pedido/cliente "socio" que generó la unificación (ver unificacion-cruzada.ts).
+  pedidoSocioId: string | null;
+  clienteSocioId: string | null;
   importeCalculado: number;
   confirmadoEn: Date | null;
   confirmadoPorId: string | null;
@@ -38,5 +47,7 @@ export interface PedidoFacturado {
   reglaAplicada: string;
   tarifaUtilizada: number | null;
   porcentajeAplicado: number | null;
+  porcentajePanalAplicado: number | null;
+  porcentajeMedicamentoAplicado: number | null;
   importeViaje: number;
 }

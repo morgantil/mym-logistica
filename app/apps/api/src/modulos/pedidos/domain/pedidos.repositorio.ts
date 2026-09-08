@@ -1,5 +1,5 @@
 import { EstadoPedido, EstadoSimpliroute, EstadoValidacion, TipoServicio } from "@mym/shared-types";
-import { Pedido, PedidoListado } from "./pedido";
+import { Pedido, PedidoFacturable, PedidoListado } from "./pedido";
 
 export interface DatosCrearPedido {
   clienteId: string;
@@ -105,7 +105,20 @@ export interface PedidosRepositorio {
   // motor) la hace directamente FacturacionRepositorioPrisma dentro de su
   // propia transacción — necesita atomicidad con la creación de
   // GrupoFacturacion, que no se puede lograr cruzando dos repositorios.
-  listarFacturables(filtro: FiltroPedidosFacturables): Promise<Pedido[]>;
+  listarFacturables(filtro: FiltroPedidosFacturables): Promise<PedidoFacturable[]>;
+
+  // Igual que listarFacturables pero SIN excluir los que ya tienen
+  // grupoFacturacionId — para usar como pool de lectura al buscar una
+  // unificación ENTRE clientes (Guia_Desarrollo_Logica_Facturacion_Arbet.docx
+  // paso 4): el pedido "socio" puede ya estar facturado dentro de SU PROPIO
+  // GrupoFacturacion (de su propio cliente) sin que eso invalide que sirva de
+  // referencia para la unificación del OTRO cliente. Si acá se usara
+  // listarFacturables, el resultado dependería del ORDEN en que se generó la
+  // vista previa de cada cliente (bug real encontrado en pruebas 2026-09-08:
+  // corriendo primero el cliente de pañales, su pedido queda con
+  // grupoFacturacionId seteado y desaparece del pool cuando el cliente de
+  // medicamentos busca su socio después). Nunca se usa para escribir.
+  listarEntregadosEnPeriodo(filtro: FiltroPedidosFacturables): Promise<PedidoFacturable[]>;
 
   // Ambos con bloqueo optimista: lanzan ConflictoVersionError (ver ese archivo)
   // si `version` no coincide con la fila actual — alguien más lo modificó primero.

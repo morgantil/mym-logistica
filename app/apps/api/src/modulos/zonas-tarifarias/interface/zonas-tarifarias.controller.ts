@@ -5,6 +5,7 @@ import { ZonasTarifariasService } from "../application/zonas-tarifarias.service"
 import {
   ActualizarZonaTarifariaDto,
   AsignarLocalidadDto,
+  AsignarPartidoDto,
   AsignarZonaSimpliRouteDto,
   CrearZonaTarifariaDto,
 } from "./dto/zona-tarifaria.dto";
@@ -66,5 +67,25 @@ export class ZonasTarifariasController {
   @Delete("zonas-simpliroute/:zonaSimpliRouteId")
   quitarZonaSimpliRoute(@Param("zonaSimpliRouteId", ParseIntPipe) zonaSimpliRouteId: number) {
     return this.service.quitarZonaSimpliRoute(zonaSimpliRouteId);
+  }
+
+  // Mapeo Partido/Municipio → Cordón — decisión 2026-09-08 (ver DOCUMENTO
+  // TECNICO.md historial): más preciso que el de zonas de SimpliRoute
+  // (esas cruzan varios partidos reales cada una).
+  @Get("partidos")
+  listarMapeoPartidos() {
+    return this.service.listarMapeoPartidos();
+  }
+
+  @Roles(Rol.ADMINISTRACION, Rol.FACTURACION)
+  @Post("partidos")
+  asignarPartido(@Body() dto: AsignarPartidoDto) {
+    return this.service.asignarPartido(dto.partido, dto.zonaTarifariaId);
+  }
+
+  @Roles(Rol.ADMINISTRACION, Rol.FACTURACION)
+  @Delete("partidos/:partido")
+  quitarPartido(@Param("partido") partido: string) {
+    return this.service.quitarPartido(partido);
   }
 }

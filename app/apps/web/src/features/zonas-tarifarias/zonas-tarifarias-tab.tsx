@@ -14,12 +14,15 @@ import { listarZonas } from "@/features/zonas-choferes/api";
 import {
   actualizarZonaTarifaria,
   asignarLocalidad,
+  asignarPartido,
   asignarZonaSimpliRoute,
   crearZonaTarifaria,
   listarMapeoLocalidades,
+  listarMapeoPartidos,
   listarMapeoZonasSimpliRoute,
   listarZonasTarifarias,
   quitarLocalidad,
+  quitarPartido,
   quitarZonaSimpliRoute,
 } from "./api";
 import type { ZonaTarifaria } from "./tipos";
@@ -49,6 +52,10 @@ export function ZonasTarifariasTab() {
   const { data: mapeoSimpliRoute } = useQuery({
     queryKey: ["zonas-tarifarias", "zonas-simpliroute"],
     queryFn: listarMapeoZonasSimpliRoute,
+  });
+  const { data: mapeoPartidos, isLoading: cargandoPartidos } = useQuery({
+    queryKey: ["zonas-tarifarias", "partidos"],
+    queryFn: listarMapeoPartidos,
   });
 
   const mutacionGuardar = useMutation({
@@ -95,6 +102,19 @@ export function ZonasTarifariasTab() {
   const mutacionQuitarZonaSimpliRoute = useMutation({
     mutationFn: (zonaSimpliRouteId: number) => quitarZonaSimpliRoute(zonaSimpliRouteId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["zonas-tarifarias", "zonas-simpliroute"] }),
+    onError: () => toast.error("No se pudo quitar el cordón."),
+  });
+
+  const mutacionAsignarPartido = useMutation({
+    mutationFn: ({ partido, zonaTarifariaId }: { partido: string; zonaTarifariaId: string }) =>
+      asignarPartido(partido, zonaTarifariaId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["zonas-tarifarias", "partidos"] }),
+    onError: () => toast.error("No se pudo asignar el cordón."),
+  });
+
+  const mutacionQuitarPartido = useMutation({
+    mutationFn: (partido: string) => quitarPartido(partido),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["zonas-tarifarias", "partidos"] }),
     onError: () => toast.error("No se pudo quitar el cordón."),
   });
 
@@ -328,6 +348,64 @@ export function ZonasTarifariasTab() {
                   </TableRow>
                 );
               })
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <h2 className="font-medium">Cordón por partido</h2>
+        <p className="text-sm text-muted-foreground">
+          El más preciso de los tres mapeos: se prioriza sobre el de zona de SimpliRoute y el de
+          localidad. El partido es un límite administrativo exacto (a diferencia de las zonas de
+          SimpliRoute, que cruzan varios partidos reales cada una). "La Matanza" queda afuera a
+          propósito — cruza los 3 Cordones, hace falta definirlo por localidad puntual.
+        </p>
+
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Partido</TableHead>
+              <TableHead>Cordón asignado</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {cargandoPartidos ? (
+              <TableRow>
+                <TableCell colSpan={2} className="text-muted-foreground">
+                  Cargando…
+                </TableCell>
+              </TableRow>
+            ) : (
+              mapeoPartidos?.map((fila) => (
+                <TableRow key={fila.partido}>
+                  <TableCell>{fila.partido}</TableCell>
+                  <TableCell>
+                    <Select
+                      value={fila.zonaTarifariaId ?? SIN_CORDON}
+                      onValueChange={(valor) => {
+                        if (valor === SIN_CORDON) {
+                          mutacionQuitarPartido.mutate(fila.partido);
+                        } else {
+                          mutacionAsignarPartido.mutate({ partido: fila.partido, zonaTarifariaId: valor });
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-full sm:w-56">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={SIN_CORDON}>Sin asignar</SelectItem>
+                        {zonas?.filter((z) => z.activa).map((z) => (
+                          <SelectItem key={z.id} value={z.id}>
+                            {z.nombre}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                </TableRow>
+              ))
             )}
           </TableBody>
         </Table>

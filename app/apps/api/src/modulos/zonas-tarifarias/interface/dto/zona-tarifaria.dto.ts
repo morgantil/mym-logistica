@@ -33,3 +33,12 @@ export class AsignarZonaSimpliRouteDto {
   @IsUUID()
   zonaTarifariaId!: string;
 }
+
+export class AsignarPartidoDto {
+  @IsString()
+  @MinLength(1)
+  partido!: string;
+
+  @IsUUID()
+  zonaTarifariaId!: string;
+}

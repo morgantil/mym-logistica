@@ -1,7 +1,9 @@
 import { Injectable } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
+import { TipoEnvase, TipoServicio } from "@mym/shared-types";
 import { PrismaService } from "../../../common/prisma/prisma.service";
 import {
+  DatosCrearCombinacion,
   DatosCrearGrupoFacturacion,
   DatosCrearPorcentaje,
   DatosCrearTarifa,
@@ -10,7 +12,12 @@ import {
 } from "../domain/facturacion.repositorio";
 import { GrupoFacturacion, PedidoFacturado } from "../domain/grupo-facturacion";
 import { PedidoParaLiquidarTransportista } from "../domain/motor-liquidacion-transportistas";
-import { PorcentajeSegundoServicio, TarifaCliente, TarifaTransportista } from "../domain/tarifa";
+import {
+  CombinacionUnificacionClientes,
+  PorcentajeSegundoServicio,
+  TarifaCliente,
+  TarifaTransportista,
+} from "../domain/tarifa";
 
 const UN_DIA_MS = 24 * 60 * 60 * 1000;
 
@@ -26,10 +33,34 @@ function mapearGrupo(fila: FilaGrupo): GrupoFacturacion {
     reglaAplicada: fila.reglaAplicada,
     tarifaUtilizada: fila.tarifaUtilizada ? Number(fila.tarifaUtilizada) : null,
     porcentajeAplicado: fila.porcentajeAplicado ? Number(fila.porcentajeAplicado) : null,
+    porcentajePanalAplicado: fila.porcentajePanalAplicado ? Number(fila.porcentajePanalAplicado) : null,
+    porcentajeMedicamentoAplicado: fila.porcentajeMedicamentoAplicado
+      ? Number(fila.porcentajeMedicamentoAplicado)
+      : null,
+    pedidoSocioId: fila.pedidoSocioId,
+    clienteSocioId: fila.clienteSocioId,
     importeCalculado: Number(fila.importeCalculado),
     confirmadoEn: fila.confirmadoEn,
     confirmadoPorId: fila.confirmadoPorId,
     pedidoIds: fila.pedidos.map((pedido) => pedido.id),
+  };
+}
+
+function mapearCombinacion(fila: {
+  id: string;
+  clienteMedicamentoId: string;
+  clienteMedicamento?: { nombre: string };
+  clientePanalId: string;
+  clientePanal?: { nombre: string };
+  activa: boolean;
+}): CombinacionUnificacionClientes {
+  return {
+    id: fila.id,
+    clienteMedicamentoId: fila.clienteMedicamentoId,
+    clienteMedicamentoNombre: fila.clienteMedicamento?.nombre,
+    clientePanalId: fila.clientePanalId,
+    clientePanalNombre: fila.clientePanal?.nombre,
+    activa: fila.activa,
   };
 }
 
@@ -47,11 +78,19 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
       .then((filas) => filas.map(mapearTarifa));
   }
 
-  async tarifaVigente(clienteId: string, zonaTarifariaId: string, fecha: Date): Promise<TarifaCliente | null> {
+  async tarifaVigente(
+    clienteId: string,
+    zonaTarifariaId: string,
+    tipoServicio: TipoServicio,
+    tipoEnvase: TipoEnvase | null,
+    fecha: Date,
+  ): Promise<TarifaCliente | null> {
     const fila = await this.prisma.tarifaCliente.findFirst({
       where: {
         clienteId,
         zonaTarifariaId,
+        tipoServicio: tipoServicio as unknown as Prisma.TarifaClienteWhereInput["tipoServicio"],
+        tipoEnvase: tipoEnvase as unknown as Prisma.TarifaClienteWhereInput["tipoEnvase"],
         vigenciaDesde: { lte: fecha },
         OR: [{ vigenciaHasta: null }, { vigenciaHasta: { gte: fecha } }],
       },
@@ -63,13 +102,17 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
 
   async crearTarifa(datos: DatosCrearTarifa): Promise<TarifaCliente> {
     return this.prisma.$transaction(async (tx) => {
-      // Cierra la tarifa de la misma zona que estuviera abierta, para no
-      // dejar dos vigentes al mismo tiempo (§23 funcional: "vigencia para
-      // mantener históricos").
+      // Cierra la tarifa de la misma combinación zona+tipoServicio+tipoEnvase
+      // que estuviera abierta, para no dejar dos vigentes al mismo tiempo
+      // (§23 funcional: "vigencia para mantener históricos"). tipoEnvase null
+      // no matchea con `equals: null` en Prisma para NOT NULL — pero acá la
+      // columna SÍ admite null, así que `tipoEnvase: datos.tipoEnvase` alcanza.
       await tx.tarifaCliente.updateMany({
         where: {
           clienteId: datos.clienteId,
           zonaTarifariaId: datos.zonaTarifariaId,
+          tipoServicio: datos.tipoServicio as unknown as Prisma.TarifaClienteWhereInput["tipoServicio"],
+          tipoEnvase: datos.tipoEnvase as unknown as Prisma.TarifaClienteWhereInput["tipoEnvase"],
           vigenciaHasta: null,
         },
         data: { vigenciaHasta: new Date(datos.vigenciaDesde.getTime() - UN_DIA_MS) },
@@ -78,6 +121,8 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
         data: {
           clienteId: datos.clienteId,
           zonaTarifariaId: datos.zonaTarifariaId,
+          tipoServicio: datos.tipoServicio as unknown as Prisma.TarifaClienteCreateInput["tipoServicio"],
+          tipoEnvase: datos.tipoEnvase as unknown as Prisma.TarifaClienteCreateInput["tipoEnvase"],
           monto: datos.monto,
           vigenciaDesde: datos.vigenciaDesde,
         },
@@ -114,11 +159,62 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
       const creado = await tx.porcentajeSegundoServicio.create({
         data: {
           clienteId: datos.clienteId,
-          porcentaje: datos.porcentaje,
+          porcentajePanal: datos.porcentajePanal,
+          porcentajeMedicamento: datos.porcentajeMedicamento,
           vigenciaDesde: datos.vigenciaDesde,
         },
       });
       return mapearPorcentaje(creado);
+    });
+  }
+
+  listarCombinaciones(): Promise<CombinacionUnificacionClientes[]> {
+    return this.prisma.combinacionUnificacionClientes
+      .findMany({
+        where: { eliminadoEn: null },
+        include: {
+          clienteMedicamento: { select: { nombre: true } },
+          clientePanal: { select: { nombre: true } },
+        },
+        orderBy: { creadoEn: "asc" },
+      })
+      .then((filas) => filas.map(mapearCombinacion));
+  }
+
+  listarCombinacionesDeCliente(clienteId: string): Promise<CombinacionUnificacionClientes[]> {
+    return this.prisma.combinacionUnificacionClientes
+      .findMany({
+        where: {
+          eliminadoEn: null,
+          activa: true,
+          OR: [{ clienteMedicamentoId: clienteId }, { clientePanalId: clienteId }],
+        },
+        include: {
+          clienteMedicamento: { select: { nombre: true } },
+          clientePanal: { select: { nombre: true } },
+        },
+      })
+      .then((filas) => filas.map(mapearCombinacion));
+  }
+
+  async crearCombinacion(datos: DatosCrearCombinacion): Promise<CombinacionUnificacionClientes> {
+    const creada = await this.prisma.combinacionUnificacionClientes.create({
+      data: {
+        clienteMedicamentoId: datos.clienteMedicamentoId,
+        clientePanalId: datos.clientePanalId,
+      },
+      include: {
+        clienteMedicamento: { select: { nombre: true } },
+        clientePanal: { select: { nombre: true } },
+      },
+    });
+    return mapearCombinacion(creada);
+  }
+
+  async eliminarCombinacion(id: string): Promise<void> {
+    await this.prisma.combinacionUnificacionClientes.update({
+      where: { id },
+      data: { eliminadoEn: new Date() },
     });
   }
 
@@ -226,6 +322,10 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
               reglaAplicada: grupo.reglaAplicada,
               tarifaUtilizada: grupo.tarifaUtilizada,
               porcentajeAplicado: grupo.porcentajeAplicado,
+              porcentajePanalAplicado: grupo.porcentajePanalAplicado ?? null,
+              porcentajeMedicamentoAplicado: grupo.porcentajeMedicamentoAplicado ?? null,
+              pedidoSocioId: grupo.pedidoSocioId ?? null,
+              clienteSocioId: grupo.clienteSocioId ?? null,
               importeCalculado: grupo.importeCalculado,
               pedidos: { connect: grupo.pedidoIds.map((id) => ({ id })) },
             },
@@ -298,6 +398,12 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
       porcentajeAplicado: pedido.grupoFacturacion!.porcentajeAplicado
         ? Number(pedido.grupoFacturacion!.porcentajeAplicado)
         : null,
+      porcentajePanalAplicado: pedido.grupoFacturacion!.porcentajePanalAplicado
+        ? Number(pedido.grupoFacturacion!.porcentajePanalAplicado)
+        : null,
+      porcentajeMedicamentoAplicado: pedido.grupoFacturacion!.porcentajeMedicamentoAplicado
+        ? Number(pedido.grupoFacturacion!.porcentajeMedicamentoAplicado)
+        : null,
       importeViaje: Number(pedido.grupoFacturacion!.importeCalculado),
     }));
   }
@@ -308,6 +414,8 @@ function mapearTarifa(fila: {
   clienteId: string;
   zonaTarifariaId: string;
   zonaTarifaria?: { nombre: string };
+  tipoServicio: unknown;
+  tipoEnvase: unknown;
   monto: Prisma.Decimal;
   vigenciaDesde: Date;
   vigenciaHasta: Date | null;
@@ -317,6 +425,8 @@ function mapearTarifa(fila: {
     clienteId: fila.clienteId,
     zonaTarifariaId: fila.zonaTarifariaId,
     zonaTarifariaNombre: fila.zonaTarifaria?.nombre,
+    tipoServicio: fila.tipoServicio as TarifaCliente["tipoServicio"],
+    tipoEnvase: fila.tipoEnvase as TarifaCliente["tipoEnvase"],
     monto: Number(fila.monto),
     vigenciaDesde: fila.vigenciaDesde,
     vigenciaHasta: fila.vigenciaHasta,
@@ -326,14 +436,16 @@ function mapearTarifa(fila: {
 function mapearPorcentaje(fila: {
   id: string;
   clienteId: string;
-  porcentaje: Prisma.Decimal;
+  porcentajePanal: Prisma.Decimal;
+  porcentajeMedicamento: Prisma.Decimal;
   vigenciaDesde: Date;
   vigenciaHasta: Date | null;
 }): PorcentajeSegundoServicio {
   return {
     id: fila.id,
     clienteId: fila.clienteId,
-    porcentaje: Number(fila.porcentaje),
+    porcentajePanal: Number(fila.porcentajePanal),
+    porcentajeMedicamento: Number(fila.porcentajeMedicamento),
     vigenciaDesde: fila.vigenciaDesde,
     vigenciaHasta: fila.vigenciaHasta,
   };

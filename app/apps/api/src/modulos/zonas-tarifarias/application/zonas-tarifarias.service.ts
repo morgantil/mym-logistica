@@ -2,6 +2,53 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { CabaProvincia } from "@mym/shared-types";
 import { PrismaService } from "../../../common/prisma/prisma.service";
 
+// Partidos del conurbano bonaerense (AMBA) — geografía oficial fija, no
+// cambia (a diferencia de la tarifa/Cordón que le corresponde a cada uno,
+// eso sí es configurable). Nombres exactos tal cual los devuelve
+// georef-ar-api (`/departamentos?provincia=Buenos Aires`), verificado a
+// mano 2026-09-08 antes de cargar el mapeo real que dio el cliente final.
+// "La Matanza" queda afuera a propósito: el cliente aclaró que cruza los
+// 3 Cordones de forma transversal (partes distintas del partido van a
+// Cordones distintos) — no se puede resolver a nivel de partido entero,
+// queda pendiente de una definición más fina (por localidad) y mientras
+// tanto sin asignar en vez de adivinar un valor.
+const PARTIDOS_CONOCIDOS = [
+  "Vicente López",
+  "San Isidro",
+  "General San Martín",
+  "Tres de Febrero",
+  "Morón",
+  "Hurlingham",
+  "Ituzaingó",
+  "Avellaneda",
+  "Lanús",
+  "Lomas de Zamora",
+  "San Fernando",
+  "Tigre",
+  "San Miguel",
+  "Malvinas Argentinas",
+  "José C. Paz",
+  "Moreno",
+  "Merlo",
+  "Quilmes",
+  "Berazategui",
+  "Florencio Varela",
+  "Almirante Brown",
+  "Esteban Echeverría",
+  "Ezeiza",
+  "Pilar",
+  "Escobar",
+  "General Rodríguez",
+  "Marcos Paz",
+  "Presidente Perón",
+  "San Vicente",
+  "Cañuelas",
+  "La Plata",
+  "Berisso",
+  "Ensenada",
+  "La Matanza",
+];
+
 // Sin regla de negocio propia — mismo criterio que ZonasChoferesService
 // (CRUD directo sobre Prisma, sin separación domain/infrastructure). Si
 // "zona tarifaria" gana complejidad propia (ej. reglas de vigencia), ahí sí
@@ -81,19 +128,63 @@ export class ZonasTarifariasService {
     await this.prisma.zonaSimpliRouteZonaTarifaria.delete({ where: { zonaSimpliRouteId } });
   }
 
+  // Mapeo Partido/Municipio → ZonaTarifaria (Cordón) — el más preciso de los
+  // tres, ver comentario en schema.prisma. `PARTIDOS_CONOCIDOS` es la lista
+  // fija de partidos del conurbano (no cambia, es geografía oficial) — se
+  // usa para mostrar todos en la pantalla aunque todavía no tengan Cordón
+  // asignado (mismo criterio que zonas de SimpliRoute).
+  async listarMapeoPartidos() {
+    const asignados = await this.prisma.partidoZonaTarifaria.findMany({
+      include: { zonaTarifaria: { select: { nombre: true } } },
+    });
+    const porPartido = new Map(asignados.map((a) => [a.partido, a]));
+
+    return PARTIDOS_CONOCIDOS.map((partido) => {
+      const asignado = porPartido.get(partido);
+      return {
+        partido,
+        zonaTarifariaId: asignado?.zonaTarifariaId ?? null,
+        zonaTarifaria: asignado?.zonaTarifaria ?? null,
+      };
+    });
+  }
+
+  async asignarPartido(partido: string, zonaTarifariaId: string) {
+    await this.asegurarQueExiste(zonaTarifariaId);
+    return this.prisma.partidoZonaTarifaria.upsert({
+      where: { partido },
+      create: { partido, zonaTarifariaId },
+      update: { zonaTarifariaId },
+    });
+  }
+
+  async quitarPartido(partido: string) {
+    const fila = await this.prisma.partidoZonaTarifaria.findUnique({ where: { partido } });
+    if (!fila) throw new NotFoundException(`Mapeo del partido "${partido}" no encontrado.`);
+    await this.prisma.partidoZonaTarifaria.delete({ where: { partido } });
+  }
+
   // Resuelve la ZonaTarifaria del pedido considerando, en orden: (1) CABA
-  // siempre resuelve directo (ver resolverPorLocalidad); (2) si hay una zona
-  // de SimpliRoute ya resuelta para este pedido (ZonasChoferesService.
-  // resolverZonaChofer) y está mapeada a un Cordón, se usa esa — es más
-  // precisa porque viene de coordenadas reales, no de texto; (3) si no,
-  // fallback al mapeo por localidad de siempre. Nunca inventa un cordón.
+  // siempre resuelve directo (ver resolverPorLocalidad); (2) si se conoce el
+  // partido (viene de GeorefArAdapter, es un límite administrativo exacto —
+  // el más confiable de los tres) y está mapeado, se usa ese; (3) si no, la
+  // zona de SimpliRoute resuelta para este pedido (ZonasChoferesService.
+  // resolverZonaChofer) si está mapeada — menos preciso, cruza partidos
+  // reales (ver schema.prisma), pero mejor que nada; (4) si no, fallback al
+  // mapeo por localidad de siempre. Nunca inventa un cordón.
   async resolverParaPedido(
     clasificacion: CabaProvincia | null,
     localidad: string,
     zonaSimpliRouteId: string | null,
+    partido: string | null = null,
   ): Promise<string | null> {
     if (clasificacion === CabaProvincia.CABA) {
       return this.resolverPorLocalidad(clasificacion, localidad);
+    }
+
+    if (partido !== null) {
+      const mapeoPartido = await this.prisma.partidoZonaTarifaria.findUnique({ where: { partido } });
+      if (mapeoPartido) return mapeoPartido.zonaTarifariaId;
     }
 
     if (zonaSimpliRouteId !== null) {

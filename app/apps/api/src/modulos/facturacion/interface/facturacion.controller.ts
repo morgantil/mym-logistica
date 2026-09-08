@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Header, Post, Query, StreamableFile } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Header, Param, Post, Query, StreamableFile } from "@nestjs/common";
 import { Rol } from "@prisma/client";
 import { Roles } from "../../../common/decorators/roles.decorator";
 import { UsuarioActual, UsuarioAutenticado } from "../../../common/decorators/usuario-actual.decorator";
 import { FacturacionService } from "../application/facturacion.service";
+import { CrearCombinacionDto } from "./dto/crear-combinacion.dto";
 import { CrearPorcentajeDto } from "./dto/crear-porcentaje.dto";
 import { CrearTarifaDto } from "./dto/crear-tarifa.dto";
 import { CrearTarifaTransportistaDto } from "./dto/crear-tarifa-transportista.dto";
@@ -24,7 +25,14 @@ export class FacturacionController {
 
   @Post("tarifas")
   crearTarifa(@Body() dto: CrearTarifaDto) {
-    return this.facturacionService.crearTarifa(dto.clienteId, dto.zonaTarifariaId, dto.monto, dto.vigenciaDesde);
+    return this.facturacionService.crearTarifa(
+      dto.clienteId,
+      dto.zonaTarifariaId,
+      dto.tipoServicio,
+      dto.tipoEnvase ?? null,
+      dto.monto,
+      dto.vigenciaDesde,
+    );
   }
 
   @Get("porcentaje-segundo-servicio")
@@ -34,7 +42,29 @@ export class FacturacionController {
 
   @Post("porcentaje-segundo-servicio")
   crearPorcentaje(@Body() dto: CrearPorcentajeDto) {
-    return this.facturacionService.crearPorcentaje(dto.clienteId, dto.porcentaje, dto.vigenciaDesde);
+    return this.facturacionService.crearPorcentaje(
+      dto.clienteId,
+      dto.porcentajePanal,
+      dto.porcentajeMedicamento,
+      dto.vigenciaDesde,
+    );
+  }
+
+  // Guia Arbet paso 4/8: combinaciones habilitadas de unificación ENTRE
+  // clientes distintos (ej. Farmaet Medicamentos + Farmapal Pañales).
+  @Get("combinaciones")
+  listarCombinaciones() {
+    return this.facturacionService.listarCombinaciones();
+  }
+
+  @Post("combinaciones")
+  crearCombinacion(@Body() dto: CrearCombinacionDto) {
+    return this.facturacionService.crearCombinacion(dto.clienteMedicamentoId, dto.clientePanalId);
+  }
+
+  @Delete("combinaciones/:id")
+  eliminarCombinacion(@Param("id") id: string) {
+    return this.facturacionService.eliminarCombinacion(id);
   }
 
   // Liquidación a transportistas — §4 TEMAS_PENDIENTES.md: monto por viaje

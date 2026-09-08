@@ -45,6 +45,14 @@ enum TipoServicioCliente {
   AMBOS
 }
 
+// Clasificación de un pedido de medicamentos para facturación — ver
+// @mym/shared-types para la regla completa (Bolsa+Bulto en el mismo pedido
+// se factura como Bulto).
+enum TipoEnvase {
+  BOLSA
+  BULTO
+}
+
 // DOCUMENTO FUNCIONAL.md §19
 enum EstadoPedido {
   SIN_ASIGNAR
@@ -175,13 +183,15 @@ model Cliente {
   eliminadoEn      DateTime?
   eliminadoPorId   String?
 
-  tarifas            TarifaCliente[]
-  destinatarios      Destinatario[]
-  pedidos            Pedido[]
-  gruposFacturacion  GrupoFacturacion[]
-  importaciones      ImportacionExcel[]
-  usuariosPermitidos UsuarioCliente[]
-  perfilImportacion  PerfilImportacion?
+  tarifas                      TarifaCliente[]
+  destinatarios                Destinatario[]
+  pedidos                      Pedido[]
+  gruposFacturacion            GrupoFacturacion[]
+  importaciones                ImportacionExcel[]
+  usuariosPermitidos           UsuarioCliente[]
+  perfilImportacion            PerfilImportacion?
+  combinacionesComoMedicamento CombinacionUnificacionClientes[] @relation("CombinacionMedicamento")
+  combinacionesComoPanal       CombinacionUnificacionClientes[] @relation("CombinacionPanal")
 
   @@map("clientes")
 }
@@ -213,10 +223,19 @@ model PerfilImportacion {
 // Cordón 1/2/3, y que la relación Localidad → zona sea configurable, sin
 // tocar código para agregar/renombrar una zona. Ver ZonaTarifaria más abajo.
 model TarifaCliente {
-  id              String    @id @default(uuid())
+  id              String       @id @default(uuid())
   clienteId       String
   zonaTarifariaId String
-  monto           Decimal   @db.Decimal(12, 2)
+  // Guia_Desarrollo_Logica_Facturacion_Arbet.docx paso 5: "Pañales: Cliente +
+  // Zona tarifaria. Medicamentos: Cliente + Zona tarifaria + Bolsa/Bulto." —
+  // antes de esta migración, TarifaCliente no tenía dimensión de tipo de
+  // servicio (solo existían tarifas de pañales, únicas por cliente+zona).
+  // Default PANAL + tipoEnvase null para las tarifas ya cargadas (representan
+  // exactamente lo que eran: tarifas de pañales, la única Etapa en uso hasta
+  // ahora). tipoEnvase solo aplica cuando tipoServicio = MEDICAMENTO.
+  tipoServicio    TipoServicio @default(PANAL)
+  tipoEnvase      TipoEnvase?
+  monto           Decimal      @db.Decimal(12, 2)
   vigenciaDesde   DateTime
   vigenciaHasta   DateTime?
 
@@ -228,7 +247,7 @@ model TarifaCliente {
   cliente       Cliente       @relation(fields: [clienteId], references: [id], onDelete: Cascade)
   zonaTarifaria ZonaTarifaria @relation(fields: [zonaTarifariaId], references: [id])
 
-  @@index([clienteId, zonaTarifariaId, vigenciaDesde])
+  @@index([clienteId, zonaTarifariaId, tipoServicio, tipoEnvase, vigenciaDesde])
   @@map("tarifas_cliente")
 }
 
@@ -331,6 +350,7 @@ model ZonaTarifaria {
 
   localidades      LocalidadZonaTarifaria[]
   zonasSimpliRoute ZonaSimpliRouteZonaTarifaria[]
+  partidos         PartidoZonaTarifaria[]
   tarifas          TarifaCliente[]
   pedidos          Pedido[]
 
@@ -368,6 +388,27 @@ model ZonaSimpliRouteZonaTarifaria {
   zonaTarifaria ZonaTarifaria @relation(fields: [zonaTarifariaId], references: [id])
 
   @@map("zonas_simpliroute_zonas_tarifarias")
+}
+
+// Mapeo Partido/Municipio (GBA) → ZonaTarifaria (Cordón) — decisión
+// 2026-09-08: las Zonas de SimpliRoute cruzan varios partidos reales cada
+// una (comprobado geocodificando los vértices de sus polígonos contra la
+// API oficial — "Sur Lanús" cae en 5 partidos distintos, "Oeste largo" en
+// 9 — están dibujadas para logística, no para separar zonas de precio), así
+// que asignarles un Cordón único da resultados imprecisos. El partido en
+// cambio es un límite administrativo exacto, y ya lo devuelve
+// GeorefArAdapter (el mismo que resuelve CABA/Provincia) — mapear por
+// partido (~29 en todo el conurbano) es mucho más preciso que por zona de
+// SimpliRoute, y mucho menos trabajo que cargar cada localidad suelta. Se
+// prioriza sobre ambos mapeos anteriores al resolver un pedido (ver
+// ZonasTarifariasService.resolverParaPedido).
+model PartidoZonaTarifaria {
+  partido         String @id
+  zonaTarifariaId String
+
+  zonaTarifaria ZonaTarifaria @relation(fields: [zonaTarifariaId], references: [id])
+
+  @@map("partidos_zonas_tarifarias")
 }
 
 // ---------------------------------------------------------------------------
@@ -505,6 +546,12 @@ model Producto {
 
   eliminadoEn DateTime?
 
+  // Solo relevante para líneas de medicamentos — Guia_Desarrollo_Logica_
+  // Facturacion_Arbet.docx paso 2. Null para pañales (y para medicamentos
+  // todavía no clasificados). No existe importador de medicamentos aún —
+  // se carga a mano o vía script hasta que se construya (TEMAS_PENDIENTES.md §13.5).
+  tipoEnvase TipoEnvase?
+
   pedido Pedido @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
 
   @@map("productos")
@@ -514,19 +561,51 @@ model Producto {
 // Facturación — §21-§32 funcional
 // ---------------------------------------------------------------------------
 
-// Historial de porcentaje aplicado a entregas unificadas, con vigencia (mismo criterio que TarifaCliente)
+// Historial de porcentaje aplicado a entregas unificadas, con vigencia (mismo
+// criterio que TarifaCliente). Decisión 2026-09-08 (ping-pong con Leonardo):
+// el documento Arbet asume pañales siempre al 100% + un % adicional de
+// medicamentos, pero el negocio real cobra un % configurable de CADA lado
+// ("se cobra un % de pañal y uno de medicamento") — por eso dos columnas en
+// vez de una. 100/100 reproduce el caso "tal cual viene del documento".
 model PorcentajeSegundoServicio {
-  id            String    @id @default(uuid())
-  clienteId     String
-  porcentaje    Decimal   @db.Decimal(5, 2)
-  vigenciaDesde DateTime
-  vigenciaHasta DateTime?
+  id                    String    @id @default(uuid())
+  clienteId             String
+  porcentajePanal       Decimal   @db.Decimal(5, 2)
+  porcentajeMedicamento Decimal   @db.Decimal(5, 2)
+  vigenciaDesde         DateTime
+  vigenciaHasta         DateTime?
 
   creadoEn    DateTime  @default(now())
   creadoPorId String?
   eliminadoEn DateTime?
 
   @@map("porcentajes_segundo_servicio")
+}
+
+// Combinaciones habilitadas de unificación ENTRE clientes distintos (Guia_
+// Desarrollo_Logica_Facturacion_Arbet.docx paso 4: "la combinación está
+// habilitada"). No confundir con la unificación interna de un cliente AMBOS
+// (ej. Bella Vista, que maneja pañales y medicamentos ella misma) — esa ya
+// funciona sola con el motor de un solo cliente, sin necesitar esta tabla
+// (decisión 2026-09-08: "solo entre ellos se pueden unificar... con el resto
+// no, es un flujo exclusivo" — Leonardo). Esta tabla es solo para el caso
+// cruzado: un cliente que solo maneja medicamentos (ej. Farmaet) unificando
+// con un cliente que solo maneja pañales (ej. Biosíntesis/Farmapal).
+model CombinacionUnificacionClientes {
+  id                   String  @id @default(uuid())
+  clienteMedicamentoId String
+  clientePanalId       String
+  activa               Boolean @default(true)
+
+  creadoEn    DateTime  @default(now())
+  creadoPorId String?
+  eliminadoEn DateTime?
+
+  clienteMedicamento Cliente @relation("CombinacionMedicamento", fields: [clienteMedicamentoId], references: [id], onDelete: Cascade)
+  clientePanal       Cliente @relation("CombinacionPanal", fields: [clientePanalId], references: [id], onDelete: Cascade)
+
+  @@unique([clienteMedicamentoId, clientePanalId])
+  @@map("combinaciones_unificacion_clientes")
 }
 
 // Liquidación a transportistas (documento funcional v6, alcance nuevo) —
@@ -561,10 +640,25 @@ model GrupoFacturacion {
   anio      Int
   estado    EstadoGrupoFacturacion @default(BORRADOR) // vista previa hasta confirmar
 
-  reglaAplicada      String // "2x1" | "UNIFICADA" | "INDIVIDUAL"
-  tarifaUtilizada    Decimal? @db.Decimal(12, 2)
-  porcentajeAplicado Decimal? @db.Decimal(5, 2)
-  importeCalculado   Decimal  @db.Decimal(12, 2)
+  reglaAplicada                 String // "2x1" | "UNIFICADA" | "INDIVIDUAL"
+  tarifaUtilizada               Decimal? @db.Decimal(12, 2)
+  porcentajeAplicado            Decimal? @db.Decimal(5, 2)
+  // Detalle de porcentajes en un viaje UNIFICADA — reemplaza a
+  // porcentajeAplicado (que solo puede guardar un número) ahora que pañal y
+  // medicamento tienen cada uno su propio % configurable. porcentajeAplicado
+  // queda sin usar para filas nuevas de UNIFICADA (se deja en la tabla, no se
+  // borra, por las filas históricas ya confirmadas). Null en 2x1/INDIVIDUAL,
+  // igual que antes.
+  porcentajePanalAplicado       Decimal? @db.Decimal(5, 2)
+  porcentajeMedicamentoAplicado Decimal? @db.Decimal(5, 2)
+  // Para una unificación ENTRE clientes distintos (combinación habilitada):
+  // referencia informativa al pedido "socio" (del otro cliente) y a qué
+  // cliente pertenece — no forma parte de este GrupoFacturacion (cada
+  // cliente se factura por separado, por su propia tarifa/%), es solo
+  // trazabilidad para auditar qué entrega compartida generó esta unificación.
+  pedidoSocioId                 String?
+  clienteSocioId                String?
+  importeCalculado              Decimal  @db.Decimal(12, 2)
 
   confirmadoEn    DateTime?
   confirmadoPorId String?

@@ -1,17 +1,26 @@
+import { TipoEnvase, TipoServicio } from "@mym/shared-types";
 import { GrupoFacturacion, PedidoFacturado } from "./grupo-facturacion";
 import { PedidoParaLiquidarTransportista } from "./motor-liquidacion-transportistas";
-import { PorcentajeSegundoServicio, TarifaCliente, TarifaTransportista } from "./tarifa";
+import {
+  CombinacionUnificacionClientes,
+  PorcentajeSegundoServicio,
+  TarifaCliente,
+  TarifaTransportista,
+} from "./tarifa";
 
 export interface DatosCrearTarifa {
   clienteId: string;
   zonaTarifariaId: string;
+  tipoServicio: TipoServicio;
+  tipoEnvase: TipoEnvase | null;
   monto: number;
   vigenciaDesde: Date;
 }
 
 export interface DatosCrearPorcentaje {
   clienteId: string;
-  porcentaje: number;
+  porcentajePanal: number;
+  porcentajeMedicamento: number;
   vigenciaDesde: Date;
 }
 
@@ -27,8 +36,17 @@ export interface DatosCrearGrupoFacturacion {
   reglaAplicada: string;
   tarifaUtilizada: number;
   porcentajeAplicado: number | null;
+  porcentajePanalAplicado?: number | null;
+  porcentajeMedicamentoAplicado?: number | null;
+  pedidoSocioId?: string | null;
+  clienteSocioId?: string | null;
   importeCalculado: number;
   pedidoIds: string[];
+}
+
+export interface DatosCrearCombinacion {
+  clienteMedicamentoId: string;
+  clientePanalId: string;
 }
 
 export interface FacturacionRepositorio {
@@ -36,16 +54,36 @@ export interface FacturacionRepositorio {
   // vigenciaDesde/vigenciaHasta para una fecha puntual (normalmente "hoy",
   // al generar la vista previa).
   listarTarifas(clienteId: string): Promise<TarifaCliente[]>;
-  tarifaVigente(clienteId: string, zonaTarifariaId: string, fecha: Date): Promise<TarifaCliente | null>;
-  // Cierra automáticamente la tarifa anterior del mismo tipo (vigenciaHasta =
-  // el día antes de la nueva vigenciaDesde) para no dejar dos tarifas del
-  // mismo tipo vigentes al mismo tiempo.
+  // La vigencia y el cierre automático (ver crearTarifa) son por la
+  // combinación completa zona+tipoServicio+tipoEnvase — dos tarifas de
+  // MEDICAMENTO en la misma zona pero distinto Bolsa/Bulto son independientes.
+  tarifaVigente(
+    clienteId: string,
+    zonaTarifariaId: string,
+    tipoServicio: TipoServicio,
+    tipoEnvase: TipoEnvase | null,
+    fecha: Date,
+  ): Promise<TarifaCliente | null>;
+  // Cierra automáticamente la tarifa anterior de la misma combinación
+  // (vigenciaHasta = el día antes de la nueva vigenciaDesde) para no dejar
+  // dos vigentes al mismo tiempo.
   crearTarifa(datos: DatosCrearTarifa): Promise<TarifaCliente>;
 
-  // Porcentaje del segundo servicio en entregas unificadas — §25 funcional.
+  // Porcentaje aplicado en entregas unificadas — §25 funcional. Un solo
+  // registro por cliente/vigencia con los dos valores (panal y medicamento).
   listarPorcentajes(clienteId: string): Promise<PorcentajeSegundoServicio[]>;
   porcentajeVigente(clienteId: string, fecha: Date): Promise<PorcentajeSegundoServicio | null>;
   crearPorcentaje(datos: DatosCrearPorcentaje): Promise<PorcentajeSegundoServicio>;
+
+  // Combinaciones habilitadas de unificación ENTRE clientes — Guia Arbet
+  // paso 4/8 ("Combinaciones habilitadas de Pañales + Medicamentos").
+  listarCombinaciones(): Promise<CombinacionUnificacionClientes[]>;
+  // Combinaciones activas donde el cliente participa, en cualquiera de los
+  // dos roles (medicamento o pañal) — usado por FacturacionService para
+  // saber con qué otros clientes buscar unificación cruzada.
+  listarCombinacionesDeCliente(clienteId: string): Promise<CombinacionUnificacionClientes[]>;
+  crearCombinacion(datos: DatosCrearCombinacion): Promise<CombinacionUnificacionClientes>;
+  eliminarCombinacion(id: string): Promise<void>;
 
   // Liquidación a transportistas — monto por viaje, configurable con
   // vigencia (decisión 2026-08-26). Sin clienteId: un único valor.

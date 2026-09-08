@@ -21,6 +21,10 @@ const HOY = new Date().toISOString().slice(0, 10);
 // Solo hace falta cuando el cliente tiene (o va a tener) entregas unificadas
 // pañales+medicamentos — DOCUMENTO FUNCIONAL.md §25. Con solo pañales (única
 // etapa en alcance hoy) no se usa, así que no es obligatorio cargarlo.
+// Decisión 2026-09-08: dos porcentajes, uno por lado — el negocio real cobra
+// un % configurable de pañal y uno de medicamento, no un pañal fijo al 100%
+// + un "% adicional" como asume el documento Arbet (ver DOCUMENTO TECNICO.md
+// historial de esa fecha). Cargar 100/100 reproduce el caso del documento.
 export function PorcentajeFormSheet({
   clienteId,
   abierto,
@@ -30,17 +34,23 @@ export function PorcentajeFormSheet({
   abierto: boolean;
   onOpenChange: (abierto: boolean) => void;
 }) {
-  const [porcentaje, setPorcentaje] = useState("");
+  const [porcentajePanal, setPorcentajePanal] = useState("100");
+  const [porcentajeMedicamento, setPorcentajeMedicamento] = useState("100");
   const [vigenciaDesde, setVigenciaDesde] = useState(HOY);
   const [error, setError] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
   const mutacion = useMutation({
-    mutationFn: () => crearPorcentaje({ clienteId, porcentaje: Number(porcentaje), vigenciaDesde }),
+    mutationFn: () =>
+      crearPorcentaje({
+        clienteId,
+        porcentajePanal: Number(porcentajePanal),
+        porcentajeMedicamento: Number(porcentajeMedicamento),
+        vigenciaDesde,
+      }),
     onSuccess: () => {
-      toast.success("Porcentaje cargado.");
+      toast.success("Porcentajes cargados.");
       queryClient.invalidateQueries({ queryKey: ["facturacion", "porcentajes", clienteId] });
-      setPorcentaje("");
       setError(null);
       onOpenChange(false);
     },
@@ -57,10 +67,11 @@ export function PorcentajeFormSheet({
     <Sheet open={abierto} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-md">
         <SheetHeader>
-          <SheetTitle>Nuevo porcentaje del segundo servicio</SheetTitle>
+          <SheetTitle>Nuevos porcentajes de entrega unificada</SheetTitle>
           <SheetDescription>
-            En una entrega unificada (pañales + medicamentos, mismo cliente/dirección/fecha), un servicio se
-            cobra al 100% y el otro con este porcentaje. Cierra automáticamente la vigencia del anterior.
+            En una entrega unificada (pañales + medicamentos, mismo domicilio/fecha), cada servicio se cobra a
+            su propio porcentaje de su tarifa. 100% reproduce "se cobra completo". Cierra automáticamente la
+            vigencia del registro anterior.
           </SheetDescription>
         </SheetHeader>
 
@@ -75,15 +86,29 @@ export function PorcentajeFormSheet({
           )}
 
           <TablaFormulario>
-            <FilaFormulario label="Porcentaje" htmlFor="porcentaje" anchoEtiqueta="140px">
+            <FilaFormulario label="% Pañal" htmlFor="porcentaje-panal" anchoEtiqueta="140px">
               <Input
-                id="porcentaje"
+                id="porcentaje-panal"
                 type="number"
                 min="0"
                 max="100"
                 step="0.01"
-                value={porcentaje}
-                onChange={(e) => setPorcentaje(e.target.value)}
+                value={porcentajePanal}
+                onChange={(e) => setPorcentajePanal(e.target.value)}
+                required
+                disabled={mutacion.isPending}
+              />
+            </FilaFormulario>
+
+            <FilaFormulario label="% Medicamento" htmlFor="porcentaje-medicamento" anchoEtiqueta="140px">
+              <Input
+                id="porcentaje-medicamento"
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={porcentajeMedicamento}
+                onChange={(e) => setPorcentajeMedicamento(e.target.value)}
                 required
                 disabled={mutacion.isPending}
               />

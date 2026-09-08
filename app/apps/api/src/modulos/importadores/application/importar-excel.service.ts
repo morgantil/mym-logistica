@@ -238,17 +238,19 @@ export class ImportarExcelService {
       // con la API oficial de datos.gob.ar (georef-ar-api) — ver DOCUMENTO
       // TECNICO.md. A partir de ahí, la zona tarifaria (CABA o el Cordón que
       // corresponda) se resuelve en orden: CABA siempre directo; si no, por
-      // la Zona de SimpliRoute ya resuelta arriba (más precisa, viene de
-      // coordenadas reales — decisión 2026-08-26); si no está mapeada,
-      // fallback al mapeo configurable Localidad → ZonaTarifaria de
-      // siempre. Nunca fija en código, nunca frena la importación si no se
-      // puede resolver: el pedido queda sin zona tarifaria asignada, para
-      // revisión manual.
+      // Partido (el más preciso, decisión 2026-09-08 — las zonas de
+      // SimpliRoute cruzan varios partidos reales cada una); si no, por la
+      // Zona de SimpliRoute ya resuelta arriba (decisión 2026-08-26); si no
+      // está mapeada, fallback al mapeo configurable Localidad →
+      // ZonaTarifaria de siempre. Nunca fija en código, nunca frena la
+      // importación si no se puede resolver: el pedido queda sin zona
+      // tarifaria asignada, para revisión manual.
       const clasificacionLocalidad = await this.normalizadorDirecciones.clasificarCabaProvincia(grupo.localidad);
       const zonaTarifariaId = await this.zonasTarifariasService.resolverParaPedido(
         clasificacionLocalidad?.clasificacion ?? null,
         grupo.localidad,
         zonaId,
+        clasificacionLocalidad?.partido ?? null,
       );
 
       // Tres fuentes posibles de observación, pueden darse juntas: la alerta de

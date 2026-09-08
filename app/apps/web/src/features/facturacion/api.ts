@@ -1,5 +1,7 @@
+import { TipoEnvase, TipoServicio } from "@mym/shared-types";
 import { apiClient } from "@/lib/api-client";
 import type {
+  CombinacionUnificacionClientes,
   GrupoFacturacion,
   PorcentajeSegundoServicio,
   ResultadoVistaPrevia,
@@ -16,6 +18,8 @@ export async function listarTarifas(clienteId: string): Promise<TarifaCliente[]>
 export async function crearTarifa(datos: {
   clienteId: string;
   zonaTarifariaId: string;
+  tipoServicio: TipoServicio;
+  tipoEnvase?: TipoEnvase;
   monto: number;
   vigenciaDesde: string;
 }): Promise<TarifaCliente> {
@@ -32,7 +36,8 @@ export async function listarPorcentajes(clienteId: string): Promise<PorcentajeSe
 
 export async function crearPorcentaje(datos: {
   clienteId: string;
-  porcentaje: number;
+  porcentajePanal: number;
+  porcentajeMedicamento: number;
   vigenciaDesde: string;
 }): Promise<PorcentajeSegundoServicio> {
   const { data } = await apiClient.post<PorcentajeSegundoServicio>(
@@ -40,6 +45,23 @@ export async function crearPorcentaje(datos: {
     datos,
   );
   return data;
+}
+
+export async function listarCombinaciones(): Promise<CombinacionUnificacionClientes[]> {
+  const { data } = await apiClient.get<CombinacionUnificacionClientes[]>("/facturacion/combinaciones");
+  return data;
+}
+
+export async function crearCombinacion(datos: {
+  clienteMedicamentoId: string;
+  clientePanalId: string;
+}): Promise<CombinacionUnificacionClientes> {
+  const { data } = await apiClient.post<CombinacionUnificacionClientes>("/facturacion/combinaciones", datos);
+  return data;
+}
+
+export async function eliminarCombinacion(id: string): Promise<void> {
+  await apiClient.delete(`/facturacion/combinaciones/${id}`);
 }
 
 export async function listarTarifasTransportista(): Promise<TarifaTransportista[]> {
