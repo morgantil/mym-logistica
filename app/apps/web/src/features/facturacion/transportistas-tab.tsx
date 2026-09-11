@@ -1,27 +1,35 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { liquidacionTransportistas, listarTarifasTransportista } from "./api";
+import { actualizarTarifaTransportista, liquidacionTransportistas, listarTarifasTransportista } from "./api";
 import { formatearMonto, NOMBRES_MES } from "./formato";
 import { TarifaTransportistaFormSheet } from "./tarifa-transportista-form-sheet";
-
-function formatearFecha(fecha: string): string {
-  return new Date(fecha).toLocaleDateString("es-AR", { timeZone: "UTC" });
-}
+import type { TarifaTransportista } from "./tipos";
 
 // Liquidación a transportistas — decisión 2026-08-26 (ver DOCUMENTO
-// TECNICO.md historial): monto por viaje configurable, con historial de
-// vigencia. El cálculo de cuántos viajes hizo cada chofer (§4.2
+// TECNICO.md historial): monto por viaje configurable. Decisión 2026-09-11:
+// sin historial de vigencia — un único registro, editable, con toggle
+// activa/inactiva. El cálculo de cuántos viajes hizo cada chofer (§4.2
 // TEMAS_PENDIENTES.md, construido 2026-08-28) sincroniza los estados reales
 // desde SimpliRoute antes de traer el resumen — ver
 // FacturacionService.liquidacionTransportistas.
 export function TransportistasTab({ mes, anio }: { mes: number; anio: number }) {
   const [sheetAbierto, setSheetAbierto] = useState(false);
+  const queryClient = useQueryClient();
 
   const { data: tarifas, isLoading } = useQuery({
     queryKey: ["facturacion", "tarifa-transportista"],
     queryFn: listarTarifasTransportista,
+  });
+  const tarifaActual: TarifaTransportista | null = tarifas?.[0] ?? null;
+
+  const mutacionActiva = useMutation({
+    mutationFn: ({ id, activa }: { id: string; activa: boolean }) => actualizarTarifaTransportista(id, { activa }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["facturacion", "tarifa-transportista"] }),
+    onError: () => toast.error("No se pudo cambiar el estado."),
   });
 
   const {
@@ -45,9 +53,9 @@ export function TransportistasTab({ mes, anio }: { mes: number; anio: number }) 
       </p>
 
       <div className="flex items-center justify-between">
-        <h2 className="font-medium">Historial de tarifa por viaje</h2>
+        <h2 className="font-medium">Tarifa por viaje</h2>
         <Button type="button" variant="outline" size="sm" onClick={() => setSheetAbierto(true)}>
-          Nueva tarifa
+          {tarifaActual ? "Editar tarifa" : "Nueva tarifa"}
         </Button>
       </div>
 
@@ -55,8 +63,8 @@ export function TransportistasTab({ mes, anio }: { mes: number; anio: number }) 
         <TableHeader>
           <TableRow>
             <TableHead>Monto por viaje</TableHead>
-            <TableHead>Vigencia desde</TableHead>
-            <TableHead>Vigencia hasta</TableHead>
+            <TableHead>Estado</TableHead>
+            <TableHead>Acciones</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -76,8 +84,20 @@ export function TransportistasTab({ mes, anio }: { mes: number; anio: number }) 
             tarifas?.map((tarifa) => (
               <TableRow key={tarifa.id}>
                 <TableCell>{formatearMonto(tarifa.monto)}</TableCell>
-                <TableCell>{formatearFecha(tarifa.vigenciaDesde)}</TableCell>
-                <TableCell>{tarifa.vigenciaHasta ? formatearFecha(tarifa.vigenciaHasta) : "Vigente"}</TableCell>
+                <TableCell>
+                  {tarifa.activa ? <Badge variant="secondary">Activa</Badge> : <Badge variant="outline">Inactiva</Badge>}
+                </TableCell>
+                <TableCell>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={mutacionActiva.isPending}
+                    onClick={() => mutacionActiva.mutate({ id: tarifa.id, activa: !tarifa.activa })}
+                  >
+                    {tarifa.activa ? "Desactivar" : "Activar"}
+                  </Button>
+                </TableCell>
               </TableRow>
             ))
           )}
@@ -148,7 +168,11 @@ export function TransportistasTab({ mes, anio }: { mes: number; anio: number }) 
         )}
       </Table>
 
-      <TarifaTransportistaFormSheet abierto={sheetAbierto} onOpenChange={setSheetAbierto} />
+      <TarifaTransportistaFormSheet
+        tarifa={sheetAbierto ? tarifaActual : null}
+        abierto={sheetAbierto}
+        onOpenChange={setSheetAbierto}
+      />
     </div>
   );
 }

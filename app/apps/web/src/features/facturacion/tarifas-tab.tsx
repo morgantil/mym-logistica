@@ -2,18 +2,23 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { TipoServicio, TipoServicioCliente } from "@mym/shared-types";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { listarClientesActivos } from "@/features/clientes/api";
-import { crearCombinacion, eliminarCombinacion, listarCombinaciones, listarPorcentajes, listarTarifas } from "./api";
+import {
+  actualizarTarifa,
+  crearCombinacion,
+  eliminarCombinacion,
+  listarCombinaciones,
+  listarPorcentajes,
+  listarTarifas,
+} from "./api";
 import { formatearMonto } from "./formato";
 import { PorcentajeFormSheet } from "./porcentaje-form-sheet";
 import { TarifaFormSheet } from "./tarifa-form-sheet";
-
-function formatearFecha(fecha: string): string {
-  return new Date(fecha).toLocaleDateString("es-AR", { timeZone: "UTC" });
-}
+import type { TarifaCliente } from "./tipos";
 
 const ETIQUETA_TIPO: Record<TipoServicio, string> = {
   [TipoServicio.PANAL]: "Pañales",
@@ -26,7 +31,9 @@ function descripcionTipoTarifa(tarifa: { tipoServicio: TipoServicio; tipoEnvase:
 }
 
 export function TarifasTab({ clienteId }: { clienteId: string | null }) {
-  const [sheetAbierto, setSheetAbierto] = useState<"tarifa" | "porcentaje" | null>(null);
+  const [tarifaEnEdicion, setTarifaEnEdicion] = useState<TarifaCliente | "nuevo" | null>(null);
+  const [porcentajeAbierto, setPorcentajeAbierto] = useState(false);
+  const queryClient = useQueryClient();
 
   const { data: tarifas, isLoading: cargandoTarifas } = useQuery({
     queryKey: ["facturacion", "tarifas", clienteId],
@@ -38,6 +45,13 @@ export function TarifasTab({ clienteId }: { clienteId: string | null }) {
     queryFn: () => listarPorcentajes(clienteId!),
     enabled: clienteId !== null,
   });
+  const porcentajeActual = porcentajes?.[0] ?? null;
+
+  const mutacionActivaTarifa = useMutation({
+    mutationFn: ({ id, activa }: { id: string; activa: boolean }) => actualizarTarifa(id, { activa }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["facturacion", "tarifas", clienteId] }),
+    onError: () => toast.error("No se pudo cambiar el estado."),
+  });
 
   if (clienteId === null) {
     return <p className="text-sm text-muted-foreground">Elegí un cliente arriba para ver sus tarifas.</p>;
@@ -48,7 +62,7 @@ export function TarifasTab({ clienteId }: { clienteId: string | null }) {
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <h2 className="font-medium">Tarifas por zona</h2>
-          <Button type="button" variant="outline" size="sm" onClick={() => setSheetAbierto("tarifa")}>
+          <Button type="button" variant="outline" size="sm" onClick={() => setTarifaEnEdicion("nuevo")}>
             Nueva tarifa
           </Button>
         </div>
@@ -58,8 +72,8 @@ export function TarifasTab({ clienteId }: { clienteId: string | null }) {
               <TableHead>Zona</TableHead>
               <TableHead>Tipo</TableHead>
               <TableHead>Monto</TableHead>
-              <TableHead>Vigencia desde</TableHead>
-              <TableHead>Vigencia hasta</TableHead>
+              <TableHead>Estado</TableHead>
+              <TableHead>Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -81,8 +95,23 @@ export function TarifasTab({ clienteId }: { clienteId: string | null }) {
                   <TableCell>{tarifa.zonaTarifariaNombre ?? tarifa.zonaTarifariaId}</TableCell>
                   <TableCell>{descripcionTipoTarifa(tarifa)}</TableCell>
                   <TableCell>{formatearMonto(tarifa.monto)}</TableCell>
-                  <TableCell>{formatearFecha(tarifa.vigenciaDesde)}</TableCell>
-                  <TableCell>{tarifa.vigenciaHasta ? formatearFecha(tarifa.vigenciaHasta) : "Vigente"}</TableCell>
+                  <TableCell>
+                    {tarifa.activa ? <Badge variant="secondary">Activa</Badge> : <Badge variant="outline">Inactiva</Badge>}
+                  </TableCell>
+                  <TableCell className="flex gap-1">
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setTarifaEnEdicion(tarifa)}>
+                      Editar
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={mutacionActivaTarifa.isPending}
+                      onClick={() => mutacionActivaTarifa.mutate({ id: tarifa.id, activa: !tarifa.activa })}
+                    >
+                      {tarifa.activa ? "Desactivar" : "Activar"}
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))
             )}
@@ -93,8 +122,8 @@ export function TarifasTab({ clienteId }: { clienteId: string | null }) {
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <h2 className="font-medium">Porcentajes de entrega unificada</h2>
-          <Button type="button" variant="outline" size="sm" onClick={() => setSheetAbierto("porcentaje")}>
-            Nuevo porcentaje
+          <Button type="button" variant="outline" size="sm" onClick={() => setPorcentajeAbierto(true)}>
+            {porcentajeActual ? "Editar porcentaje" : "Nuevo porcentaje"}
           </Button>
         </div>
         <Table>
@@ -102,20 +131,19 @@ export function TarifasTab({ clienteId }: { clienteId: string | null }) {
             <TableRow>
               <TableHead>% Pañal</TableHead>
               <TableHead>% Medicamento</TableHead>
-              <TableHead>Vigencia desde</TableHead>
-              <TableHead>Vigencia hasta</TableHead>
+              <TableHead>Estado</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {cargandoPorcentajes ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-muted-foreground">
+                <TableCell colSpan={3} className="text-muted-foreground">
                   Cargando…
                 </TableCell>
               </TableRow>
             ) : porcentajes?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-muted-foreground">
+                <TableCell colSpan={3} className="text-muted-foreground">
                   Todavía no hay porcentajes cargados — solo hacen falta si este cliente tiene entregas
                   unificadas de pañales y medicamentos.
                 </TableCell>
@@ -125,9 +153,12 @@ export function TarifasTab({ clienteId }: { clienteId: string | null }) {
                 <TableRow key={porcentaje.id}>
                   <TableCell>{porcentaje.porcentajePanal}%</TableCell>
                   <TableCell>{porcentaje.porcentajeMedicamento}%</TableCell>
-                  <TableCell>{formatearFecha(porcentaje.vigenciaDesde)}</TableCell>
                   <TableCell>
-                    {porcentaje.vigenciaHasta ? formatearFecha(porcentaje.vigenciaHasta) : "Vigente"}
+                    {porcentaje.activa ? (
+                      <Badge variant="secondary">Activo</Badge>
+                    ) : (
+                      <Badge variant="outline">Inactivo</Badge>
+                    )}
                   </TableCell>
                 </TableRow>
               ))
@@ -140,13 +171,14 @@ export function TarifasTab({ clienteId }: { clienteId: string | null }) {
 
       <TarifaFormSheet
         clienteId={clienteId}
-        abierto={sheetAbierto === "tarifa"}
-        onOpenChange={(abierto) => !abierto && setSheetAbierto(null)}
+        tarifa={tarifaEnEdicion}
+        onOpenChange={(abierto) => !abierto && setTarifaEnEdicion(null)}
       />
       <PorcentajeFormSheet
         clienteId={clienteId}
-        abierto={sheetAbierto === "porcentaje"}
-        onOpenChange={(abierto) => !abierto && setSheetAbierto(null)}
+        porcentaje={porcentajeAbierto ? porcentajeActual : null}
+        abierto={porcentajeAbierto}
+        onOpenChange={setPorcentajeAbierto}
       />
     </div>
   );

@@ -3,6 +3,7 @@ import { apiClient } from "@/lib/api-client";
 import type {
   CombinacionUnificacionClientes,
   GrupoFacturacion,
+  PedidoFacturado,
   PorcentajeSegundoServicio,
   ResultadoVistaPrevia,
   ResumenChofer,
@@ -21,9 +22,16 @@ export async function crearTarifa(datos: {
   tipoServicio: TipoServicio;
   tipoEnvase?: TipoEnvase;
   monto: number;
-  vigenciaDesde: string;
 }): Promise<TarifaCliente> {
   const { data } = await apiClient.post<TarifaCliente>("/facturacion/tarifas", datos);
+  return data;
+}
+
+export async function actualizarTarifa(
+  id: string,
+  datos: Partial<{ monto: number; activa: boolean }>,
+): Promise<TarifaCliente> {
+  const { data } = await apiClient.patch<TarifaCliente>(`/facturacion/tarifas/${id}`, datos);
   return data;
 }
 
@@ -38,10 +46,20 @@ export async function crearPorcentaje(datos: {
   clienteId: string;
   porcentajePanal: number;
   porcentajeMedicamento: number;
-  vigenciaDesde: string;
 }): Promise<PorcentajeSegundoServicio> {
   const { data } = await apiClient.post<PorcentajeSegundoServicio>(
     "/facturacion/porcentaje-segundo-servicio",
+    datos,
+  );
+  return data;
+}
+
+export async function actualizarPorcentaje(
+  id: string,
+  datos: Partial<{ porcentajePanal: number; porcentajeMedicamento: number; activa: boolean }>,
+): Promise<PorcentajeSegundoServicio> {
+  const { data } = await apiClient.patch<PorcentajeSegundoServicio>(
+    `/facturacion/porcentaje-segundo-servicio/${id}`,
     datos,
   );
   return data;
@@ -69,11 +87,16 @@ export async function listarTarifasTransportista(): Promise<TarifaTransportista[
   return data;
 }
 
-export async function crearTarifaTransportista(datos: {
-  monto: number;
-  vigenciaDesde: string;
-}): Promise<TarifaTransportista> {
+export async function crearTarifaTransportista(datos: { monto: number }): Promise<TarifaTransportista> {
   const { data } = await apiClient.post<TarifaTransportista>("/facturacion/tarifa-transportista", datos);
+  return data;
+}
+
+export async function actualizarTarifaTransportista(
+  id: string,
+  datos: Partial<{ monto: number; activa: boolean }>,
+): Promise<TarifaTransportista> {
+  const { data } = await apiClient.patch<TarifaTransportista>(`/facturacion/tarifa-transportista/${id}`, datos);
   return data;
 }
 
@@ -86,6 +109,17 @@ export async function liquidacionTransportistas(mes: number, anio: number): Prom
 
 export async function listarGrupos(clienteId: string, mes: number, anio: number): Promise<GrupoFacturacion[]> {
   const { data } = await apiClient.get<GrupoFacturacion[]>("/facturacion/grupos", {
+    params: { clienteId, mes, anio },
+  });
+  return data;
+}
+
+export async function listarPedidosFacturados(
+  clienteId: string,
+  mes: number,
+  anio: number,
+): Promise<PedidoFacturado[]> {
+  const { data } = await apiClient.get<PedidoFacturado[]>("/facturacion/pedidos-facturados", {
     params: { clienteId, mes, anio },
   });
   return data;

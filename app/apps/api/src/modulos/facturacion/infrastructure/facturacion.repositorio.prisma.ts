@@ -1,8 +1,11 @@
-import { Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { TipoEnvase, TipoServicio } from "@mym/shared-types";
 import { PrismaService } from "../../../common/prisma/prisma.service";
 import {
+  DatosActualizarPorcentaje,
+  DatosActualizarTarifa,
+  DatosActualizarTarifaTransportista,
   DatosCrearCombinacion,
   DatosCrearGrupoFacturacion,
   DatosCrearPorcentaje,
@@ -18,8 +21,6 @@ import {
   TarifaCliente,
   TarifaTransportista,
 } from "../domain/tarifa";
-
-const UN_DIA_MS = 24 * 60 * 60 * 1000;
 
 type FilaGrupo = Prisma.GrupoFacturacionGetPayload<{ include: { pedidos: { select: { id: true } } } }>;
 
@@ -73,18 +74,17 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
     return this.prisma.tarifaCliente
       .findMany({
         where: { clienteId },
-        orderBy: { vigenciaDesde: "desc" },
+        orderBy: { creadoEn: "desc" },
         include: { zonaTarifaria: { select: { nombre: true } } },
       })
       .then((filas) => filas.map(mapearTarifa));
   }
 
-  async tarifaVigente(
+  async tarifaActiva(
     clienteId: string,
     zonaTarifariaId: string,
     tipoServicio: TipoServicio,
     tipoEnvase: TipoEnvase | null,
-    fecha: Date,
   ): Promise<TarifaCliente | null> {
     const fila = await this.prisma.tarifaCliente.findFirst({
       where: {
@@ -92,81 +92,93 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
         zonaTarifariaId,
         tipoServicio: tipoServicio as unknown as Prisma.TarifaClienteWhereInput["tipoServicio"],
         tipoEnvase: tipoEnvase as unknown as Prisma.TarifaClienteWhereInput["tipoEnvase"],
-        vigenciaDesde: { lte: fecha },
-        OR: [{ vigenciaHasta: null }, { vigenciaHasta: { gte: fecha } }],
+        activa: true,
       },
-      orderBy: { vigenciaDesde: "desc" },
       include: { zonaTarifaria: { select: { nombre: true } } },
     });
     return fila ? mapearTarifa(fila) : null;
   }
 
   async crearTarifa(datos: DatosCrearTarifa): Promise<TarifaCliente> {
-    return this.prisma.$transaction(async (tx) => {
-      // Cierra la tarifa de la misma combinación zona+tipoServicio+tipoEnvase
-      // que estuviera abierta, para no dejar dos vigentes al mismo tiempo
-      // (§23 funcional: "vigencia para mantener históricos"). tipoEnvase null
-      // no matchea con `equals: null` en Prisma para NOT NULL — pero acá la
-      // columna SÍ admite null, así que `tipoEnvase: datos.tipoEnvase` alcanza.
-      await tx.tarifaCliente.updateMany({
-        where: {
-          clienteId: datos.clienteId,
-          zonaTarifariaId: datos.zonaTarifariaId,
-          tipoServicio: datos.tipoServicio as unknown as Prisma.TarifaClienteWhereInput["tipoServicio"],
-          tipoEnvase: datos.tipoEnvase as unknown as Prisma.TarifaClienteWhereInput["tipoEnvase"],
-          vigenciaHasta: null,
-        },
-        data: { vigenciaHasta: new Date(datos.vigenciaDesde.getTime() - UN_DIA_MS) },
-      });
-      const creada = await tx.tarifaCliente.create({
-        data: {
-          clienteId: datos.clienteId,
-          zonaTarifariaId: datos.zonaTarifariaId,
-          tipoServicio: datos.tipoServicio as unknown as Prisma.TarifaClienteCreateInput["tipoServicio"],
-          tipoEnvase: datos.tipoEnvase as unknown as Prisma.TarifaClienteCreateInput["tipoEnvase"],
-          monto: datos.monto,
-          vigenciaDesde: datos.vigenciaDesde,
-        },
-        include: { zonaTarifaria: { select: { nombre: true } } },
-      });
-      return mapearTarifa(creada);
+    // Decisión 2026-09-11: sin historial por vigencia — una sola fila por
+    // combinación clienteId+zonaTarifariaId+tipoServicio+tipoEnvase. Si ya
+    // existe, no se crea otra (usar actualizarTarifa para editarla).
+    const existente = await this.prisma.tarifaCliente.findFirst({
+      where: {
+        clienteId: datos.clienteId,
+        zonaTarifariaId: datos.zonaTarifariaId,
+        tipoServicio: datos.tipoServicio as unknown as Prisma.TarifaClienteWhereInput["tipoServicio"],
+        tipoEnvase: datos.tipoEnvase as unknown as Prisma.TarifaClienteWhereInput["tipoEnvase"],
+      },
     });
+    if (existente) {
+      throw new BadRequestException(
+        "Ya existe una tarifa para esa zona y tipo — editá la que ya está en vez de crear otra.",
+      );
+    }
+    const creada = await this.prisma.tarifaCliente.create({
+      data: {
+        clienteId: datos.clienteId,
+        zonaTarifariaId: datos.zonaTarifariaId,
+        tipoServicio: datos.tipoServicio as unknown as Prisma.TarifaClienteCreateInput["tipoServicio"],
+        tipoEnvase: datos.tipoEnvase as unknown as Prisma.TarifaClienteCreateInput["tipoEnvase"],
+        monto: datos.monto,
+      },
+      include: { zonaTarifaria: { select: { nombre: true } } },
+    });
+    return mapearTarifa(creada);
+  }
+
+  async actualizarTarifa(id: string, datos: DatosActualizarTarifa): Promise<TarifaCliente> {
+    const existente = await this.prisma.tarifaCliente.findUnique({ where: { id } });
+    if (!existente) throw new NotFoundException(`Tarifa ${id} no encontrada.`);
+    const actualizada = await this.prisma.tarifaCliente.update({
+      where: { id },
+      data: datos,
+      include: { zonaTarifaria: { select: { nombre: true } } },
+    });
+    return mapearTarifa(actualizada);
   }
 
   listarPorcentajes(clienteId: string): Promise<PorcentajeSegundoServicio[]> {
     return this.prisma.porcentajeSegundoServicio
-      .findMany({ where: { clienteId }, orderBy: { vigenciaDesde: "desc" } })
+      .findMany({ where: { clienteId }, orderBy: { creadoEn: "desc" } })
       .then((filas) => filas.map(mapearPorcentaje));
   }
 
-  async porcentajeVigente(clienteId: string, fecha: Date): Promise<PorcentajeSegundoServicio | null> {
+  async porcentajeActivo(clienteId: string): Promise<PorcentajeSegundoServicio | null> {
     const fila = await this.prisma.porcentajeSegundoServicio.findFirst({
-      where: {
-        clienteId,
-        vigenciaDesde: { lte: fecha },
-        OR: [{ vigenciaHasta: null }, { vigenciaHasta: { gte: fecha } }],
-      },
-      orderBy: { vigenciaDesde: "desc" },
+      where: { clienteId, activa: true },
     });
     return fila ? mapearPorcentaje(fila) : null;
   }
 
   async crearPorcentaje(datos: DatosCrearPorcentaje): Promise<PorcentajeSegundoServicio> {
-    return this.prisma.$transaction(async (tx) => {
-      await tx.porcentajeSegundoServicio.updateMany({
-        where: { clienteId: datos.clienteId, vigenciaHasta: null },
-        data: { vigenciaHasta: new Date(datos.vigenciaDesde.getTime() - UN_DIA_MS) },
-      });
-      const creado = await tx.porcentajeSegundoServicio.create({
-        data: {
-          clienteId: datos.clienteId,
-          porcentajePanal: datos.porcentajePanal,
-          porcentajeMedicamento: datos.porcentajeMedicamento,
-          vigenciaDesde: datos.vigenciaDesde,
-        },
-      });
-      return mapearPorcentaje(creado);
+    // Sin historial por vigencia — una sola fila por cliente. Si ya existe,
+    // no se crea otra (usar actualizarPorcentaje para editarla).
+    const existente = await this.prisma.porcentajeSegundoServicio.findFirst({
+      where: { clienteId: datos.clienteId },
     });
+    if (existente) {
+      throw new BadRequestException(
+        "Este cliente ya tiene un porcentaje cargado — editalo en vez de crear otro.",
+      );
+    }
+    const creado = await this.prisma.porcentajeSegundoServicio.create({
+      data: {
+        clienteId: datos.clienteId,
+        porcentajePanal: datos.porcentajePanal,
+        porcentajeMedicamento: datos.porcentajeMedicamento,
+      },
+    });
+    return mapearPorcentaje(creado);
+  }
+
+  async actualizarPorcentaje(id: string, datos: DatosActualizarPorcentaje): Promise<PorcentajeSegundoServicio> {
+    const existente = await this.prisma.porcentajeSegundoServicio.findUnique({ where: { id } });
+    if (!existente) throw new NotFoundException(`Porcentaje ${id} no encontrado.`);
+    const actualizado = await this.prisma.porcentajeSegundoServicio.update({ where: { id }, data: datos });
+    return mapearPorcentaje(actualizado);
   }
 
   listarCombinaciones(): Promise<CombinacionUnificacionClientes[]> {
@@ -221,32 +233,34 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
 
   listarTarifasTransportista(): Promise<TarifaTransportista[]> {
     return this.prisma.tarifaTransportista
-      .findMany({ orderBy: { vigenciaDesde: "desc" } })
+      .findMany({ orderBy: { creadoEn: "desc" } })
       .then((filas) => filas.map(mapearTarifaTransportista));
   }
 
-  async tarifaTransportistaVigente(fecha: Date): Promise<TarifaTransportista | null> {
-    const fila = await this.prisma.tarifaTransportista.findFirst({
-      where: {
-        vigenciaDesde: { lte: fecha },
-        OR: [{ vigenciaHasta: null }, { vigenciaHasta: { gte: fecha } }],
-      },
-      orderBy: { vigenciaDesde: "desc" },
-    });
+  async tarifaTransportistaActiva(): Promise<TarifaTransportista | null> {
+    const fila = await this.prisma.tarifaTransportista.findFirst({ where: { activa: true } });
     return fila ? mapearTarifaTransportista(fila) : null;
   }
 
   async crearTarifaTransportista(datos: DatosCrearTarifaTransportista): Promise<TarifaTransportista> {
-    return this.prisma.$transaction(async (tx) => {
-      await tx.tarifaTransportista.updateMany({
-        where: { vigenciaHasta: null },
-        data: { vigenciaHasta: new Date(datos.vigenciaDesde.getTime() - UN_DIA_MS) },
-      });
-      const creada = await tx.tarifaTransportista.create({
-        data: { monto: datos.monto, vigenciaDesde: datos.vigenciaDesde },
-      });
-      return mapearTarifaTransportista(creada);
-    });
+    // Sin historial por vigencia — es un valor único global, si ya existe
+    // alguna fila hay que editarla (actualizarTarifaTransportista).
+    const existente = await this.prisma.tarifaTransportista.findFirst();
+    if (existente) {
+      throw new BadRequestException("Ya hay una tarifa de transportista cargada — editala en vez de crear otra.");
+    }
+    const creada = await this.prisma.tarifaTransportista.create({ data: { monto: datos.monto } });
+    return mapearTarifaTransportista(creada);
+  }
+
+  async actualizarTarifaTransportista(
+    id: string,
+    datos: DatosActualizarTarifaTransportista,
+  ): Promise<TarifaTransportista> {
+    const existente = await this.prisma.tarifaTransportista.findUnique({ where: { id } });
+    if (!existente) throw new NotFoundException(`Tarifa de transportista ${id} no encontrada.`);
+    const actualizada = await this.prisma.tarifaTransportista.update({ where: { id }, data: datos });
+    return mapearTarifaTransportista(actualizada);
   }
 
   async listarEntregadosPorChoferEnPeriodo(
@@ -405,6 +419,7 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
 
     return pedidos.map((pedido) => ({
       pedidoId: pedido.id,
+      numero: pedido.numero,
       fechaProgramada: pedido.fechaProgramada,
       destinatarioNombre: pedido.destinatario.nombre,
       numeroAfiliado: pedido.destinatario.numeroAfiliado,
@@ -443,8 +458,7 @@ function mapearTarifa(fila: {
   tipoServicio: unknown;
   tipoEnvase: unknown;
   monto: Prisma.Decimal;
-  vigenciaDesde: Date;
-  vigenciaHasta: Date | null;
+  activa: boolean;
 }): TarifaCliente {
   return {
     id: fila.id,
@@ -454,8 +468,7 @@ function mapearTarifa(fila: {
     tipoServicio: fila.tipoServicio as TarifaCliente["tipoServicio"],
     tipoEnvase: fila.tipoEnvase as TarifaCliente["tipoEnvase"],
     monto: Number(fila.monto),
-    vigenciaDesde: fila.vigenciaDesde,
-    vigenciaHasta: fila.vigenciaHasta,
+    activa: fila.activa,
   };
 }
 
@@ -464,29 +477,21 @@ function mapearPorcentaje(fila: {
   clienteId: string;
   porcentajePanal: Prisma.Decimal;
   porcentajeMedicamento: Prisma.Decimal;
-  vigenciaDesde: Date;
-  vigenciaHasta: Date | null;
+  activa: boolean;
 }): PorcentajeSegundoServicio {
   return {
     id: fila.id,
     clienteId: fila.clienteId,
     porcentajePanal: Number(fila.porcentajePanal),
     porcentajeMedicamento: Number(fila.porcentajeMedicamento),
-    vigenciaDesde: fila.vigenciaDesde,
-    vigenciaHasta: fila.vigenciaHasta,
+    activa: fila.activa,
   };
 }
 
-function mapearTarifaTransportista(fila: {
-  id: string;
-  monto: Prisma.Decimal;
-  vigenciaDesde: Date;
-  vigenciaHasta: Date | null;
-}): TarifaTransportista {
+function mapearTarifaTransportista(fila: { id: string; monto: Prisma.Decimal; activa: boolean }): TarifaTransportista {
   return {
     id: fila.id,
     monto: Number(fila.monto),
-    vigenciaDesde: fila.vigenciaDesde,
-    vigenciaHasta: fila.vigenciaHasta,
+    activa: fila.activa,
   };
 }

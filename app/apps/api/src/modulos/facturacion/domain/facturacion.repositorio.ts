@@ -14,19 +14,32 @@ export interface DatosCrearTarifa {
   tipoServicio: TipoServicio;
   tipoEnvase: TipoEnvase | null;
   monto: number;
-  vigenciaDesde: Date;
+}
+
+export interface DatosActualizarTarifa {
+  monto?: number;
+  activa?: boolean;
 }
 
 export interface DatosCrearPorcentaje {
   clienteId: string;
   porcentajePanal: number;
   porcentajeMedicamento: number;
-  vigenciaDesde: Date;
+}
+
+export interface DatosActualizarPorcentaje {
+  porcentajePanal?: number;
+  porcentajeMedicamento?: number;
+  activa?: boolean;
 }
 
 export interface DatosCrearTarifaTransportista {
   monto: number;
-  vigenciaDesde: Date;
+}
+
+export interface DatosActualizarTarifaTransportista {
+  monto?: number;
+  activa?: boolean;
 }
 
 export interface DatosCrearGrupoFacturacion {
@@ -51,30 +64,30 @@ export interface DatosCrearCombinacion {
 }
 
 export interface FacturacionRepositorio {
-  // Tarifas — §23 funcional. `tarifaVigente` es la que corresponde según
-  // vigenciaDesde/vigenciaHasta para una fecha puntual (normalmente "hoy",
-  // al generar la vista previa).
+  // Tarifas — §23 funcional. Decisión 2026-09-11: sin historial por vigencia,
+  // una fila por cliente+zona+tipo+envase, editable y con toggle activa/inactiva
+  // (ver comentario en tarifa.ts). `tarifaActiva` es la que corresponde a esa
+  // combinación con activa=true — no depende de ninguna fecha.
   listarTarifas(clienteId: string): Promise<TarifaCliente[]>;
-  // La vigencia y el cierre automático (ver crearTarifa) son por la
-  // combinación completa zona+tipoServicio+tipoEnvase — dos tarifas de
-  // MEDICAMENTO en la misma zona pero distinto Bolsa/Bulto son independientes.
-  tarifaVigente(
+  tarifaActiva(
     clienteId: string,
     zonaTarifariaId: string,
     tipoServicio: TipoServicio,
     tipoEnvase: TipoEnvase | null,
-    fecha: Date,
   ): Promise<TarifaCliente | null>;
-  // Cierra automáticamente la tarifa anterior de la misma combinación
-  // (vigenciaHasta = el día antes de la nueva vigenciaDesde) para no dejar
-  // dos vigentes al mismo tiempo.
+  // Rechaza si ya existe una fila para esa combinación exacta (clienteId +
+  // zonaTarifariaId + tipoServicio + tipoEnvase) — para esa hay que usar
+  // actualizarTarifa, no crear una nueva.
   crearTarifa(datos: DatosCrearTarifa): Promise<TarifaCliente>;
+  actualizarTarifa(id: string, datos: DatosActualizarTarifa): Promise<TarifaCliente>;
 
   // Porcentaje aplicado en entregas unificadas — §25 funcional. Un solo
-  // registro por cliente/vigencia con los dos valores (panal y medicamento).
+  // registro por cliente, con los dos valores (panal y medicamento). Sin
+  // vigencia desde 2026-09-11, mismo criterio que las tarifas.
   listarPorcentajes(clienteId: string): Promise<PorcentajeSegundoServicio[]>;
-  porcentajeVigente(clienteId: string, fecha: Date): Promise<PorcentajeSegundoServicio | null>;
+  porcentajeActivo(clienteId: string): Promise<PorcentajeSegundoServicio | null>;
   crearPorcentaje(datos: DatosCrearPorcentaje): Promise<PorcentajeSegundoServicio>;
+  actualizarPorcentaje(id: string, datos: DatosActualizarPorcentaje): Promise<PorcentajeSegundoServicio>;
 
   // Combinaciones habilitadas de unificación ENTRE clientes — Guia Arbet
   // paso 4/8 ("Combinaciones habilitadas de Pañales + Medicamentos").
@@ -86,11 +99,15 @@ export interface FacturacionRepositorio {
   crearCombinacion(datos: DatosCrearCombinacion): Promise<CombinacionUnificacionClientes>;
   eliminarCombinacion(id: string): Promise<void>;
 
-  // Liquidación a transportistas — monto por viaje, configurable con
-  // vigencia (decisión 2026-08-26). Sin clienteId: un único valor.
+  // Liquidación a transportistas — monto por viaje. Sin clienteId: un único
+  // valor global. Sin vigencia desde 2026-09-11, mismo criterio que las tarifas.
   listarTarifasTransportista(): Promise<TarifaTransportista[]>;
-  tarifaTransportistaVigente(fecha: Date): Promise<TarifaTransportista | null>;
+  tarifaTransportistaActiva(): Promise<TarifaTransportista | null>;
   crearTarifaTransportista(datos: DatosCrearTarifaTransportista): Promise<TarifaTransportista>;
+  actualizarTarifaTransportista(
+    id: string,
+    datos: DatosActualizarTarifaTransportista,
+  ): Promise<TarifaTransportista>;
 
   // §4.2 TEMAS_PENDIENTES.md — pedidos ENTREGADO con chofer asignado en el
   // período, para el cálculo de cuántos viajes hizo cada uno. Por

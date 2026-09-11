@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { AxiosError } from "axios";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { listarZonasTarifarias } from "@/features/zonas-tarifarias/api";
-import { crearTarifa } from "./api";
+import { actualizarTarifa, crearTarifa } from "./api";
+import type { TarifaCliente } from "./tipos";
 
 const ETIQUETAS_TIPO_SERVICIO: Record<TipoServicio, string> = {
   [TipoServicio.PANAL]: "Pañales",
@@ -29,21 +30,22 @@ function mensajeError(error: unknown): string {
   return "No se pudo guardar. Probá de nuevo en unos segundos.";
 }
 
-const HOY = new Date().toISOString().slice(0, 10);
-
-// Solo alta: una tarifa nueva cierra automáticamente la vigencia de la
-// anterior de la misma zona (§23 funcional, "vigencia para mantener históricos") —
-// no tiene sentido "editar" una tarifa vieja, se carga una nueva. Las zonas
-// (CABA, Cordón 1/2/3, ...) son configurables — ver Ajustes → Zonas tarifarias.
+// Un solo formulario para crear y editar (decisión 2026-09-11: sin historial
+// por vigencia, se edita el monto directo) — si viene `tarifa`, edita (zona/
+// tipo/Bolsa-Bulto quedan fijos, son la identidad de la fila); si no, crea.
+// Las zonas (CABA, Cordón 1/2/3, ...) son configurables — ver Zonas tarifarias.
 export function TarifaFormSheet({
   clienteId,
-  abierto,
+  tarifa,
   onOpenChange,
 }: {
   clienteId: string;
-  abierto: boolean;
+  tarifa: TarifaCliente | null | "nuevo";
   onOpenChange: (abierto: boolean) => void;
 }) {
+  const abierto = tarifa !== null;
+  const editando = tarifa !== null && tarifa !== "nuevo";
+
   const { data: zonas } = useQuery({
     queryKey: ["zonas-tarifarias"],
     queryFn: listarZonasTarifarias,
@@ -54,27 +56,42 @@ export function TarifaFormSheet({
   const [tipoServicio, setTipoServicio] = useState<TipoServicio>(TipoServicio.PANAL);
   const [tipoEnvase, setTipoEnvase] = useState<TipoEnvase | "">("");
   const [monto, setMonto] = useState("");
-  const [vigenciaDesde, setVigenciaDesde] = useState(HOY);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (editando) {
+      setZonaTarifariaId(tarifa.zonaTarifariaId);
+      setTipoServicio(tarifa.tipoServicio);
+      setTipoEnvase(tarifa.tipoEnvase ?? "");
+      setMonto(String(tarifa.monto));
+    } else {
+      setZonaTarifariaId("");
+      setTipoServicio(TipoServicio.PANAL);
+      setTipoEnvase("");
+      setMonto("");
+    }
+    setError(null);
+  }, [tarifa, editando]);
 
   const esMedicamento = tipoServicio === TipoServicio.MEDICAMENTO;
 
   const queryClient = useQueryClient();
   const mutacion = useMutation({
-    mutationFn: () =>
-      crearTarifa({
+    mutationFn: () => {
+      if (editando) {
+        return actualizarTarifa(tarifa.id, { monto: Number(monto) });
+      }
+      return crearTarifa({
         clienteId,
         zonaTarifariaId,
         tipoServicio,
         tipoEnvase: esMedicamento && tipoEnvase ? tipoEnvase : undefined,
         monto: Number(monto),
-        vigenciaDesde,
-      }),
+      });
+    },
     onSuccess: () => {
-      toast.success("Tarifa cargada.");
+      toast.success(editando ? "Tarifa actualizada." : "Tarifa cargada.");
       queryClient.invalidateQueries({ queryKey: ["facturacion", "tarifas", clienteId] });
-      setMonto("");
-      setError(null);
       onOpenChange(false);
     },
     onError: (err) => setError(mensajeError(err)),
@@ -90,9 +107,11 @@ export function TarifaFormSheet({
     <Sheet open={abierto} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-md">
         <SheetHeader>
-          <SheetTitle>Nueva tarifa</SheetTitle>
+          <SheetTitle>{editando ? "Editar tarifa" : "Nueva tarifa"}</SheetTitle>
           <SheetDescription>
-            Cierra automáticamente la vigencia de la tarifa anterior de la misma zona.
+            {editando
+              ? "La zona y el tipo de servicio de una tarifa no se pueden cambiar — si hace falta otra combinación, cargala como una tarifa nueva."
+              : "Una tarifa por zona y tipo de servicio — para editarla después, entrá de nuevo a esta pantalla."}
           </SheetDescription>
         </SheetHeader>
 
@@ -108,57 +127,70 @@ export function TarifaFormSheet({
 
           <TablaFormulario>
             <FilaFormulario label="Zona" htmlFor="zona-tarifa" anchoEtiqueta="140px">
-              <Select value={zonaTarifariaId} onValueChange={setZonaTarifariaId}>
-                <SelectTrigger id="zona-tarifa">
-                  <SelectValue placeholder="Elegir zona" />
-                </SelectTrigger>
-                <SelectContent>
-                  {zonasActivas.map((zona) => (
-                    <SelectItem key={zona.id} value={zona.id}>
-                      {zona.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FilaFormulario>
-
-            <FilaFormulario label="Tipo de servicio" htmlFor="tipo-servicio-tarifa" anchoEtiqueta="140px">
-              <Select
-                value={tipoServicio}
-                onValueChange={(valor) => {
-                  setTipoServicio(valor as TipoServicio);
-                  setTipoEnvase("");
-                }}
-              >
-                <SelectTrigger id="tipo-servicio-tarifa">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.values(TipoServicio).map((valor) => (
-                    <SelectItem key={valor} value={valor}>
-                      {ETIQUETAS_TIPO_SERVICIO[valor]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FilaFormulario>
-
-            {esMedicamento && (
-              <FilaFormulario label="Bolsa / Bulto" htmlFor="tipo-envase-tarifa" anchoEtiqueta="140px">
-                <Select value={tipoEnvase} onValueChange={(valor) => setTipoEnvase(valor as TipoEnvase)}>
-                  <SelectTrigger id="tipo-envase-tarifa">
-                    <SelectValue placeholder="Elegir" />
+              {editando ? (
+                <p className="text-sm">{tarifa.zonaTarifariaNombre ?? tarifa.zonaTarifariaId}</p>
+              ) : (
+                <Select value={zonaTarifariaId} onValueChange={setZonaTarifariaId}>
+                  <SelectTrigger id="zona-tarifa">
+                    <SelectValue placeholder="Elegir zona" />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.values(TipoEnvase).map((valor) => (
-                      <SelectItem key={valor} value={valor}>
-                        {ETIQUETAS_TIPO_ENVASE[valor]}
+                    {zonasActivas.map((zona) => (
+                      <SelectItem key={zona.id} value={zona.id}>
+                        {zona.nombre}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              </FilaFormulario>
-            )}
+              )}
+            </FilaFormulario>
+
+            <FilaFormulario label="Tipo de servicio" htmlFor="tipo-servicio-tarifa" anchoEtiqueta="140px">
+              {editando ? (
+                <p className="text-sm">{ETIQUETAS_TIPO_SERVICIO[tipoServicio]}</p>
+              ) : (
+                <Select
+                  value={tipoServicio}
+                  onValueChange={(valor) => {
+                    setTipoServicio(valor as TipoServicio);
+                    setTipoEnvase("");
+                  }}
+                >
+                  <SelectTrigger id="tipo-servicio-tarifa">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.values(TipoServicio).map((valor) => (
+                      <SelectItem key={valor} value={valor}>
+                        {ETIQUETAS_TIPO_SERVICIO[valor]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </FilaFormulario>
+
+            {esMedicamento &&
+              (editando ? (
+                <FilaFormulario label="Bolsa / Bulto" htmlFor="tipo-envase-tarifa" anchoEtiqueta="140px">
+                  <p className="text-sm">{tipoEnvase ? ETIQUETAS_TIPO_ENVASE[tipoEnvase] : "—"}</p>
+                </FilaFormulario>
+              ) : (
+                <FilaFormulario label="Bolsa / Bulto" htmlFor="tipo-envase-tarifa" anchoEtiqueta="140px">
+                  <Select value={tipoEnvase} onValueChange={(valor) => setTipoEnvase(valor as TipoEnvase)}>
+                    <SelectTrigger id="tipo-envase-tarifa">
+                      <SelectValue placeholder="Elegir" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.values(TipoEnvase).map((valor) => (
+                        <SelectItem key={valor} value={valor}>
+                          {ETIQUETAS_TIPO_ENVASE[valor]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FilaFormulario>
+              ))}
 
             <FilaFormulario label="Monto" htmlFor="monto-tarifa" anchoEtiqueta="140px">
               <Input
@@ -168,17 +200,6 @@ export function TarifaFormSheet({
                 step="0.01"
                 value={monto}
                 onChange={(e) => setMonto(e.target.value)}
-                required
-                disabled={mutacion.isPending}
-              />
-            </FilaFormulario>
-
-            <FilaFormulario label="Vigencia desde" htmlFor="vigencia-tarifa" anchoEtiqueta="140px">
-              <Input
-                id="vigencia-tarifa"
-                type="date"
-                value={vigenciaDesde}
-                onChange={(e) => setVigenciaDesde(e.target.value)}
                 required
                 disabled={mutacion.isPending}
               />

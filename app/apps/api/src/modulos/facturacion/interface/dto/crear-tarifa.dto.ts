@@ -1,5 +1,4 @@
-import { Type } from "class-transformer";
-import { IsDate, IsEnum, IsNumber, IsUUID, Min, ValidateIf } from "class-validator";
+import { IsEnum, IsNumber, IsUUID, Min, ValidateIf } from "class-validator";
 import { TipoEnvase, TipoServicio } from "@mym/shared-types";
 
 export class CrearTarifaDto {
@@ -21,8 +20,4 @@ export class CrearTarifaDto {
   @IsNumber()
   @Min(0)
   monto!: number;
-
-  @Type(() => Date)
-  @IsDate()
-  vigenciaDesde!: Date;
 }

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { AxiosError } from "axios";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { FilaFormulario, TablaFormulario } from "@/components/shell/fila-formulario";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { crearPorcentaje } from "./api";
+import { actualizarPorcentaje, crearPorcentaje } from "./api";
+import type { PorcentajeSegundoServicio } from "./tipos";
 
 function mensajeError(error: unknown): string {
   if (error instanceof AxiosError && error.response?.data?.message) {
@@ -16,40 +17,57 @@ function mensajeError(error: unknown): string {
   return "No se pudo guardar. Probá de nuevo en unos segundos.";
 }
 
-const HOY = new Date().toISOString().slice(0, 10);
-
 // Solo hace falta cuando el cliente tiene (o va a tener) entregas unificadas
 // pañales+medicamentos — DOCUMENTO FUNCIONAL.md §25. Con solo pañales (única
 // etapa en alcance hoy) no se usa, así que no es obligatorio cargarlo.
-// Decisión 2026-09-08: dos porcentajes, uno por lado — el negocio real cobra
-// un % configurable de pañal y uno de medicamento, no un pañal fijo al 100%
-// + un "% adicional" como asume el documento Arbet (ver DOCUMENTO TECNICO.md
-// historial de esa fecha). Cargar 100/100 reproduce el caso del documento.
+// Decisión 2026-09-08: dos porcentajes, uno por lado. Decisión 2026-09-11: un
+// solo registro por cliente, sin historial — si ya existe, este mismo
+// formulario lo edita en vez de crear otro.
 export function PorcentajeFormSheet({
   clienteId,
+  porcentaje,
   abierto,
   onOpenChange,
 }: {
   clienteId: string;
+  porcentaje: PorcentajeSegundoServicio | null;
   abierto: boolean;
   onOpenChange: (abierto: boolean) => void;
 }) {
+  const editando = porcentaje !== null;
+
   const [porcentajePanal, setPorcentajePanal] = useState("100");
   const [porcentajeMedicamento, setPorcentajeMedicamento] = useState("100");
-  const [vigenciaDesde, setVigenciaDesde] = useState(HOY);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (porcentaje) {
+      setPorcentajePanal(String(porcentaje.porcentajePanal));
+      setPorcentajeMedicamento(String(porcentaje.porcentajeMedicamento));
+    } else {
+      setPorcentajePanal("100");
+      setPorcentajeMedicamento("100");
+    }
+    setError(null);
+  }, [porcentaje]);
 
   const queryClient = useQueryClient();
   const mutacion = useMutation({
-    mutationFn: () =>
-      crearPorcentaje({
+    mutationFn: () => {
+      if (editando) {
+        return actualizarPorcentaje(porcentaje.id, {
+          porcentajePanal: Number(porcentajePanal),
+          porcentajeMedicamento: Number(porcentajeMedicamento),
+        });
+      }
+      return crearPorcentaje({
         clienteId,
         porcentajePanal: Number(porcentajePanal),
         porcentajeMedicamento: Number(porcentajeMedicamento),
-        vigenciaDesde,
-      }),
+      });
+    },
     onSuccess: () => {
-      toast.success("Porcentajes cargados.");
+      toast.success(editando ? "Porcentajes actualizados." : "Porcentajes cargados.");
       queryClient.invalidateQueries({ queryKey: ["facturacion", "porcentajes", clienteId] });
       setError(null);
       onOpenChange(false);
@@ -67,11 +85,10 @@ export function PorcentajeFormSheet({
     <Sheet open={abierto} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-md">
         <SheetHeader>
-          <SheetTitle>Nuevos porcentajes de entrega unificada</SheetTitle>
+          <SheetTitle>{editando ? "Editar porcentajes" : "Nuevos porcentajes"} de entrega unificada</SheetTitle>
           <SheetDescription>
             En una entrega unificada (pañales + medicamentos, mismo domicilio/fecha), cada servicio se cobra a
-            su propio porcentaje de su tarifa. 100% reproduce "se cobra completo". Cierra automáticamente la
-            vigencia del registro anterior.
+            su propio porcentaje de su tarifa. 100% reproduce "se cobra completo".
           </SheetDescription>
         </SheetHeader>
 
@@ -109,17 +126,6 @@ export function PorcentajeFormSheet({
                 step="0.01"
                 value={porcentajeMedicamento}
                 onChange={(e) => setPorcentajeMedicamento(e.target.value)}
-                required
-                disabled={mutacion.isPending}
-              />
-            </FilaFormulario>
-
-            <FilaFormulario label="Vigencia desde" htmlFor="vigencia-porcentaje" anchoEtiqueta="140px">
-              <Input
-                id="vigencia-porcentaje"
-                type="date"
-                value={vigenciaDesde}
-                onChange={(e) => setVigenciaDesde(e.target.value)}
                 required
                 disabled={mutacion.isPending}
               />

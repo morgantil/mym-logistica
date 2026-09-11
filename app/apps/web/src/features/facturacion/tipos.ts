@@ -8,8 +8,7 @@ export interface TarifaCliente {
   tipoServicio: TipoServicio;
   tipoEnvase: TipoEnvase | null;
   monto: number;
-  vigenciaDesde: string;
-  vigenciaHasta: string | null;
+  activa: boolean;
 }
 
 export interface PorcentajeSegundoServicio {
@@ -17,8 +16,7 @@ export interface PorcentajeSegundoServicio {
   clienteId: string;
   porcentajePanal: number;
   porcentajeMedicamento: number;
-  vigenciaDesde: string;
-  vigenciaHasta: string | null;
+  activa: boolean;
 }
 
 // Guia Arbet paso 4/8: combinación habilitada de unificación ENTRE dos
@@ -37,8 +35,7 @@ export interface CombinacionUnificacionClientes {
 export interface TarifaTransportista {
   id: string;
   monto: number;
-  vigenciaDesde: string;
-  vigenciaHasta: string | null;
+  activa: boolean;
 }
 
 export type ReglaAplicada = "2x1" | "UNIFICADA" | "INDIVIDUAL";
@@ -66,6 +63,28 @@ export interface GrupoFacturacion {
 export interface PedidoExcluido {
   pedidoId: string;
   motivo: string;
+}
+
+// Detalle por pedido para la pantalla de Liquidación (§31 funcional, mismo
+// dato que ya arma el Excel) — decisión 2026-09-11.
+export interface PedidoFacturado {
+  pedidoId: string;
+  numero: number;
+  fechaProgramada: string;
+  destinatarioNombre: string;
+  numeroAfiliado: string;
+  direccion: string;
+  zonaTarifariaNombre: string | null;
+  tipoServicio: TipoServicio;
+  choferNombre: string | null;
+  grupoId: string;
+  reglaAplicada: ReglaAplicada;
+  tarifaUtilizada: number | null;
+  porcentajeAplicado: number | null;
+  porcentajePanalAplicado: number | null;
+  porcentajeMedicamentoAplicado: number | null;
+  cantidadViajes: number;
+  importeViaje: number;
 }
 
 // §4.2 TEMAS_PENDIENTES.md: resumen de cuántos viajes hizo cada chofer en un

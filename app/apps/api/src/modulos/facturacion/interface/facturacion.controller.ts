@@ -1,8 +1,11 @@
-import { Body, Controller, Delete, Get, Header, Param, Post, Query, StreamableFile } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Header, Param, Patch, Post, Query, StreamableFile } from "@nestjs/common";
 import { Rol } from "@prisma/client";
 import { Roles } from "../../../common/decorators/roles.decorator";
 import { UsuarioActual, UsuarioAutenticado } from "../../../common/decorators/usuario-actual.decorator";
 import { FacturacionService } from "../application/facturacion.service";
+import { ActualizarPorcentajeDto } from "./dto/actualizar-porcentaje.dto";
+import { ActualizarTarifaDto } from "./dto/actualizar-tarifa.dto";
+import { ActualizarTarifaTransportistaDto } from "./dto/actualizar-tarifa-transportista.dto";
 import { CrearCombinacionDto } from "./dto/crear-combinacion.dto";
 import { CrearPorcentajeDto } from "./dto/crear-porcentaje.dto";
 import { CrearTarifaDto } from "./dto/crear-tarifa.dto";
@@ -31,8 +34,12 @@ export class FacturacionController {
       dto.tipoServicio,
       dto.tipoEnvase ?? null,
       dto.monto,
-      dto.vigenciaDesde,
     );
+  }
+
+  @Patch("tarifas/:id")
+  actualizarTarifa(@Param("id") id: string, @Body() dto: ActualizarTarifaDto) {
+    return this.facturacionService.actualizarTarifa(id, dto);
   }
 
   @Get("porcentaje-segundo-servicio")
@@ -42,12 +49,12 @@ export class FacturacionController {
 
   @Post("porcentaje-segundo-servicio")
   crearPorcentaje(@Body() dto: CrearPorcentajeDto) {
-    return this.facturacionService.crearPorcentaje(
-      dto.clienteId,
-      dto.porcentajePanal,
-      dto.porcentajeMedicamento,
-      dto.vigenciaDesde,
-    );
+    return this.facturacionService.crearPorcentaje(dto.clienteId, dto.porcentajePanal, dto.porcentajeMedicamento);
+  }
+
+  @Patch("porcentaje-segundo-servicio/:id")
+  actualizarPorcentaje(@Param("id") id: string, @Body() dto: ActualizarPorcentajeDto) {
+    return this.facturacionService.actualizarPorcentaje(id, dto);
   }
 
   // Guia Arbet paso 4/8: combinaciones habilitadas de unificación ENTRE
@@ -76,7 +83,12 @@ export class FacturacionController {
 
   @Post("tarifa-transportista")
   crearTarifaTransportista(@Body() dto: CrearTarifaTransportistaDto) {
-    return this.facturacionService.crearTarifaTransportista(dto.monto, dto.vigenciaDesde);
+    return this.facturacionService.crearTarifaTransportista(dto.monto);
+  }
+
+  @Patch("tarifa-transportista/:id")
+  actualizarTarifaTransportista(@Param("id") id: string, @Body() dto: ActualizarTarifaTransportistaDto) {
+    return this.facturacionService.actualizarTarifaTransportista(id, dto);
   }
 
   // §4.2 TEMAS_PENDIENTES.md: cuántos viajes hizo cada chofer en el mes y
@@ -92,6 +104,13 @@ export class FacturacionController {
   @Get("grupos")
   listarGrupos(@Query() query: PeriodoDto) {
     return this.facturacionService.listarGrupos(query.clienteId, query.mes, query.anio);
+  }
+
+  // Detalle por pedido (Nº de pedido, Nº de afiliado, destinatario…) para
+  // mostrar en la pantalla de Liquidación — mismo dato que ya arma el Excel.
+  @Get("pedidos-facturados")
+  listarPedidosFacturados(@Query() query: PeriodoDto) {
+    return this.facturacionService.listarPedidosFacturados(query.clienteId, query.mes, query.anio);
   }
 
   // Corre el motor de reglas y deja el resultado en BORRADOR — se puede

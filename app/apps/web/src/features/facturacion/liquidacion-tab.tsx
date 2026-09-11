@@ -7,9 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { CLASES_TONO } from "@/features/pedidos/estado-labels";
-import { confirmar, descargarReporteMensual, generarVistaPrevia, listarGrupos } from "./api";
+import { confirmar, descargarReporteMensual, generarVistaPrevia, listarGrupos, listarPedidosFacturados } from "./api";
 import { formatearMonto, NOMBRES_MES } from "./formato";
 import type { ReglaAplicada } from "./tipos";
+
+function formatearFecha(fecha: string): string {
+  return new Date(fecha).toLocaleDateString("es-AR", { timeZone: "UTC" });
+}
 
 function mensajeError(error: unknown): string {
   if (error instanceof AxiosError && error.response?.data?.message) {
@@ -50,10 +54,20 @@ export function LiquidacionTab({
     enabled: clienteId !== null,
   });
 
+  // Decisión 2026-09-11: detalle por pedido visible en pantalla (antes solo
+  // estaba en el Excel descargable) — Leonardo pidió más información para
+  // quien hace la liquidación (Nº de pedido, Nº de afiliado, destinatario…).
+  const { data: pedidosFacturados, isLoading: cargandoDetalle } = useQuery({
+    queryKey: ["facturacion", "pedidos-facturados", clienteId, mes, anio],
+    queryFn: () => listarPedidosFacturados(clienteId!, mes, anio),
+    enabled: clienteId !== null,
+  });
+
   const mutacionVistaPrevia = useMutation({
     mutationFn: () => generarVistaPrevia(clienteId!, mes, anio),
     onSuccess: (resultado) => {
       queryClient.invalidateQueries({ queryKey: ["facturacion", "grupos", clienteId, mes, anio] });
+      queryClient.invalidateQueries({ queryKey: ["facturacion", "pedidos-facturados", clienteId, mes, anio] });
       if (resultado.excluidos.length > 0) {
         toast.warning(`Vista previa generada, pero ${resultado.excluidos.length} pedido(s) quedaron excluidos.`);
       } else {
@@ -68,6 +82,7 @@ export function LiquidacionTab({
     onSuccess: () => {
       toast.success("Liquidación confirmada. Ya quedó en firme.");
       queryClient.invalidateQueries({ queryKey: ["facturacion", "grupos", clienteId, mes, anio] });
+      queryClient.invalidateQueries({ queryKey: ["facturacion", "pedidos-facturados", clienteId, mes, anio] });
     },
     onError: (error) => toast.error(mensajeError(error)),
   });
@@ -196,6 +211,60 @@ export function LiquidacionTab({
           </TableFooter>
         )}
       </Table>
+
+      {hayGrupos && (
+        <div className="flex flex-col gap-2 pt-4">
+          <h2 className="font-medium">Detalle por pedido</h2>
+          <div className="overflow-x-auto rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nº Pedido</TableHead>
+                  <TableHead>Nº Afiliado</TableHead>
+                  <TableHead>Destinatario</TableHead>
+                  <TableHead>Dirección</TableHead>
+                  <TableHead>Fecha</TableHead>
+                  <TableHead>Zona</TableHead>
+                  <TableHead>Chofer</TableHead>
+                  <TableHead>Regla aplicada</TableHead>
+                  <TableHead>Importe del viaje</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {cargandoDetalle ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-muted-foreground">
+                      Cargando…
+                    </TableCell>
+                  </TableRow>
+                ) : !pedidosFacturados || pedidosFacturados.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-muted-foreground">
+                      No hay pedidos para mostrar.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  pedidosFacturados.map((pedido) => (
+                    <TableRow key={pedido.pedidoId}>
+                      <TableCell className="whitespace-nowrap">{pedido.numero}</TableCell>
+                      <TableCell className="whitespace-nowrap">{pedido.numeroAfiliado}</TableCell>
+                      <TableCell className="whitespace-nowrap">{pedido.destinatarioNombre}</TableCell>
+                      <TableCell className="whitespace-nowrap">{pedido.direccion}</TableCell>
+                      <TableCell className="whitespace-nowrap">{formatearFecha(pedido.fechaProgramada)}</TableCell>
+                      <TableCell className="whitespace-nowrap">{pedido.zonaTarifariaNombre ?? "—"}</TableCell>
+                      <TableCell className="whitespace-nowrap">{pedido.choferNombre ?? "Sin asignar"}</TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        <BadgeRegla regla={pedido.reglaAplicada} />
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">{formatearMonto(pedido.importeViaje)}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -39,6 +39,9 @@ export interface GrupoFacturacion {
 // para "repartir" el importe entre ellos, así que no se inventa una.
 export interface PedidoFacturado {
   pedidoId: string;
+  // N.º de Pedido interno (§8.2 funcional), no el UUID — decisión 2026-09-11:
+  // Leonardo pidió más info visible para quien hace la liquidación.
+  numero: number;
   fechaProgramada: Date;
   destinatarioNombre: string;
   numeroAfiliado: string;

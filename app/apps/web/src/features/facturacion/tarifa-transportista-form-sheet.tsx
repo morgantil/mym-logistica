@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { AxiosError } from "axios";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { FilaFormulario, TablaFormulario } from "@/components/shell/fila-formulario";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { crearTarifaTransportista } from "./api";
+import { actualizarTarifaTransportista, crearTarifaTransportista } from "./api";
+import type { TarifaTransportista } from "./tipos";
 
 function mensajeError(error: unknown): string {
   if (error instanceof AxiosError && error.response?.data?.message) {
@@ -16,26 +17,38 @@ function mensajeError(error: unknown): string {
   return "No se pudo guardar. Probá de nuevo en unos segundos.";
 }
 
-const HOY = new Date().toISOString().slice(0, 10);
-
+// Decisión 2026-09-11: sin historial por vigencia — si ya hay una tarifa
+// cargada, este mismo formulario la edita en vez de crear otra.
 export function TarifaTransportistaFormSheet({
+  tarifa,
   abierto,
   onOpenChange,
 }: {
+  tarifa: TarifaTransportista | null;
   abierto: boolean;
   onOpenChange: (abierto: boolean) => void;
 }) {
+  const editando = tarifa !== null;
+
   const [monto, setMonto] = useState("");
-  const [vigenciaDesde, setVigenciaDesde] = useState(HOY);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setMonto(tarifa ? String(tarifa.monto) : "");
+    setError(null);
+  }, [tarifa]);
 
   const queryClient = useQueryClient();
   const mutacion = useMutation({
-    mutationFn: () => crearTarifaTransportista({ monto: Number(monto), vigenciaDesde }),
+    mutationFn: () => {
+      if (editando) {
+        return actualizarTarifaTransportista(tarifa.id, { monto: Number(monto) });
+      }
+      return crearTarifaTransportista({ monto: Number(monto) });
+    },
     onSuccess: () => {
       toast.success("Tarifa por viaje actualizada.");
       queryClient.invalidateQueries({ queryKey: ["facturacion", "tarifa-transportista"] });
-      setMonto("");
       setError(null);
       onOpenChange(false);
     },
@@ -52,10 +65,10 @@ export function TarifaTransportistaFormSheet({
     <Sheet open={abierto} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-md">
         <SheetHeader>
-          <SheetTitle>Nueva tarifa por viaje</SheetTitle>
+          <SheetTitle>{editando ? "Editar tarifa por viaje" : "Nueva tarifa por viaje"}</SheetTitle>
           <SheetDescription>
             Monto fijo que se le paga al transportista por cada viaje realizado, sin distinguir 2×1 ni
-            entrega unificada. Cierra automáticamente la vigencia de la tarifa anterior.
+            entrega unificada.
           </SheetDescription>
         </SheetHeader>
 
@@ -81,17 +94,6 @@ export function TarifaTransportistaFormSheet({
                 required
                 disabled={mutacion.isPending}
                 autoFocus
-              />
-            </FilaFormulario>
-
-            <FilaFormulario label="Vigencia desde" htmlFor="vigencia-transportista" anchoEtiqueta="140px">
-              <Input
-                id="vigencia-transportista"
-                type="date"
-                value={vigenciaDesde}
-                onChange={(e) => setVigenciaDesde(e.target.value)}
-                required
-                disabled={mutacion.isPending}
               />
             </FilaFormulario>
           </TablaFormulario>

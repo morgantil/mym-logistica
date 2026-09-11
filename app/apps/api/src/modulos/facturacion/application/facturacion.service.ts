@@ -59,17 +59,27 @@ export class FacturacionService {
     tipoServicio: TipoServicio,
     tipoEnvase: TipoEnvase | null,
     monto: number,
-    vigenciaDesde: Date,
   ) {
-    return this.repositorio.crearTarifa({ clienteId, zonaTarifariaId, tipoServicio, tipoEnvase, monto, vigenciaDesde });
+    return this.repositorio.crearTarifa({ clienteId, zonaTarifariaId, tipoServicio, tipoEnvase, monto });
+  }
+
+  actualizarTarifa(id: string, datos: { monto?: number; activa?: boolean }) {
+    return this.repositorio.actualizarTarifa(id, datos);
   }
 
   listarPorcentajes(clienteId: string) {
     return this.repositorio.listarPorcentajes(clienteId);
   }
 
-  crearPorcentaje(clienteId: string, porcentajePanal: number, porcentajeMedicamento: number, vigenciaDesde: Date) {
-    return this.repositorio.crearPorcentaje({ clienteId, porcentajePanal, porcentajeMedicamento, vigenciaDesde });
+  crearPorcentaje(clienteId: string, porcentajePanal: number, porcentajeMedicamento: number) {
+    return this.repositorio.crearPorcentaje({ clienteId, porcentajePanal, porcentajeMedicamento });
+  }
+
+  actualizarPorcentaje(
+    id: string,
+    datos: { porcentajePanal?: number; porcentajeMedicamento?: number; activa?: boolean },
+  ) {
+    return this.repositorio.actualizarPorcentaje(id, datos);
   }
 
   listarCombinaciones() {
@@ -88,12 +98,24 @@ export class FacturacionService {
     return this.repositorio.listarTarifasTransportista();
   }
 
-  crearTarifaTransportista(monto: number, vigenciaDesde: Date) {
-    return this.repositorio.crearTarifaTransportista({ monto, vigenciaDesde });
+  crearTarifaTransportista(monto: number) {
+    return this.repositorio.crearTarifaTransportista({ monto });
+  }
+
+  actualizarTarifaTransportista(id: string, datos: { monto?: number; activa?: boolean }) {
+    return this.repositorio.actualizarTarifaTransportista(id, datos);
   }
 
   listarGrupos(clienteId: string, mes: number, anio: number) {
     return this.repositorio.listarGrupos(clienteId, mes, anio);
+  }
+
+  // Decisión 2026-09-11: mismo detalle por pedido que ya se arma para el
+  // Excel (§31), pero expuesto como JSON para mostrarlo directo en la
+  // pantalla de Liquidación — Leonardo pidió más información visible para
+  // quien hace la liquidación (Nº de pedido, Nº de afiliado, destinatario…).
+  listarPedidosFacturados(clienteId: string, mes: number, anio: number) {
+    return this.repositorio.listarPedidosFacturados(clienteId, mes, anio);
   }
 
   // Convierte los PedidoFacturable de un cliente (§30 funcional) en
@@ -170,8 +192,6 @@ export class FacturacionService {
     const pedidosCrudos = await this.pedidosService.listarFacturables({ clienteId, fechaDesde, fechaHasta });
     const { pedidosParaFacturar: propios, excluidos } = this.construirPedidosParaFacturar(pedidosCrudos);
 
-    const hoy = new Date();
-
     // Tarifas: solo se exigen las combinaciones zona+tipoServicio+tipoEnvase
     // que realmente aparecen entre los pedidos propios a facturar — un
     // cliente que solo entrega pañales en CABA no debería tener que cargar
@@ -184,12 +204,11 @@ export class FacturacionService {
     const clavesUsadas = new Map<string, PedidoParaFacturar>();
     for (const pedido of propios) clavesUsadas.set(claveTarifaDePedido(pedido), pedido);
     for (const [clave, pedido] of clavesUsadas) {
-      const tarifa = await this.repositorio.tarifaVigente(
+      const tarifa = await this.repositorio.tarifaActiva(
         clienteId,
         pedido.zonaTarifariaId,
         pedido.tipoServicio,
         pedido.tipoEnvase,
-        hoy,
       );
       if (!tarifa) {
         const descripcionTipo =
@@ -197,7 +216,7 @@ export class FacturacionService {
             ? "Pañales"
             : `Medicamentos / ${pedido.tipoEnvase === TipoEnvase.BULTO ? "Bulto" : "Bolsa"}`;
         throw new BadRequestException(
-          `Falta una tarifa vigente de "${nombreDeZona(pedido.zonaTarifariaId)}" (${descripcionTipo}) para este cliente — cargala antes de generar la facturación.`,
+          `Falta una tarifa activa de "${nombreDeZona(pedido.zonaTarifariaId)}" (${descripcionTipo}) para este cliente — cargala antes de generar la facturación.`,
         );
       }
       tarifas[clave] = tarifa.monto;
@@ -213,8 +232,8 @@ export class FacturacionService {
     const hayMedicamentos = propios.some((p) => p.tipoServicio === TipoServicio.MEDICAMENTO);
     const necesitaPorcentaje = hayMedicamentos || combosComoPanal.length > 0 || combosComoMedicamento.length > 0;
 
-    const porcentajeVigente = await this.repositorio.porcentajeVigente(clienteId, hoy);
-    if (necesitaPorcentaje && porcentajeVigente === null) {
+    const porcentajeActivoCliente = await this.repositorio.porcentajeActivo(clienteId);
+    if (necesitaPorcentaje && porcentajeActivoCliente === null) {
       throw new BadRequestException(
         "Hay pedidos de medicamentos o combinaciones de unificación habilitadas pero no hay un porcentaje configurado para este cliente.",
       );
@@ -245,7 +264,7 @@ export class FacturacionService {
         propiosPanal,
         socios,
         tarifas,
-        porcentajeVigente?.porcentajePanal ?? 0,
+        porcentajeActivoCliente?.porcentajePanal ?? 0,
       );
       viajesCruzados.push(...viajes);
       pedidosRestantes = [...otros, ...sinUnificar];
@@ -268,15 +287,15 @@ export class FacturacionService {
         propiosMedicamento,
         socios,
         tarifas,
-        porcentajeVigente?.porcentajeMedicamento ?? 0,
+        porcentajeActivoCliente?.porcentajeMedicamento ?? 0,
       );
       viajesCruzados.push(...viajes);
       pedidosRestantes = [...otros, ...sinUnificar];
     }
 
     const viajesPropios = calcularFacturacionCliente(pedidosRestantes, tarifas, {
-      panal: porcentajeVigente?.porcentajePanal ?? 0,
-      medicamento: porcentajeVigente?.porcentajeMedicamento ?? 0,
+      panal: porcentajeActivoCliente?.porcentajePanal ?? 0,
+      medicamento: porcentajeActivoCliente?.porcentajeMedicamento ?? 0,
     });
 
     const viajes = [...viajesCruzados, ...viajesPropios];
@@ -346,7 +365,7 @@ export class FacturacionService {
     const { fechaDesde, fechaHasta } = rangoDelMes(mes, anio);
     const [pedidos, tarifa] = await Promise.all([
       this.repositorio.listarEntregadosPorChoferEnPeriodo(fechaDesde, fechaHasta),
-      this.repositorio.tarifaTransportistaVigente(new Date()),
+      this.repositorio.tarifaTransportistaActiva(),
     ]);
 
     if (pedidos.length === 0) return [];
