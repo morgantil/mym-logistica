@@ -3,9 +3,11 @@ import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { flexRender } from "@tanstack/react-table";
 import { getCoreRowModel, useLegacyTable, type LegacyColumnDef } from "@tanstack/react-table/legacy";
-import { ArrowDown, ArrowUp, ArrowUpDown, SlidersHorizontal } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, SlidersHorizontal, X } from "lucide-react";
+import { toast } from "sonner";
 import { EstadoPedido } from "@mym/shared-types";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -25,7 +27,7 @@ import {
 } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth-context";
-import { actualizarColumnasPedidos, listarPedidos, obtenerColumnasPedidos } from "./api";
+import { actualizarColumnasPedidos, eliminarPedido, eliminarPedidos, listarPedidos, obtenerColumnasPedidos } from "./api";
 import { BultosCelda } from "./bultos-celda";
 import { DetallePedidoSheet } from "./detalle-pedido-sheet";
 import { ordenarColumnas } from "./orden-columnas";
@@ -109,9 +111,24 @@ export function PedidosTabla() {
   const puedeEditarBultos = Boolean(
     usuario?.roles.some((rol) => rol === "LOGISTICA" || rol === "ADMINISTRACION"),
   );
+  // Borrado lógico — decisión 2026-09-11, ver validar-eliminacion.ts (solo
+  // pedidos que todavía no se mandaron a SimpliRoute).
+  const puedeEliminar = Boolean(
+    usuario?.roles.some((rol) => rol === "OPERACIONES" || rol === "LOGISTICA" || rol === "ADMINISTRACION"),
+  );
 
   const [pagina, setPagina] = useState(1);
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState<PedidoListado | null>(null);
+  const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
+
+  function alternarSeleccion(pedidoId: string) {
+    setSeleccionados((actual) => {
+      const nuevo = new Set(actual);
+      if (nuevo.has(pedidoId)) nuevo.delete(pedidoId);
+      else nuevo.add(pedidoId);
+      return nuevo;
+    });
+  }
 
   // El filtro de estado vive en la URL (?estado=...) para que el Dashboard
   // pueda linkear directo a "Pedidos filtrados por X" — no solo mostrar un
@@ -214,6 +231,30 @@ export function PedidosTabla() {
     mutacionColumnas.mutate(siguiente);
   }
 
+  const mutacionEliminarUno = useMutation({
+    mutationFn: eliminarPedido,
+    onSuccess: () => {
+      toast.success("Pedido borrado.");
+      queryClient.invalidateQueries({ queryKey: ["pedidos"] });
+    },
+    onError: () => toast.error("No se pudo borrar — ¿ya se envió a SimpliRoute?"),
+  });
+
+  const mutacionEliminarVarios = useMutation({
+    mutationFn: eliminarPedidos,
+    onSuccess: (resultado) => {
+      if (resultado.eliminados.length > 0) {
+        toast.success(`${resultado.eliminados.length} pedido(s) borrado(s).`);
+      }
+      if (resultado.errores.length > 0) {
+        toast.error(`${resultado.errores.length} pedido(s) no se pudieron borrar (¿ya enviados?).`);
+      }
+      setSeleccionados(new Set());
+      queryClient.invalidateQueries({ queryKey: ["pedidos"] });
+    },
+    onError: () => toast.error("No se pudo borrar. Probá de nuevo en unos segundos."),
+  });
+
   const definicionesColumna: Record<(typeof IDS_COLUMNAS_DEFAULT)[number], LegacyColumnDef<PedidoListado>> = useMemo(
     () => ({
       cliente: { id: "cliente", header: "Cliente", cell: ({ row }) => row.original.clienteNombre },
@@ -282,19 +323,54 @@ export function PedidosTabla() {
 
   const columnas = useMemo<LegacyColumnDef<PedidoListado>[]>(() => {
     const orden = ordenarColumnas([...IDS_COLUMNAS_DEFAULT], columnasFijas);
+    const columnaSeleccion: LegacyColumnDef<PedidoListado> = {
+      id: "seleccion",
+      header: "",
+      cell: ({ row }) => {
+        const elegible = row.original.estadoSimpliroute === "NO_ENVIADO";
+        return (
+          <Checkbox
+            checked={seleccionados.has(row.original.id)}
+            onCheckedChange={() => alternarSeleccion(row.original.id)}
+            disabled={!puedeEliminar || !elegible}
+            aria-label={`Seleccionar pedido de ${row.original.destinatarioNombre}`}
+          />
+        );
+      },
+    };
     return [
+      ...(puedeEliminar ? [columnaSeleccion] : []),
       ...orden.map((id) => definicionesColumna[id as (typeof IDS_COLUMNAS_DEFAULT)[number]]),
       {
         id: "acciones",
         header: "Acciones",
         cell: ({ row }) => (
-          <Button type="button" variant="outline" size="sm" onClick={() => setPedidoSeleccionado(row.original)}>
-            Ver detalle
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button type="button" variant="outline" size="sm" onClick={() => setPedidoSeleccionado(row.original)}>
+              Ver detalle
+            </Button>
+            {puedeEliminar && row.original.estadoSimpliroute === "NO_ENVIADO" && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                title="Borrar pedido"
+                aria-label={`Borrar pedido de ${row.original.destinatarioNombre}`}
+                disabled={mutacionEliminarUno.isPending}
+                onClick={() => {
+                  if (window.confirm(`¿Borrar el pedido de ${row.original.destinatarioNombre}?`)) {
+                    mutacionEliminarUno.mutate(row.original.id);
+                  }
+                }}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
         ),
       },
     ];
-  }, [columnasFijas, definicionesColumna]);
+  }, [columnasFijas, definicionesColumna, puedeEliminar, seleccionados, mutacionEliminarUno]);
 
   const tabla = useLegacyTable({
     data: data?.datos ?? [],
@@ -414,7 +490,28 @@ export function PedidosTabla() {
           </DropdownMenu>
         </div>
 
-        <p className="text-sm text-muted-foreground">{total} pedido{total === 1 ? "" : "s"}</p>
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm text-muted-foreground">{total} pedido{total === 1 ? "" : "s"}</p>
+          {puedeEliminar && seleccionados.size > 0 && (
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              disabled={mutacionEliminarVarios.isPending}
+              onClick={() => {
+                if (
+                  window.confirm(
+                    `¿Borrar ${seleccionados.size} pedido(s)? Solo se borran los que todavía no se mandaron a SimpliRoute.`,
+                  )
+                ) {
+                  mutacionEliminarVarios.mutate(Array.from(seleccionados));
+                }
+              }}
+            >
+              {mutacionEliminarVarios.isPending ? "Borrando…" : `Borrar seleccionados (${seleccionados.size})`}
+            </Button>
+          )}
+        </div>
       </div>
 
       {isError ? (
@@ -430,6 +527,7 @@ export function PedidosTabla() {
                   {headerGroup.headers.map((header) => {
                     const ordenable =
                       header.id !== "acciones" &&
+                      header.id !== "seleccion" &&
                       !NO_ORDENABLES.has(header.id as (typeof IDS_COLUMNAS_DEFAULT)[number]);
                     const activo = orden?.campo === header.id;
                     return (

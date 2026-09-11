@@ -1,19 +1,27 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth-context";
-import { enviarASimpliRoute, revisarPendientesDeEnvio } from "./api";
+import { eliminarPedido, eliminarPedidos, enviarASimpliRoute, revisarPendientesDeEnvio } from "./api";
 
 // §17-18 funcional: candidatos a envío con sus motivos bloqueantes, selección
 // y envío masivo a SimpliRoute (un pedido inválido no frena a los demás).
+// Decisión 2026-09-11: se le suma borrado (individual con X, o en lote sobre
+// la misma selección) — solo se puede borrar un pedido que todavía no se
+// mandó a SimpliRoute (ver validar-eliminacion.ts), independiente de si
+// tiene o no motivos bloqueantes para el envío (son reglas distintas).
 export function RevisionPanel() {
   const { usuario } = useAuth();
   const puedeEnviar = Boolean(
     usuario?.roles.some((rol) => rol === "OPERACIONES" || rol === "ADMINISTRACION"),
+  );
+  const puedeEliminar = Boolean(
+    usuario?.roles.some((rol) => rol === "OPERACIONES" || rol === "LOGISTICA" || rol === "ADMINISTRACION"),
   );
 
   const queryClient = useQueryClient();
@@ -39,6 +47,30 @@ export function RevisionPanel() {
     onError: () => {
       toast.error("No se pudo enviar. Probá de nuevo en unos segundos.");
     },
+  });
+
+  const mutacionEliminarUno = useMutation({
+    mutationFn: eliminarPedido,
+    onSuccess: () => {
+      toast.success("Pedido borrado.");
+      queryClient.invalidateQueries({ queryKey: ["pedidos"] });
+    },
+    onError: () => toast.error("No se pudo borrar — ¿ya se envió a SimpliRoute?"),
+  });
+
+  const mutacionEliminarVarios = useMutation({
+    mutationFn: eliminarPedidos,
+    onSuccess: (resultado) => {
+      if (resultado.eliminados.length > 0) {
+        toast.success(`${resultado.eliminados.length} pedido(s) borrado(s).`);
+      }
+      if (resultado.errores.length > 0) {
+        toast.error(`${resultado.errores.length} pedido(s) no se pudieron borrar (¿ya enviados?).`);
+      }
+      setSeleccionados(new Set());
+      queryClient.invalidateQueries({ queryKey: ["pedidos"] });
+    },
+    onError: () => toast.error("No se pudo borrar. Probá de nuevo en unos segundos."),
   });
 
   function alternarSeleccion(pedidoId: string) {
@@ -84,17 +116,35 @@ export function RevisionPanel() {
             Limpiar selección
           </Button>
         </div>
-        {puedeEnviar && (
-          <Button
-            type="button"
-            disabled={seleccionados.size === 0 || mutacion.isPending}
-            onClick={() => mutacion.mutate(Array.from(seleccionados))}
-          >
-            {mutacion.isPending
-              ? "Enviando…"
-              : `Enviar seleccionados (${seleccionados.size})`}
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {puedeEnviar && (
+            <Button
+              type="button"
+              disabled={seleccionados.size === 0 || mutacion.isPending}
+              onClick={() => mutacion.mutate(Array.from(seleccionados))}
+            >
+              {mutacion.isPending ? "Enviando…" : `Enviar seleccionados (${seleccionados.size})`}
+            </Button>
+          )}
+          {puedeEliminar && (
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={seleccionados.size === 0 || mutacionEliminarVarios.isPending}
+              onClick={() => {
+                if (
+                  window.confirm(
+                    `¿Borrar ${seleccionados.size} pedido(s)? Solo se borran los que todavía no se mandaron a SimpliRoute.`,
+                  )
+                ) {
+                  mutacionEliminarVarios.mutate(Array.from(seleccionados));
+                }
+              }}
+            >
+              {mutacionEliminarVarios.isPending ? "Borrando…" : `Borrar seleccionados (${seleccionados.size})`}
+            </Button>
+          )}
+        </div>
       </div>
 
       <Table>
@@ -106,18 +156,20 @@ export function RevisionPanel() {
             <TableHead>Dirección</TableHead>
             <TableHead>Fecha</TableHead>
             <TableHead>Motivos bloqueantes</TableHead>
+            <TableHead className="w-10" />
           </TableRow>
         </TableHeader>
         <TableBody>
           {data.map(({ pedido, erroresBloqueantes }) => {
             const bloqueado = erroresBloqueantes.length > 0;
+            const puedeBorrarEste = puedeEliminar && pedido.estadoSimpliroute === "NO_ENVIADO";
             return (
               <TableRow key={pedido.id}>
                 <TableCell>
                   <Checkbox
                     checked={seleccionados.has(pedido.id)}
                     onCheckedChange={() => alternarSeleccion(pedido.id)}
-                    disabled={!puedeEnviar || bloqueado}
+                    disabled={!puedeEnviar && !puedeEliminar}
                     aria-label={`Seleccionar pedido de ${pedido.destinatarioNombre}`}
                   />
                 </TableCell>
@@ -143,6 +195,25 @@ export function RevisionPanel() {
                     >
                       Listo para enviar
                     </Badge>
+                  )}
+                </TableCell>
+                <TableCell>
+                  {puedeBorrarEste && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      title="Borrar pedido"
+                      aria-label={`Borrar pedido de ${pedido.destinatarioNombre}`}
+                      disabled={mutacionEliminarUno.isPending}
+                      onClick={() => {
+                        if (window.confirm(`¿Borrar el pedido de ${pedido.destinatarioNombre}?`)) {
+                          mutacionEliminarUno.mutate(pedido.id);
+                        }
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
                   )}
                 </TableCell>
               </TableRow>

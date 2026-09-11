@@ -83,3 +83,9 @@ export interface ResultadoEnvioMasivo {
   enviados: string[];
   errores: { pedidoId: string; errores: string[] }[];
 }
+
+// Respuesta de POST /pedidos/eliminar — decisión 2026-09-11.
+export interface ResultadoEliminacionMasiva {
+  eliminados: string[];
+  errores: { pedidoId: string; errores: string[] }[];
+}

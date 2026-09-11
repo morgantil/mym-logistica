@@ -19,6 +19,7 @@ import {
   PEDIDOS_REPOSITORIO,
   PedidosRepositorio,
 } from "../domain/pedidos.repositorio";
+import { validarPedidoParaEliminar } from "../domain/validar-eliminacion";
 import { validarPedidoParaEnvio } from "../domain/validar-envio";
 
 export interface PedidoConErrores {
@@ -34,6 +35,11 @@ export interface ResultadoEnvioMasivo {
 export interface ResultadoSincronizacion {
   actualizados: number;
   sinCambios: number;
+  errores: PedidoConErrores[];
+}
+
+export interface ResultadoEliminacionMasiva {
+  eliminados: string[];
   errores: PedidoConErrores[];
 }
 
@@ -300,6 +306,46 @@ export class PedidosService {
           errores: [error instanceof Error ? error.message : "Error desconocido al sincronizar."],
         });
       }
+    }
+
+    return resultado;
+  }
+
+  // Decisión 2026-09-11: borrado lógico de pedidos mal cargados/duplicados/de
+  // prueba, sin depender de un script contra la base (ver DOCUMENTO
+  // TECNICO.md — surgió del incidente de datos del mismo día). Solo permitido
+  // si el pedido todavía no se mandó a SimpliRoute (validarPedidoParaEliminar).
+  async eliminarPedido(id: string): Promise<void> {
+    const pedido = await this.repositorio.obtenerPorId(id);
+    if (!pedido) {
+      throw new NotFoundException(`Pedido ${id} no encontrado.`);
+    }
+    const error = validarPedidoParaEliminar(pedido);
+    if (error) {
+      throw new BadRequestException(error);
+    }
+    await this.repositorio.eliminar(id);
+  }
+
+  // Selección múltiple desde Grilla/Revisión — un pedido que no se puede
+  // borrar (ya enviado, o no encontrado) no frena a los demás, mismo criterio
+  // que enviarASimpliRoute.
+  async eliminarPedidos(pedidoIds: string[]): Promise<ResultadoEliminacionMasiva> {
+    const resultado: ResultadoEliminacionMasiva = { eliminados: [], errores: [] };
+
+    for (const pedidoId of pedidoIds) {
+      const pedido = await this.repositorio.obtenerPorId(pedidoId);
+      if (!pedido) {
+        resultado.errores.push({ pedidoId, errores: ["Pedido no encontrado."] });
+        continue;
+      }
+      const error = validarPedidoParaEliminar(pedido);
+      if (error) {
+        resultado.errores.push({ pedidoId, errores: [error] });
+        continue;
+      }
+      await this.repositorio.eliminar(pedidoId);
+      resultado.eliminados.push(pedidoId);
     }
 
     return resultado;

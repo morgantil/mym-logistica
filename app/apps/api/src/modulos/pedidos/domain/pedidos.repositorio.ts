@@ -176,6 +176,12 @@ export interface PedidosRepositorio {
   // Sin bloqueo optimista a propósito: es solo informativo ("¿ya se imprimió
   // alguna etiqueta?"), no hay dato de negocio en juego que se pueda pisar.
   marcarEtiquetaImpresa(id: string): Promise<void>;
+
+  // Borrado lógico (ver soft-delete.middleware.ts — Pedido ya está en
+  // MODELOS_CON_BORRADO_LOGICO). La validación de "se puede borrar este
+  // pedido" (ver validar-eliminacion.ts) la hace el service ANTES de llamar
+  // acá — este método no vuelve a chequear nada, confía en el llamador.
+  eliminar(id: string): Promise<void>;
 }
 
 export const PEDIDOS_REPOSITORIO = Symbol("PEDIDOS_REPOSITORIO");

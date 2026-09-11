@@ -326,6 +326,12 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
     await this.prisma.pedido.update({ where: { id }, data: { etiquetaImpresaEn: new Date() } });
   }
 
+  async eliminar(id: string): Promise<void> {
+    // El middleware de borrado lógico reescribe esto como un update seteando
+    // eliminadoEn — nunca borra la fila físicamente (ver soft-delete.middleware.ts).
+    await this.prisma.pedido.delete({ where: { id } });
+  }
+
   async listarPendientesDeSincronizar(): Promise<PedidoParaSincronizar[]> {
     const pedidos = await this.prisma.pedido.findMany({
       where: {

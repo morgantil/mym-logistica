@@ -1,5 +1,6 @@
 import {
   Controller,
+  Delete,
   Get,
   Header,
   Param,
@@ -15,6 +16,7 @@ import { Roles } from "../../../common/decorators/roles.decorator";
 import { UsuarioActual, UsuarioAutenticado } from "../../../common/decorators/usuario-actual.decorator";
 import { PedidosService } from "../application/pedidos.service";
 import { ActualizarBultosDto } from "./dto/actualizar-bultos.dto";
+import { EliminarPedidosDto } from "./dto/eliminar-pedidos.dto";
 import { EnviarSimpliRouteDto } from "./dto/enviar-simpliroute.dto";
 import { ListarPedidosDto } from "./dto/listar-pedidos.dto";
 
@@ -98,5 +100,22 @@ export class PedidosController {
     return new StreamableFile(pdf, {
       disposition: `inline; filename="etiqueta-pedido-${id}-bulto-${numeroBulto}.pdf"`,
     });
+  }
+
+  // Borrado lógico — solo pedidos que todavía no se mandaron a SimpliRoute
+  // (ver validar-eliminacion.ts). Mismos roles que ya pueden operar sobre
+  // pedidos día a día.
+  @Roles(Rol.OPERACIONES, Rol.LOGISTICA, Rol.ADMINISTRACION)
+  @Delete(":id")
+  eliminarPedido(@Param("id") id: string) {
+    return this.pedidosService.eliminarPedido(id);
+  }
+
+  // Selección múltiple desde Grilla/Revisión — un pedido no eliminable no
+  // frena a los demás, mismo criterio que enviar-simpliroute.
+  @Roles(Rol.OPERACIONES, Rol.LOGISTICA, Rol.ADMINISTRACION)
+  @Post("eliminar")
+  eliminarPedidos(@Body() dto: EliminarPedidosDto) {
+    return this.pedidosService.eliminarPedidos(dto.pedidoIds);
   }
 }

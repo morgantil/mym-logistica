@@ -5,6 +5,7 @@ import type {
   PaginaPedidos,
   PedidoConErroresBloqueantes,
   PedidoListado,
+  ResultadoEliminacionMasiva,
   ResultadoEnvioMasivo,
 } from "./tipos";
 
@@ -48,6 +49,16 @@ export async function enviarASimpliRoute(pedidoIds: string[]): Promise<Resultado
   const { data } = await apiClient.post<ResultadoEnvioMasivo>("/pedidos/enviar-simpliroute", {
     pedidoIds,
   });
+  return data;
+}
+
+// Borrado lógico — solo pedidos que todavía no se mandaron a SimpliRoute.
+export async function eliminarPedido(pedidoId: string): Promise<void> {
+  await apiClient.delete(`/pedidos/${pedidoId}`);
+}
+
+export async function eliminarPedidos(pedidoIds: string[]): Promise<ResultadoEliminacionMasiva> {
+  const { data } = await apiClient.post<ResultadoEliminacionMasiva>("/pedidos/eliminar", { pedidoIds });
   return data;
 }
 
