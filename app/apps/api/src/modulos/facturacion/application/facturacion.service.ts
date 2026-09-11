@@ -133,6 +133,7 @@ export class FacturacionService {
         clienteId: pedido.clienteId,
         tipoServicio: pedido.tipoServicio,
         tipoEnvase,
+        cantidadPedidoOriginal: pedido.cantidadPedidoOriginal,
         fechaProgramada: pedido.fechaProgramada.toISOString().slice(0, 10),
         direccionUsada: pedido.direccionUsada,
         zonaTarifariaId: pedido.zonaTarifariaId,
@@ -157,6 +158,13 @@ export class FacturacionService {
     // previa refleje entregas reales recientes sin que el usuario tenga que
     // acordarse de sincronizar antes por su cuenta (ver PedidosService.sincronizarEstados).
     await this.pedidosService.sincronizarEstados();
+
+    // Limpiar el BORRADOR anterior ANTES de listar — si no, un pedido que ya
+    // quedó vinculado a un cálculo previo de este mismo cliente/mes/año no
+    // aparece en listarFacturables (excluye grupoFacturacionId no nulo) y
+    // "Volver a calcular" nunca lo vuelve a levantar (bug real encontrado
+    // 2026-09-11, ver DOCUMENTO TECNICO.md historial).
+    await this.repositorio.limpiarBorrador(clienteId, mes, anio);
 
     const { fechaDesde, fechaHasta } = rangoDelMes(mes, anio);
     const pedidosCrudos = await this.pedidosService.listarFacturables({ clienteId, fechaDesde, fechaHasta });
@@ -288,6 +296,7 @@ export class FacturacionService {
         porcentajeMedicamentoAplicado: viaje.detalleUnificacion?.porcentajeMedicamento ?? null,
         pedidoSocioId: viaje.socioEntreClientes?.pedidoId ?? null,
         clienteSocioId: viaje.socioEntreClientes?.clienteId ?? null,
+        cantidadViajes: viaje.cantidadViajes,
         importeCalculado: viaje.importeCalculado,
         pedidoIds: viaje.pedidoIds,
       })),

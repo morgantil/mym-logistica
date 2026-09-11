@@ -21,6 +21,12 @@ export interface PedidoParaFacturar {
   fechaProgramada: string; // YYYY-MM-DD
   direccionUsada: string;
   zonaTarifariaId: string;
+  // Cuántos pedidos del sistema de origen representa este Pedido (ver
+  // Pedido.cantidadPedidoOriginal en schema.prisma) — decisión 2026-09-11,
+  // caso real Farmapal: varias líneas con mismo afiliado/dirección/fecha
+  // pero distinto Nº de ticket se agrupan en un solo Pedido por logística,
+  // pero para el 2×1 son pedidos originales separados. Siempre ≥1.
+  cantidadPedidoOriginal: number;
 }
 
 export type ReglaAplicada = "2x1" | "UNIFICADA" | "INDIVIDUAL";
@@ -32,6 +38,13 @@ export interface ViajeFacturable {
   zonaTarifariaId: string;
   pedidoIds: string[];
   reglaAplicada: ReglaAplicada;
+  // Cuántos viajes representa esta fila — decisión 2026-09-11: un Pedido no
+  // puede pertenecer a dos GrupoFacturacion a la vez, así que el 2×1 de un
+  // grupo entero (mismo cliente+fecha+dirección+clave de tarifa) sale en UNA
+  // sola fila con esta cantidad, en vez de una fila por cada par de pedidos.
+  // Siempre 1 en UNIFICADA/INDIVIDUAL, puede ser >1 en 2x1 (ver
+  // calcularViajesPorPeso).
+  cantidadViajes: number;
   tarifaUtilizada: number;
   porcentajeAplicado: number | null;
   importeCalculado: number;
@@ -161,28 +174,29 @@ export function buscarUnificaciones(
   };
 }
 
-export interface ViajeDosPorUno {
+export interface ViajePorPeso {
   pedidoIds: string[];
   reglaAplicada: "2x1" | "INDIVIDUAL";
+  cantidadViajes: number;
 }
 
-// §27 pasos 5-6, §24 funcional: cada 2 pedidos (del mismo tipo, ya sin los
-// usados en una unificación) forman 1 viaje. Si queda uno sin pareja, se
-// factura solo como viaje adicional ("INDIVIDUAL"). El llamador ya agrupó los
-// pedidos de forma que compartan la misma clave de tarifa (mismo Bolsa/Bulto
-// si son medicamentos) — acá adentro solo importa la cantidad.
-export function aplicarDosPorUno(pedidos: PedidoParaFacturar[]): ViajeDosPorUno[] {
-  const viajes: ViajeDosPorUno[] = [];
-
-  for (let i = 0; i < pedidos.length; i += 2) {
-    const par = pedidos.slice(i, i + 2);
-    viajes.push({
-      pedidoIds: par.map((pedido) => pedido.id),
-      reglaAplicada: par.length === 2 ? "2x1" : "INDIVIDUAL",
-    });
-  }
-
-  return viajes;
+// §27 pasos 5-6, §24 funcional, extendido 2026-09-11 con el peso por pedidos
+// originales: cada 2 pedidos ORIGINALES (no 2 filas de Pedido — ver
+// cantidadPedidoOriginal) forman 1 viaje, redondeando hacia arriba si sobra
+// uno (mismos ejemplos del documento Arbet: 4→2 viajes, 5→3 viajes, 10→5
+// viajes — todos con peso 1 cada uno, caso más común). Un Pedido no se puede
+// partir entre dos filas de facturación (no puede pertenecer a dos
+// GrupoFacturacion a la vez), así que TODO el grupo sale en una sola fila con
+// la cantidad de viajes que representa. El llamador ya agrupó los pedidos de
+// forma que compartan la misma clave de tarifa (mismo Bolsa/Bulto si son
+// medicamentos).
+export function calcularViajesPorPeso(pedidos: PedidoParaFacturar[]): ViajePorPeso {
+  const pesoTotal = pedidos.reduce((total, pedido) => total + pedido.cantidadPedidoOriginal, 0);
+  return {
+    pedidoIds: pedidos.map((pedido) => pedido.id),
+    reglaAplicada: pesoTotal > 1 ? "2x1" : "INDIVIDUAL",
+    cantidadViajes: Math.ceil(pesoTotal / 2),
+  };
 }
 
 // Agrupa una lista de pedidos (ya del mismo tipo de servicio) por su clave de
@@ -251,6 +265,7 @@ export function calcularFacturacionCliente(
         zonaTarifariaId: grupo.zonaTarifariaId,
         pedidoIds: [panal.id, medicamento.id],
         reglaAplicada: "UNIFICADA",
+        cantidadViajes: 1,
         tarifaUtilizada: tarifaPanal + tarifaMedicamento,
         porcentajeAplicado: null,
         importeCalculado: importePanal + importeMedicamento,
@@ -268,22 +283,24 @@ export function calcularFacturacionCliente(
     // 2x1 sobre lo que quedó sin unificar — sub-agrupado por clave de tarifa
     // (panalesRestantes siempre comparte una sola clave; medicamentosRestantes
     // puede tener Bolsa y Bulto mezclados dentro del mismo grupo fecha+dirección).
+    // Una sola fila por clave, con la cantidad de viajes que pesa ese grupo
+    // (ver calcularViajesPorPeso) — no una fila por cada par de Pedidos.
     for (const restantesDeUnTipo of [panalesRestantes, medicamentosRestantes]) {
       for (const [, pedidosDeEstaClave] of agruparPorClaveTarifa(restantesDeUnTipo)) {
         const tarifa = tarifaDe(pedidosDeEstaClave[0]);
-        for (const viaje of aplicarDosPorUno(pedidosDeEstaClave)) {
-          viajes.push({
-            clienteId: grupo.clienteId,
-            fecha: grupo.fecha,
-            direccion: grupo.direccion,
-            zonaTarifariaId: grupo.zonaTarifariaId,
-            pedidoIds: viaje.pedidoIds,
-            reglaAplicada: viaje.reglaAplicada,
-            tarifaUtilizada: tarifa,
-            porcentajeAplicado: null,
-            importeCalculado: tarifa,
-          });
-        }
+        const { pedidoIds, reglaAplicada, cantidadViajes } = calcularViajesPorPeso(pedidosDeEstaClave);
+        viajes.push({
+          clienteId: grupo.clienteId,
+          fecha: grupo.fecha,
+          direccion: grupo.direccion,
+          zonaTarifariaId: grupo.zonaTarifariaId,
+          pedidoIds,
+          reglaAplicada,
+          cantidadViajes,
+          tarifaUtilizada: tarifa,
+          porcentajeAplicado: null,
+          importeCalculado: tarifa * cantidadViajes,
+        });
       }
     }
   }

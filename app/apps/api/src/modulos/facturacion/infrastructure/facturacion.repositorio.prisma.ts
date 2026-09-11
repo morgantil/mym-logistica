@@ -39,6 +39,7 @@ function mapearGrupo(fila: FilaGrupo): GrupoFacturacion {
       : null,
     pedidoSocioId: fila.pedidoSocioId,
     clienteSocioId: fila.clienteSocioId,
+    cantidadViajes: fila.cantidadViajes,
     importeCalculado: Number(fila.importeCalculado),
     confirmadoEn: fila.confirmadoEn,
     confirmadoPorId: fila.confirmadoPorId,
@@ -281,6 +282,38 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
   // borra físicamente (GrupoFacturacion no tiene borrado lógico — un BORRADOR
   // sin confirmar no tiene valor de auditoría, ver soft-delete.middleware.ts)
   // y por último crea los nuevos. Todo en una sola transacción.
+  // Extraído para que generarVistaPrevia lo pueda llamar ANTES de volver a
+  // listar los pedidos facturables — decisión 2026-09-11: si se limpia recién
+  // adentro de reemplazarBorrador (al final del cálculo), un pedido que ya
+  // había quedado en un BORRADOR de un cálculo anterior no aparece en el
+  // nuevo listado (listarFacturables excluye grupoFacturacionId no nulo) y
+  // "Volver a calcular" nunca lo vuelve a levantar — bug real encontrado
+  // probando el peso por pedidos originales (ver DOCUMENTO TECNICO.md historial).
+  private async limpiarBorradorEnTx(
+    tx: Prisma.TransactionClient,
+    clienteId: string,
+    mes: number,
+    anio: number,
+  ): Promise<void> {
+    const anteriores = await tx.grupoFacturacion.findMany({
+      where: { clienteId, mes, anio, estado: "BORRADOR" },
+      select: { id: true },
+    });
+    const idsAnteriores = anteriores.map((g) => g.id);
+
+    if (idsAnteriores.length > 0) {
+      await tx.pedido.updateMany({
+        where: { grupoFacturacionId: { in: idsAnteriores } },
+        data: { grupoFacturacionId: null, reglaAplicada: null },
+      });
+      await tx.grupoFacturacion.deleteMany({ where: { id: { in: idsAnteriores } } });
+    }
+  }
+
+  async limpiarBorrador(clienteId: string, mes: number, anio: number): Promise<void> {
+    await this.prisma.$transaction((tx) => this.limpiarBorradorEnTx(tx, clienteId, mes, anio));
+  }
+
   async reemplazarBorrador(
     clienteId: string,
     mes: number,
@@ -297,19 +330,10 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
     // para volúmenes reales sin tener que rediseñar el batching ahora.
     return this.prisma.$transaction(
       async (tx) => {
-        const anteriores = await tx.grupoFacturacion.findMany({
-          where: { clienteId, mes, anio, estado: "BORRADOR" },
-          select: { id: true },
-        });
-        const idsAnteriores = anteriores.map((g) => g.id);
-
-        if (idsAnteriores.length > 0) {
-          await tx.pedido.updateMany({
-            where: { grupoFacturacionId: { in: idsAnteriores } },
-            data: { grupoFacturacionId: null, reglaAplicada: null },
-          });
-          await tx.grupoFacturacion.deleteMany({ where: { id: { in: idsAnteriores } } });
-        }
+        // Ya se llamó a limpiarBorrador antes de listar los pedidos
+        // facturables (ver FacturacionService.generarVistaPrevia) — esto
+        // queda como red de seguridad, no debería encontrar nada para borrar.
+        await this.limpiarBorradorEnTx(tx, clienteId, mes, anio);
 
         const creados: FilaGrupo[] = [];
         for (const grupo of grupos) {
@@ -326,6 +350,7 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
               porcentajeMedicamentoAplicado: grupo.porcentajeMedicamentoAplicado ?? null,
               pedidoSocioId: grupo.pedidoSocioId ?? null,
               clienteSocioId: grupo.clienteSocioId ?? null,
+              cantidadViajes: grupo.cantidadViajes,
               importeCalculado: grupo.importeCalculado,
               pedidos: { connect: grupo.pedidoIds.map((id) => ({ id })) },
             },
@@ -404,6 +429,7 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
       porcentajeMedicamentoAplicado: pedido.grupoFacturacion!.porcentajeMedicamentoAplicado
         ? Number(pedido.grupoFacturacion!.porcentajeMedicamentoAplicado)
         : null,
+      cantidadViajes: pedido.grupoFacturacion!.cantidadViajes,
       importeViaje: Number(pedido.grupoFacturacion!.importeCalculado),
     }));
   }

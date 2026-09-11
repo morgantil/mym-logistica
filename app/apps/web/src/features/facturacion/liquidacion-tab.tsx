@@ -92,6 +92,7 @@ export function LiquidacionTab({
   const hayGrupos = (grupos?.length ?? 0) > 0;
   const confirmado = hayGrupos && grupos!.every((grupo) => grupo.estado === EstadoGrupoFacturacion.CONFIRMADO);
   const totalPedidos = grupos?.reduce((total, grupo) => total + grupo.pedidoIds.length, 0) ?? 0;
+  const totalViajes = grupos?.reduce((total, grupo) => total + grupo.cantidadViajes, 0) ?? 0;
   const totalImporte = grupos?.reduce((total, grupo) => total + grupo.importeCalculado, 0) ?? 0;
 
   return (
@@ -148,6 +149,7 @@ export function LiquidacionTab({
           <TableRow>
             <TableHead>Regla aplicada</TableHead>
             <TableHead>Pedidos</TableHead>
+            <TableHead>Viajes</TableHead>
             <TableHead>Tarifa utilizada</TableHead>
             <TableHead>Porcentaje aplicado</TableHead>
             <TableHead>Importe</TableHead>
@@ -156,13 +158,13 @@ export function LiquidacionTab({
         <TableBody>
           {isLoading ? (
             <TableRow>
-              <TableCell colSpan={5} className="text-muted-foreground">
+              <TableCell colSpan={6} className="text-muted-foreground">
                 Cargando…
               </TableCell>
             </TableRow>
           ) : !hayGrupos ? (
             <TableRow>
-              <TableCell colSpan={5} className="text-muted-foreground">
+              <TableCell colSpan={6} className="text-muted-foreground">
                 Todavía no se generó una vista previa para este mes.
               </TableCell>
             </TableRow>
@@ -173,6 +175,7 @@ export function LiquidacionTab({
                   <BadgeRegla regla={grupo.reglaAplicada} />
                 </TableCell>
                 <TableCell>{grupo.pedidoIds.length}</TableCell>
+                <TableCell>{grupo.cantidadViajes}</TableCell>
                 <TableCell>{grupo.tarifaUtilizada !== null ? formatearMonto(grupo.tarifaUtilizada) : "—"}</TableCell>
                 <TableCell>{grupo.porcentajeAplicado !== null ? `${grupo.porcentajeAplicado}%` : "—"}</TableCell>
                 <TableCell>{formatearMonto(grupo.importeCalculado)}</TableCell>
@@ -185,6 +188,7 @@ export function LiquidacionTab({
             <TableRow>
               <TableCell className="font-medium">Total</TableCell>
               <TableCell className="font-medium">{totalPedidos}</TableCell>
+              <TableCell className="font-medium">{totalViajes}</TableCell>
               <TableCell />
               <TableCell />
               <TableCell className="font-medium">{formatearMonto(totalImporte)}</TableCell>

@@ -21,6 +21,10 @@ export interface GrupoFacturacion {
   // pedido/cliente "socio" que generó la unificación (ver unificacion-cruzada.ts).
   pedidoSocioId: string | null;
   clienteSocioId: string | null;
+  // Cuántos viajes representa esta fila — decisión 2026-09-11 (ver
+  // motor-facturacion.ts, calcularViajesPorPeso). Siempre 1 salvo en 2x1,
+  // donde puede ser >1 si algún Pedido agrupa varios pedidos originales.
+  cantidadViajes: number;
   importeCalculado: number;
   confirmadoEn: Date | null;
   confirmadoPorId: string | null;
@@ -49,5 +53,6 @@ export interface PedidoFacturado {
   porcentajeAplicado: number | null;
   porcentajePanalAplicado: number | null;
   porcentajeMedicamentoAplicado: number | null;
+  cantidadViajes: number;
   importeViaje: number;
 }

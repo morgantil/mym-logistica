@@ -33,6 +33,9 @@ export interface Pedido {
   bultos: number | null;
   observaciones: string | null;
   etiquetaImpresaEn: Date | null;
+  // Cuántos pedidos del sistema de origen (Nº de ticket distintos) se
+  // agruparon en este Pedido — ver comentario en schema.prisma. Default 1.
+  cantidadPedidoOriginal: number;
   version: number;
   creadoEn: Date; // momento real de creación del registro — distinto de fechaProgramada (la de entrega, elegida a mano)
 }

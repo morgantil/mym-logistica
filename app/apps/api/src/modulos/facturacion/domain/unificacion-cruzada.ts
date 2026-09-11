@@ -83,6 +83,7 @@ export function calcularUnificacionesEntreClientes(
       zonaTarifariaId: propio.zonaTarifariaId,
       pedidoIds: [propio.id],
       reglaAplicada: "UNIFICADA",
+      cantidadViajes: 1,
       tarifaUtilizada: tarifa,
       porcentajeAplicado: porcentajePropio,
       importeCalculado: importe,

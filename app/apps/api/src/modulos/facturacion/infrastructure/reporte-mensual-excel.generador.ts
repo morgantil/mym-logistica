@@ -49,6 +49,7 @@ export async function generarReporteMensualExcel(datos: {
     { header: "Tipo de servicio", key: "tipoServicio", width: 16 },
     { header: "Chofer", key: "chofer", width: 20 },
     { header: "Regla aplicada", key: "regla", width: 14 },
+    { header: "Cantidad de viajes", key: "cantidadViajes", width: 16 },
     { header: "Tarifa del viaje", key: "tarifa", width: 16 },
     { header: "Porcentaje aplicado", key: "porcentaje", width: 18 },
     { header: "% Pañal (unificada)", key: "porcentajePanal", width: 18 },
@@ -68,6 +69,7 @@ export async function generarReporteMensualExcel(datos: {
       tipoServicio: TEXTO_TIPO_SERVICIO[pedido.tipoServicio],
       chofer: pedido.choferNombre ?? "Sin asignar",
       regla: TEXTO_REGLA[pedido.reglaAplicada] ?? pedido.reglaAplicada,
+      cantidadViajes: pedido.cantidadViajes,
       tarifa: pedido.tarifaUtilizada,
       porcentaje: pedido.porcentajeAplicado,
       porcentajePanal: pedido.porcentajePanalAplicado,
@@ -89,6 +91,7 @@ export async function generarReporteMensualExcel(datos: {
     { header: "Dirección", key: "direccion", width: 32 },
     { header: "Regla aplicada", key: "regla", width: 14 },
     { header: "Cantidad de pedidos", key: "cantidadPedidos", width: 18 },
+    { header: "Cantidad de viajes", key: "cantidadViajes", width: 16 },
     { header: "Tarifa", key: "tarifa", width: 14 },
     { header: "Porcentaje", key: "porcentaje", width: 14 },
     { header: "Importe", key: "importe", width: 14 },
@@ -103,6 +106,7 @@ export async function generarReporteMensualExcel(datos: {
       direccion: referencia?.direccion ?? "",
       regla: TEXTO_REGLA[grupo.reglaAplicada] ?? grupo.reglaAplicada,
       cantidadPedidos: grupo.pedidoIds.length,
+      cantidadViajes: grupo.cantidadViajes,
       tarifa: grupo.tarifaUtilizada,
       porcentaje: grupo.porcentajeAplicado,
       importe: grupo.importeCalculado,
@@ -113,6 +117,7 @@ export async function generarReporteMensualExcel(datos: {
   const filaTotal = hojaResumen.addRow({
     regla: "Total",
     cantidadPedidos: datos.grupos.reduce((total, g) => total + g.pedidoIds.length, 0),
+    cantidadViajes: datos.grupos.reduce((total, g) => total + g.cantidadViajes, 0),
     importe: datos.grupos.reduce((total, g) => total + g.importeCalculado, 0),
   });
   filaTotal.font = { bold: true };

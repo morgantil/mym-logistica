@@ -56,6 +56,7 @@ export interface GrupoFacturacion {
   porcentajeMedicamentoAplicado: number | null;
   pedidoSocioId: string | null;
   clienteSocioId: string | null;
+  cantidadViajes: number;
   importeCalculado: number;
   confirmadoEn: string | null;
   confirmadoPorId: string | null;

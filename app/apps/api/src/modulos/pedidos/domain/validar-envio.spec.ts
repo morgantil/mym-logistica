@@ -31,6 +31,7 @@ function pedidoListoParaEnviar(overrides: Partial<Pedido> = {}): Pedido {
     bultos: 2,
     observaciones: null,
     etiquetaImpresaEn: null,
+    cantidadPedidoOriginal: 1,
     version: 0,
     creadoEn: new Date(),
     ...overrides,

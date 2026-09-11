@@ -3,9 +3,9 @@ import {
   PedidoParaFacturar,
   TarifasPorTipo,
   agruparPorClienteFechaDireccion,
-  aplicarDosPorUno,
   buscarUnificaciones,
   calcularFacturacionCliente,
+  calcularViajesPorPeso,
   construirClaveTarifa,
   separarPorTipoServicio,
 } from "./motor-facturacion";
@@ -45,6 +45,7 @@ function pedido(overrides: Partial<PedidoParaFacturar> & { id: string }): Pedido
     clienteId: "cliente-1",
     tipoServicio: TipoServicio.PANAL,
     tipoEnvase: null,
+    cantidadPedidoOriginal: 1,
     fechaProgramada: "2026-08-01",
     direccionUsada: "Av. Siempre Viva 123",
     zonaTarifariaId: ZONA_CABA,
@@ -57,26 +58,27 @@ function pedidos(cantidad: number, overrides: Partial<PedidoParaFacturar> = {}):
 }
 
 describe("motor-facturacion — casos de ejemplo del §28 funcional / Guia Arbet §9", () => {
-  it("caso 1: 10 pedidos de pañales, mismo cliente/fecha/dirección → 5 viajes 2x1, sin unificación", () => {
+  it("caso 1: 10 pedidos de pañales, mismo cliente/fecha/dirección → 1 fila, 5 viajes 2x1, sin unificación", () => {
     const viajes = calcularFacturacionCliente(pedidos(10), TARIFAS, PORCENTAJES_DOCUMENTO_ARBET);
 
-    expect(viajes).toHaveLength(5);
-    expect(viajes.every((v) => v.reglaAplicada === "2x1")).toBe(true);
-    expect(viajes.every((v) => v.importeCalculado === 1000)).toBe(true);
-    expect(viajes.reduce((total, v) => total + v.pedidoIds.length, 0)).toBe(10);
+    expect(viajes).toHaveLength(1);
+    expect(viajes[0].reglaAplicada).toBe("2x1");
+    expect(viajes[0].cantidadViajes).toBe(5);
+    expect(viajes[0].importeCalculado).toBe(5000); // 5 viajes × 1000
+    expect(viajes[0].pedidoIds).toHaveLength(10);
   });
 
-  it("caso 2: 3 pedidos de medicamentos (mismo Bolsa/Bulto) → 2 viajes (1 par 2x1 + 1 individual)", () => {
+  it("caso 2: 3 pedidos de medicamentos (mismo Bolsa/Bulto) → 1 fila, 2 viajes (par + individual)", () => {
     const viajes = calcularFacturacionCliente(
       pedidos(3, { tipoServicio: TipoServicio.MEDICAMENTO, tipoEnvase: TipoEnvase.BOLSA }),
       TARIFAS,
       PORCENTAJES_DOCUMENTO_ARBET,
     );
 
-    expect(viajes).toHaveLength(2);
-    expect(viajes.filter((v) => v.reglaAplicada === "2x1")).toHaveLength(1);
-    expect(viajes.filter((v) => v.reglaAplicada === "INDIVIDUAL")).toHaveLength(1);
-    expect(viajes.every((v) => v.importeCalculado === 800)).toBe(true);
+    expect(viajes).toHaveLength(1);
+    expect(viajes[0].reglaAplicada).toBe("2x1");
+    expect(viajes[0].cantidadViajes).toBe(2);
+    expect(viajes[0].importeCalculado).toBe(1600); // 2 viajes × 800
   });
 
   it("caso 3: 1 pañal + 1 medicamento → 1 entrega unificada (100% + porcentaje), documento Arbet", () => {
@@ -91,6 +93,7 @@ describe("motor-facturacion — casos de ejemplo del §28 funcional / Guia Arbet
 
     expect(viajes).toHaveLength(1);
     expect(viajes[0].reglaAplicada).toBe("UNIFICADA");
+    expect(viajes[0].cantidadViajes).toBe(1);
     expect(viajes[0].pedidoIds).toEqual(expect.arrayContaining(["panal", "medicamento"]));
     expect(viajes[0].importeCalculado).toBe(1400); // 1000 (100% panal) + 400 (50% de 800 bolsa)
     expect(viajes[0].detalleUnificacion).toEqual({
@@ -103,7 +106,7 @@ describe("motor-facturacion — casos de ejemplo del §28 funcional / Guia Arbet
     });
   });
 
-  it("caso 4: 3 pañales + 1 medicamento → 1 unificada + 1 viaje 2x1 con los 2 pañales restantes", () => {
+  it("caso 4: 3 pañales + 1 medicamento → 1 unificada + 1 fila 2x1 con los 2 pañales restantes", () => {
     const viajes = calcularFacturacionCliente(
       [
         ...pedidos(3, { id: "panal" }).map((p, i) => ({ ...p, id: `panal-${i}` })),
@@ -119,6 +122,7 @@ describe("motor-facturacion — casos de ejemplo del §28 funcional / Guia Arbet
     expect(unificada?.importeCalculado).toBe(1400);
     expect(unificada?.pedidoIds).toContain("medicamento");
     expect(dosPorUno?.pedidoIds).toHaveLength(2);
+    expect(dosPorUno?.cantidadViajes).toBe(1);
     expect(dosPorUno?.importeCalculado).toBe(1000);
 
     const totalFacturado = viajes.reduce((total, v) => total + v.importeCalculado, 0);
@@ -137,8 +141,71 @@ describe("motor-facturacion — casos de ejemplo del §28 funcional / Guia Arbet
 
     const viajesA = viajes.filter((v) => v.clienteId === "farmacia-a");
     const viajesB = viajes.filter((v) => v.clienteId === "farmacia-b");
-    expect(viajesA).toHaveLength(5);
-    expect(viajesB).toHaveLength(2);
+    expect(viajesA).toHaveLength(1);
+    expect(viajesA[0].cantidadViajes).toBe(5);
+    expect(viajesB).toHaveLength(1);
+    expect(viajesB[0].cantidadViajes).toBe(2);
+  });
+});
+
+describe("motor-facturacion — peso por pedidos originales (decisión 2026-09-11, caso real Farmapal)", () => {
+  it("un solo Pedido que agrupa 4 pedidos originales (mismo afiliado/dirección/fecha, distinto ticket) se factura como 2 viajes, no como 1 individual", () => {
+    // Caso real: 4 líneas del Excel con Nº de ticket distinto se agrupan en
+    // UN solo Pedido por logística (mismo destinatario/dirección/fecha) —
+    // pero son 4 pedidos originales de Farmapal, no 1.
+    const viajes = calcularFacturacionCliente(
+      [pedido({ id: "pedido-agrupado", cantidadPedidoOriginal: 4 })],
+      TARIFAS,
+      PORCENTAJES_DOCUMENTO_ARBET,
+    );
+
+    expect(viajes).toHaveLength(1);
+    expect(viajes[0].reglaAplicada).toBe("2x1");
+    expect(viajes[0].cantidadViajes).toBe(2);
+    expect(viajes[0].importeCalculado).toBe(2000); // 2 viajes × 1000, no 1000
+    expect(viajes[0].pedidoIds).toEqual(["pedido-agrupado"]);
+  });
+
+  it("peso impar (3 pedidos originales en 1 Pedido) redondea hacia arriba, igual que el 2x1 normal", () => {
+    const viajes = calcularFacturacionCliente(
+      [pedido({ id: "pedido-agrupado", cantidadPedidoOriginal: 3 })],
+      TARIFAS,
+      PORCENTAJES_DOCUMENTO_ARBET,
+    );
+
+    expect(viajes[0].cantidadViajes).toBe(2); // ceil(3/2)
+    expect(viajes[0].importeCalculado).toBe(2000);
+  });
+
+  it("peso 1 (default, sin tickets distintos) sigue facturando como INDIVIDUAL, sin romper el comportamiento de siempre", () => {
+    const viajes = calcularFacturacionCliente(
+      [pedido({ id: "solo", cantidadPedidoOriginal: 1 })],
+      TARIFAS,
+      PORCENTAJES_DOCUMENTO_ARBET,
+    );
+
+    expect(viajes[0].reglaAplicada).toBe("INDIVIDUAL");
+    expect(viajes[0].cantidadViajes).toBe(1);
+    expect(viajes[0].importeCalculado).toBe(1000);
+  });
+
+  it("combina el peso de varios Pedidos reales en la misma dirección/fecha (no solo el de uno)", () => {
+    // Un Pedido con 3 originales + otro Pedido normal (1 original) en la
+    // misma dirección/fecha → peso total 4 → 2 viajes, repartidos entre los
+    // dos ids reales (ninguno se puede partir entre dos facturaciones).
+    const viajes = calcularFacturacionCliente(
+      [
+        pedido({ id: "agrupado", cantidadPedidoOriginal: 3 }),
+        pedido({ id: "suelto", cantidadPedidoOriginal: 1 }),
+      ],
+      TARIFAS,
+      PORCENTAJES_DOCUMENTO_ARBET,
+    );
+
+    expect(viajes).toHaveLength(1);
+    expect(viajes[0].cantidadViajes).toBe(2);
+    expect(viajes[0].importeCalculado).toBe(2000);
+    expect(viajes[0].pedidoIds).toEqual(expect.arrayContaining(["agrupado", "suelto"]));
   });
 });
 
@@ -154,7 +221,7 @@ describe("motor-facturacion — Bolsa/Bulto (Guia Arbet paso 2 y 5)", () => {
     );
 
     // Bolsa y Bulto en el mismo grupo fecha+dirección no pueden compartir
-    // viaje 2x1 (tarifa distinta) — cada uno queda como INDIVIDUAL.
+    // fila de 2x1 (tarifa distinta) — cada uno queda en su propia fila INDIVIDUAL.
     expect(viajes).toHaveLength(2);
     const viajeBolsa = viajes.find((v) => v.pedidoIds.includes("bolsa"));
     const viajeBulto = viajes.find((v) => v.pedidoIds.includes("bulto"));
@@ -260,21 +327,29 @@ describe("buscarUnificaciones", () => {
   });
 });
 
-describe("aplicarDosPorUno", () => {
-  it("devuelve [] para una lista vacía", () => {
-    expect(aplicarDosPorUno([])).toEqual([]);
+describe("calcularViajesPorPeso", () => {
+  it("un pedido con peso 1 es INDIVIDUAL, 1 viaje", () => {
+    const resultado = calcularViajesPorPeso(pedidos(1));
+    expect(resultado.reglaAplicada).toBe("INDIVIDUAL");
+    expect(resultado.cantidadViajes).toBe(1);
   });
 
-  it("un solo pedido queda como viaje INDIVIDUAL", () => {
-    const [viaje] = aplicarDosPorUno(pedidos(1));
-    expect(viaje.reglaAplicada).toBe("INDIVIDUAL");
-    expect(viaje.pedidoIds).toHaveLength(1);
+  it("2 pedidos de peso 1 cada uno dan 1 viaje 2x1", () => {
+    const resultado = calcularViajesPorPeso(pedidos(2));
+    expect(resultado.reglaAplicada).toBe("2x1");
+    expect(resultado.cantidadViajes).toBe(1);
   });
 
-  it("2 pedidos forman 1 viaje 2x1", () => {
-    const viajes = aplicarDosPorUno(pedidos(2));
-    expect(viajes).toHaveLength(1);
-    expect(viajes[0].reglaAplicada).toBe("2x1");
+  it("un solo pedido con peso 4 da 2 viajes 2x1 (no 1 individual)", () => {
+    const resultado = calcularViajesPorPeso([pedido({ id: "p1", cantidadPedidoOriginal: 4 })]);
+    expect(resultado.reglaAplicada).toBe("2x1");
+    expect(resultado.cantidadViajes).toBe(2);
+    expect(resultado.pedidoIds).toEqual(["p1"]);
+  });
+
+  it("peso impar total redondea hacia arriba (5 → 3 viajes, ejemplo del documento Arbet)", () => {
+    const resultado = calcularViajesPorPeso(pedidos(5));
+    expect(resultado.cantidadViajes).toBe(3);
   });
 });
 

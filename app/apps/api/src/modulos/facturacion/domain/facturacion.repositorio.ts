@@ -40,6 +40,7 @@ export interface DatosCrearGrupoFacturacion {
   porcentajeMedicamentoAplicado?: number | null;
   pedidoSocioId?: string | null;
   clienteSocioId?: string | null;
+  cantidadViajes: number;
   importeCalculado: number;
   pedidoIds: string[];
 }
@@ -105,6 +106,15 @@ export interface FacturacionRepositorio {
 
   // Grupos de facturación (vista previa / confirmación) — §21, §32 funcional.
   existeGrupoConfirmado(clienteId: string, mes: number, anio: number): Promise<boolean>;
+  // Desvincula los pedidos de cualquier BORRADOR existente de ese
+  // cliente/mes/año y los borra — decisión 2026-09-11: hay que llamarlo ANTES
+  // de volver a listar los pedidos facturables de una "vista previa" nueva,
+  // porque listarFacturables excluye los que ya tienen grupoFacturacionId. Si
+  // se limpia recién en reemplazarBorrador (al final), un pedido que ya
+  // había quedado en un BORRADOR de un cálculo anterior nunca se vuelve a
+  // levantar al recalcular — bug real encontrado probando el peso por
+  // pedidos originales (ver DOCUMENTO TECNICO.md historial).
+  limpiarBorrador(clienteId: string, mes: number, anio: number): Promise<void>;
   // Reemplaza los BORRADOR existentes de ese cliente/mes/año por los nuevos
   // (permite recalcular la simulación las veces que haga falta antes de
   // confirmar — DOCUMENTO TECNICO.md sección 2, "vista previa de facturación").

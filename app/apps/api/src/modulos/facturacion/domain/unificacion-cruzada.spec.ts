@@ -8,6 +8,7 @@ function pedido(overrides: Partial<PedidoParaFacturar> & { id: string; clienteId
   return {
     tipoServicio: TipoServicio.PANAL,
     tipoEnvase: null,
+    cantidadPedidoOriginal: 1,
     fechaProgramada: "2026-09-01",
     direccionUsada: "Av. Siempre Viva 123",
     zonaTarifariaId: ZONA_CABA,

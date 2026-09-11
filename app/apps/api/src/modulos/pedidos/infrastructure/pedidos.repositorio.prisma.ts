@@ -166,6 +166,7 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
         fechaProgramada: datos.fechaProgramada,
         tipoServicio: datos.tipoServicio as unknown as Prisma.PedidoCreateInput["tipoServicio"],
         observaciones: datos.observaciones,
+        cantidadPedidoOriginal: datos.cantidadPedidoOriginal,
         zonaId: datos.zonaId,
         zonaNombre: datos.zonaNombre,
         choferId: datos.choferId,

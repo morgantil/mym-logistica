@@ -483,6 +483,15 @@ model Pedido {
   // pantalla de Embalaje y Despacho. No impide reimprimir, solo informa.
   etiquetaImpresaEn    DateTime?
 
+  // Cuántos pedidos DEL SISTEMA DE ORIGEN (ej. Farmanet) se agruparon en este
+  // Pedido — decisión 2026-09-11 (Leonardo, caso real Farmapal): varias líneas
+  // del Excel con mismo afiliado/dirección/fecha pero *distinto* Nº de ticket
+  // son pedidos originales separados, agrupados acá solo por conveniencia
+  // logística (un solo viaje, no cuatro). Para facturación importa el número
+  // real de pedidos originales, no cuántas filas de Pedido hay — ver
+  // motor-facturacion.ts. Default 1 (sin tickets, o todos el mismo ticket).
+  cantidadPedidoOriginal Int @default(1)
+
   grupoFacturacionId String?
   reglaAplicada      String? // "2x1" | "UNIFICADA" | "INDIVIDUAL" — informativo, el detalle vive en GrupoFacturacion
 
@@ -639,6 +648,14 @@ model GrupoFacturacion {
   // trazabilidad para auditar qué entrega compartida generó esta unificación.
   pedidoSocioId                 String?
   clienteSocioId                String?
+  // Decisión 2026-09-11: una fila ya no es siempre "1 viaje" — un Pedido
+  // puede pesar más de 1 (varios pedidos originales agrupados, ver
+  // Pedido.cantidadPedidoOriginal), así que el 2×1 de un grupo entero
+  // (mismo cliente+fecha+dirección) queda en UNA fila con la cantidad de
+  // viajes que representa, en vez de una fila por cada par de pedidos —
+  // un Pedido no puede pertenecer a dos GrupoFacturacion a la vez. Siempre 1
+  // en UNIFICADA/INDIVIDUAL (un solo viaje), puede ser >1 en 2x1.
+  cantidadViajes                Int      @default(1)
   importeCalculado              Decimal  @db.Decimal(12, 2)
 
   confirmadoEn    DateTime?

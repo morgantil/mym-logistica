@@ -33,6 +33,9 @@ export interface PedidoListado {
   bultos: number | null;
   observaciones: string | null;
   etiquetaImpresaEn: string | null;
+  // Cuántos pedidos del sistema de origen (Nº de ticket distintos) se
+  // agruparon en este Pedido — decisión 2026-09-11, caso real Farmapal.
+  cantidadPedidoOriginal: number;
   version: number;
   clienteNombre: string;
   destinatarioNombre: string;

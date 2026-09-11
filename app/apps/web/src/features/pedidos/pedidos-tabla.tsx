@@ -72,6 +72,7 @@ const IDS_COLUMNAS_DEFAULT = [
   "fecha",
   "fechaSubida",
   "productos",
+  "cantidadPedidoOriginal",
   "bultos",
   "zona",
   "chofer",
@@ -92,6 +93,7 @@ const LABEL_COLUMNA: Record<(typeof IDS_COLUMNAS_DEFAULT)[number], string> = {
   fecha: "Fecha",
   fechaSubida: "Fecha de subida",
   productos: "Productos",
+  cantidadPedidoOriginal: "Cant. Pedido Original",
   bultos: "Bultos",
   zona: "Zona",
   chofer: "Chofer",
@@ -103,7 +105,7 @@ const LABEL_COLUMNA: Record<(typeof IDS_COLUMNAS_DEFAULT)[number], string> = {
 // "productos" es un cálculo agregado (suma de varios renglones), no una
 // columna guardada — ordenar por eso necesitaría un query aparte, no se
 // implementó (ver CampoOrdenPedido). Todas las demás sí son ordenables.
-const NO_ORDENABLES = new Set<(typeof IDS_COLUMNAS_DEFAULT)[number]>(["productos"]);
+const NO_ORDENABLES = new Set<(typeof IDS_COLUMNAS_DEFAULT)[number]>(["productos", "cantidadPedidoOriginal"]);
 
 export function PedidosTabla() {
   const { usuario } = useAuth();
@@ -294,6 +296,11 @@ export function PedidosTabla() {
           const total = row.original.productos.reduce((acc, p) => acc + p.cantidad, 0);
           return `${total} u. (${row.original.productos.length} prod.)`;
         },
+      },
+      cantidadPedidoOriginal: {
+        id: "cantidadPedidoOriginal",
+        header: "Cant. Pedido Original",
+        cell: ({ row }) => row.original.cantidadPedidoOriginal,
       },
       bultos: {
         id: "bultos",

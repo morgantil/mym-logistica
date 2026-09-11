@@ -287,6 +287,10 @@ export class ImportarExcelService {
         fechaProgramada: new Date(grupo.fechaEntrega),
         tipoServicio: TipoServicio.PANAL,
         observaciones: observacionesPartes.length > 0 ? observacionesPartes.join(" · ") : null,
+        // Decisión 2026-09-11 (caso real Farmapal): líneas con distinto Nº de
+        // ticket agrupadas en este Pedido son pedidos originales separados —
+        // sin tickets (o todos el mismo), sigue siendo 1 pedido real.
+        cantidadPedidoOriginal: ticketsDistintos.length || 1,
         zonaId,
         zonaNombre,
         choferId,

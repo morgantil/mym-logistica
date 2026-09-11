@@ -13,6 +13,8 @@ export interface DatosCrearPedido {
   fechaProgramada: Date;
   tipoServicio: TipoServicio;
   observaciones: string | null;
+  // Ver Pedido.cantidadPedidoOriginal en schema.prisma.
+  cantidadPedidoOriginal: number;
   productos: { codigo: string | null; descripcion: string; cantidad: number; ticket: string | null }[];
   zonaId: string | null;
   zonaNombre: string | null;
