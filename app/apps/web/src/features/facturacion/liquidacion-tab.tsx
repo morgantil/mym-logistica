@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { AxiosError } from "axios";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -9,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { CLASES_TONO } from "@/features/pedidos/estado-labels";
 import { confirmar, descargarReporteMensual, generarVistaPrevia, listarGrupos, listarPedidosFacturados } from "./api";
 import { formatearMonto, NOMBRES_MES } from "./formato";
-import type { ReglaAplicada } from "./tipos";
+import type { GrupoFacturacion, PedidoFacturado, ReglaAplicada } from "./tipos";
 
 function formatearFecha(fecha: string): string {
   return new Date(fecha).toLocaleDateString("es-AR", { timeZone: "UTC" });
@@ -106,9 +107,21 @@ export function LiquidacionTab({
 
   const hayGrupos = (grupos?.length ?? 0) > 0;
   const confirmado = hayGrupos && grupos!.every((grupo) => grupo.estado === EstadoGrupoFacturacion.CONFIRMADO);
-  const totalPedidos = grupos?.reduce((total, grupo) => total + grupo.pedidoIds.length, 0) ?? 0;
   const totalViajes = grupos?.reduce((total, grupo) => total + grupo.cantidadViajes, 0) ?? 0;
   const totalImporte = grupos?.reduce((total, grupo) => total + grupo.importeCalculado, 0) ?? 0;
+
+  // Un grupo puede juntar más de un pedido (2×1 entre pedidos distintos, o
+  // unificación pañal+medicamento) — se agrupan las filas de detalle debajo
+  // de una única cabecera con el importe del grupo, para no repetirlo ni
+  // sumarlo dos veces en el total.
+  const pedidosPorGrupo = new Map<string, PedidoFacturado[]>();
+  for (const pedido of pedidosFacturados ?? []) {
+    const lista = pedidosPorGrupo.get(pedido.grupoId) ?? [];
+    lista.push(pedido);
+    pedidosPorGrupo.set(pedido.grupoId, lista);
+  }
+
+  const cargando = isLoading || cargandoDetalle;
 
   return (
     <div className="flex flex-col gap-4">
@@ -159,112 +172,86 @@ export function LiquidacionTab({
         </div>
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Regla aplicada</TableHead>
-            <TableHead>Pedidos</TableHead>
-            <TableHead>Viajes</TableHead>
-            <TableHead>Tarifa utilizada</TableHead>
-            <TableHead>Porcentaje aplicado</TableHead>
-            <TableHead>Importe</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {isLoading ? (
+      <div className="overflow-x-auto rounded-md border">
+        <Table>
+          <TableHeader>
             <TableRow>
-              <TableCell colSpan={6} className="text-muted-foreground">
-                Cargando…
-              </TableCell>
+              <TableHead>Pedido</TableHead>
+              <TableHead>Afiliado</TableHead>
+              <TableHead>Destinatario</TableHead>
+              <TableHead>Dirección</TableHead>
+              <TableHead>Fecha</TableHead>
+              <TableHead>Zona</TableHead>
+              <TableHead>Chofer</TableHead>
             </TableRow>
-          ) : !hayGrupos ? (
-            <TableRow>
-              <TableCell colSpan={6} className="text-muted-foreground">
-                Todavía no se generó una vista previa para este mes.
-              </TableCell>
-            </TableRow>
-          ) : (
-            grupos!.map((grupo) => (
-              <TableRow key={grupo.id}>
-                <TableCell>
-                  <BadgeRegla regla={grupo.reglaAplicada} />
+          </TableHeader>
+          <TableBody>
+            {cargando ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-muted-foreground">
+                  Cargando…
                 </TableCell>
-                <TableCell>{grupo.pedidoIds.length}</TableCell>
-                <TableCell>{grupo.cantidadViajes}</TableCell>
-                <TableCell>{grupo.tarifaUtilizada !== null ? formatearMonto(grupo.tarifaUtilizada) : "—"}</TableCell>
-                <TableCell>{grupo.porcentajeAplicado !== null ? `${grupo.porcentajeAplicado}%` : "—"}</TableCell>
-                <TableCell>{formatearMonto(grupo.importeCalculado)}</TableCell>
               </TableRow>
-            ))
+            ) : !hayGrupos ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-muted-foreground">
+                  Todavía no se generó una vista previa para este mes.
+                </TableCell>
+              </TableRow>
+            ) : (
+              grupos!.map((grupo) => <FilasGrupo key={grupo.id} grupo={grupo} pedidos={pedidosPorGrupo.get(grupo.id) ?? []} />)
+            )}
+          </TableBody>
+          {hayGrupos && (
+            <TableFooter>
+              <TableRow>
+                <TableCell colSpan={5} className="font-medium">
+                  Total
+                </TableCell>
+                <TableCell colSpan={2} className="font-medium">
+                  {totalViajes} {totalViajes === 1 ? "viaje" : "viajes"} · {formatearMonto(totalImporte)}
+                </TableCell>
+              </TableRow>
+            </TableFooter>
           )}
-        </TableBody>
-        {hayGrupos && (
-          <TableFooter>
-            <TableRow>
-              <TableCell className="font-medium">Total</TableCell>
-              <TableCell className="font-medium">{totalPedidos}</TableCell>
-              <TableCell className="font-medium">{totalViajes}</TableCell>
-              <TableCell />
-              <TableCell />
-              <TableCell className="font-medium">{formatearMonto(totalImporte)}</TableCell>
-            </TableRow>
-          </TableFooter>
-        )}
-      </Table>
-
-      {hayGrupos && (
-        <div className="flex flex-col gap-2 pt-4">
-          <h2 className="font-medium">Detalle por pedido</h2>
-          <div className="overflow-x-auto rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nº Pedido</TableHead>
-                  <TableHead>Nº Afiliado</TableHead>
-                  <TableHead>Destinatario</TableHead>
-                  <TableHead>Dirección</TableHead>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>Zona</TableHead>
-                  <TableHead>Chofer</TableHead>
-                  <TableHead>Regla aplicada</TableHead>
-                  <TableHead>Importe del viaje</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {cargandoDetalle ? (
-                  <TableRow>
-                    <TableCell colSpan={9} className="text-muted-foreground">
-                      Cargando…
-                    </TableCell>
-                  </TableRow>
-                ) : !pedidosFacturados || pedidosFacturados.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={9} className="text-muted-foreground">
-                      No hay pedidos para mostrar.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  pedidosFacturados.map((pedido) => (
-                    <TableRow key={pedido.pedidoId}>
-                      <TableCell className="whitespace-nowrap">{pedido.numero}</TableCell>
-                      <TableCell className="whitespace-nowrap">{pedido.numeroAfiliado}</TableCell>
-                      <TableCell className="whitespace-nowrap">{pedido.destinatarioNombre}</TableCell>
-                      <TableCell className="whitespace-nowrap">{pedido.direccion}</TableCell>
-                      <TableCell className="whitespace-nowrap">{formatearFecha(pedido.fechaProgramada)}</TableCell>
-                      <TableCell className="whitespace-nowrap">{pedido.zonaTarifariaNombre ?? "—"}</TableCell>
-                      <TableCell className="whitespace-nowrap">{pedido.choferNombre ?? "Sin asignar"}</TableCell>
-                      <TableCell className="whitespace-nowrap">
-                        <BadgeRegla regla={pedido.reglaAplicada} />
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap">{formatearMonto(pedido.importeViaje)}</TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </div>
-      )}
+        </Table>
+      </div>
     </div>
+  );
+}
+
+function FilasGrupo({ grupo, pedidos }: { grupo: GrupoFacturacion; pedidos: PedidoFacturado[] }) {
+  return (
+    <Fragment>
+      <TableRow className="bg-muted/50 hover:bg-muted/50">
+        <TableCell colSpan={7}>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <BadgeRegla regla={grupo.reglaAplicada} />
+              {grupo.tarifaUtilizada !== null && (
+                <span className="text-sm text-muted-foreground">Tarifa {formatearMonto(grupo.tarifaUtilizada)}</span>
+              )}
+              {grupo.porcentajeAplicado !== null && (
+                <span className="text-sm text-muted-foreground">{grupo.porcentajeAplicado}%</span>
+              )}
+            </div>
+            <span className="text-sm font-medium">
+              {grupo.cantidadViajes} {grupo.cantidadViajes === 1 ? "viaje" : "viajes"} · {formatearMonto(grupo.importeCalculado)}
+            </span>
+          </div>
+        </TableCell>
+      </TableRow>
+      {pedidos.map((pedido) => (
+        <TableRow key={pedido.pedidoId}>
+          <TableCell className="whitespace-nowrap">{pedido.numero}</TableCell>
+          <TableCell className="whitespace-nowrap">{pedido.numeroAfiliado}</TableCell>
+          <TableCell className="whitespace-nowrap">{pedido.destinatarioNombre}</TableCell>
+          <TableCell className="whitespace-nowrap">{pedido.direccion}</TableCell>
+          <TableCell className="whitespace-nowrap">{formatearFecha(pedido.fechaProgramada)}</TableCell>
+          <TableCell className="whitespace-nowrap">{pedido.zonaTarifariaNombre ?? "—"}</TableCell>
+          <TableCell className="whitespace-nowrap">{pedido.choferNombre ?? "Sin asignar"}</TableCell>
+        </TableRow>
+      ))}
+    </Fragment>
   );
 }
