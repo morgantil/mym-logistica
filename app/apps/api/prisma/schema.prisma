@@ -509,12 +509,16 @@ model Pedido {
   eliminadoEn      DateTime?
   eliminadoPorId   String?
 
-  cliente          Cliente           @relation(fields: [clienteId], references: [id])
-  destinatario     Destinatario      @relation(fields: [destinatarioId], references: [id])
-  importacion      ImportacionExcel? @relation(fields: [importacionId], references: [id])
-  zonaTarifaria    ZonaTarifaria?    @relation(fields: [zonaTarifariaId], references: [id])
-  grupoFacturacion GrupoFacturacion? @relation(fields: [grupoFacturacionId], references: [id])
-  productos        Producto[]
+  cliente                       Cliente                @relation(fields: [clienteId], references: [id])
+  destinatario                  Destinatario           @relation(fields: [destinatarioId], references: [id])
+  importacion                   ImportacionExcel?      @relation(fields: [importacionId], references: [id])
+  zonaTarifaria                 ZonaTarifaria?         @relation(fields: [zonaTarifariaId], references: [id])
+  grupoFacturacion              GrupoFacturacion?      @relation(fields: [grupoFacturacionId], references: [id])
+  productos                     Producto[]
+  // Ver UnificacionCruzadaPar — un Pedido solo puede estar del lado que le
+  // corresponde según su propio tipoServicio, nunca los dos a la vez.
+  parUnificacionComoPanal       UnificacionCruzadaPar? @relation("UnificacionCruzadaPanal")
+  parUnificacionComoMedicamento UnificacionCruzadaPar? @relation("UnificacionCruzadaMedicamento")
 
   @@index([clienteId, estado, fechaProgramada])
   @@index([destinatarioId])
@@ -597,11 +601,36 @@ model CombinacionUnificacionClientes {
   creadoPorId String?
   eliminadoEn DateTime?
 
-  clienteMedicamento Cliente @relation("CombinacionMedicamento", fields: [clienteMedicamentoId], references: [id], onDelete: Cascade)
-  clientePanal       Cliente @relation("CombinacionPanal", fields: [clientePanalId], references: [id], onDelete: Cascade)
+  clienteMedicamento Cliente                 @relation("CombinacionMedicamento", fields: [clienteMedicamentoId], references: [id], onDelete: Cascade)
+  clientePanal       Cliente                 @relation("CombinacionPanal", fields: [clientePanalId], references: [id], onDelete: Cascade)
+  pares              UnificacionCruzadaPar[]
 
   @@unique([clienteMedicamentoId, clientePanalId])
   @@map("combinaciones_unificacion_clientes")
+}
+
+// Guia Arbet paso 4 — decisión 2026-09-11 (ver DOCUMENTO TECNICO.md
+// historial): una vez que una unificación ENTRE clientes distintos se
+// CONFIRMA de un lado, el par pañal/medicamento queda grabado acá para
+// siempre. Así, cuando el otro cliente de la combinación corra su propia
+// vista previa (antes o después, no importa el orden), tiene que respetar
+// la MISMA decisión en vez de volver a adivinar por fecha+ubicación. Sin
+// esto, dos clientes que comparten un viaje podían terminar con reglas
+// distintas (uno Unificada, el otro Individual) si confirmaban en momentos
+// distintos del mes, sin que nada lo detectara. Los `@unique` garantizan que
+// cada Pedido esté en como máximo un par.
+model UnificacionCruzadaPar {
+  id                  String   @id @default(uuid())
+  combinacionId       String
+  pedidoPanalId       String   @unique
+  pedidoMedicamentoId String   @unique
+  creadoEn            DateTime @default(now())
+
+  combinacion       CombinacionUnificacionClientes @relation(fields: [combinacionId], references: [id], onDelete: Cascade)
+  pedidoPanal       Pedido                         @relation("UnificacionCruzadaPanal", fields: [pedidoPanalId], references: [id], onDelete: Cascade)
+  pedidoMedicamento Pedido                         @relation("UnificacionCruzadaMedicamento", fields: [pedidoMedicamentoId], references: [id], onDelete: Cascade)
+
+  @@map("unificaciones_cruzadas_pares")
 }
 
 // Liquidación a transportistas (documento funcional v6, alcance nuevo) —

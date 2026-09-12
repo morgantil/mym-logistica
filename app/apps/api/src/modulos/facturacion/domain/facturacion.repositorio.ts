@@ -63,6 +63,12 @@ export interface DatosCrearCombinacion {
   clientePanalId: string;
 }
 
+export interface DatosCrearParUnificacion {
+  combinacionId: string;
+  pedidoPanalId: string;
+  pedidoMedicamentoId: string;
+}
+
 export interface FacturacionRepositorio {
   // Tarifas — §23 funcional. Decisión 2026-09-11: sin historial por vigencia,
   // una fila por cliente+zona+tipo+envase, editable y con toggle activa/inactiva
@@ -98,6 +104,32 @@ export interface FacturacionRepositorio {
   listarCombinacionesDeCliente(clienteId: string): Promise<CombinacionUnificacionClientes[]>;
   crearCombinacion(datos: DatosCrearCombinacion): Promise<CombinacionUnificacionClientes>;
   eliminarCombinacion(id: string): Promise<void>;
+
+  // Guia Arbet paso 4, riesgo #2 (ver UnificacionCruzadaPar en schema.prisma):
+  // de los ids pasados, cuáles ya están vinculados a otro pedido en una
+  // unificación cruzada confirmada, y con cuál. Sirve tanto para saber si un
+  // "propio" ya tiene un par decidido (hay que respetarlo, no volver a
+  // adivinar) como para excluir de los candidatos a un socio que ya está
+  // comprometido con otro pedido distinto.
+  obtenerParesPorPedidos(pedidoIds: string[]): Promise<Map<string, string>>;
+  // De los ids pasados, cuáles pertenecen a un GrupoFacturacion ya
+  // CONFIRMADO — un candidato en este estado ya no puede ofrecerse para una
+  // NUEVA unificación cruzada (su cliente ya lo facturó y cerró el mes con
+  // otra regla; ver DOCUMENTO TECNICO.md historial).
+  listarPedidosConGrupoConfirmado(pedidoIds: string[]): Promise<Set<string>>;
+  // La combinación activa (o no) que conecta a estos dos clientes, sin
+  // importar el orden — para saber a qué combinación pertenece un par a
+  // grabar en confirmar().
+  buscarCombinacionEntreClientes(
+    clienteAId: string,
+    clienteBId: string,
+  ): Promise<CombinacionUnificacionClientes | null>;
+  // Graba (o confirma que ya existe, idéntico) el par pañal/medicamento de
+  // una unificación cruzada recién confirmada. Si alguno de los dos pedidos
+  // ya está vinculado con un pedido DISTINTO, rechaza — eso indicaría una
+  // condición de carrera entre dos confirmaciones concurrentes, no un caso
+  // normal.
+  crearParUnificacion(datos: DatosCrearParUnificacion): Promise<void>;
 
   // Liquidación a transportistas — monto por viaje. Sin clienteId: un único
   // valor global. Sin vigencia desde 2026-09-11, mismo criterio que las tarifas.

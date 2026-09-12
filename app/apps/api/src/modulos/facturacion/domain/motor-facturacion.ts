@@ -27,6 +27,12 @@ export interface PedidoParaFacturar {
   // pero distinto Nº de ticket se agrupan en un solo Pedido por logística,
   // pero para el 2×1 son pedidos originales separados. Siempre ≥1.
   cantidadPedidoOriginal: number;
+  // Coordenada real de la entrega, geocodificada por SimpliRoute al enviar
+  // (ver Pedido.latitudEntrega) — null hasta que el pedido se envía, o si no
+  // pudo geocodificar. Usada solo por unificacion-cruzada.ts para emparejar
+  // pedidos de dos clientes distintos por ubicación real en vez de texto.
+  latitudEntrega: number | null;
+  longitudEntrega: number | null;
 }
 
 export type ReglaAplicada = "2x1" | "UNIFICADA" | "INDIVIDUAL";

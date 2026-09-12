@@ -8,6 +8,7 @@ import {
   DatosActualizarTarifaTransportista,
   DatosCrearCombinacion,
   DatosCrearGrupoFacturacion,
+  DatosCrearParUnificacion,
   DatosCrearPorcentaje,
   DatosCrearTarifa,
   DatosCrearTarifaTransportista,
@@ -211,6 +212,15 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
   }
 
   async crearCombinacion(datos: DatosCrearCombinacion): Promise<CombinacionUnificacionClientes> {
+    // `@@unique([clienteMedicamentoId, clientePanalId])` en el schema evitaría
+    // el duplicado igual, pero con un error crudo de Postgres — este chequeo
+    // da un mensaje entendible, mismo criterio que crearTarifa/crearPorcentaje.
+    const existente = await this.prisma.combinacionUnificacionClientes.findFirst({
+      where: { clienteMedicamentoId: datos.clienteMedicamentoId, clientePanalId: datos.clientePanalId },
+    });
+    if (existente) {
+      throw new BadRequestException("Ya existe esta combinación entre estos dos clientes.");
+    }
     const creada = await this.prisma.combinacionUnificacionClientes.create({
       data: {
         clienteMedicamentoId: datos.clienteMedicamentoId,
@@ -229,6 +239,67 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
       where: { id },
       data: { eliminadoEn: new Date() },
     });
+  }
+
+  async obtenerParesPorPedidos(pedidoIds: string[]): Promise<Map<string, string>> {
+    if (pedidoIds.length === 0) return new Map();
+    const pares = await this.prisma.unificacionCruzadaPar.findMany({
+      where: { OR: [{ pedidoPanalId: { in: pedidoIds } }, { pedidoMedicamentoId: { in: pedidoIds } }] },
+    });
+    const mapa = new Map<string, string>();
+    for (const par of pares) {
+      mapa.set(par.pedidoPanalId, par.pedidoMedicamentoId);
+      mapa.set(par.pedidoMedicamentoId, par.pedidoPanalId);
+    }
+    return mapa;
+  }
+
+  async listarPedidosConGrupoConfirmado(pedidoIds: string[]): Promise<Set<string>> {
+    if (pedidoIds.length === 0) return new Set();
+    const filas = await this.prisma.pedido.findMany({
+      where: { id: { in: pedidoIds }, grupoFacturacion: { estado: "CONFIRMADO" } },
+      select: { id: true },
+    });
+    return new Set(filas.map((fila) => fila.id));
+  }
+
+  async buscarCombinacionEntreClientes(
+    clienteAId: string,
+    clienteBId: string,
+  ): Promise<CombinacionUnificacionClientes | null> {
+    const fila = await this.prisma.combinacionUnificacionClientes.findFirst({
+      where: {
+        eliminadoEn: null,
+        OR: [
+          { clienteMedicamentoId: clienteAId, clientePanalId: clienteBId },
+          { clienteMedicamentoId: clienteBId, clientePanalId: clienteAId },
+        ],
+      },
+      include: {
+        clienteMedicamento: { select: { nombre: true } },
+        clientePanal: { select: { nombre: true } },
+      },
+    });
+    return fila ? mapearCombinacion(fila) : null;
+  }
+
+  async crearParUnificacion(datos: DatosCrearParUnificacion): Promise<void> {
+    const [existentePanal, existenteMedicamento] = await Promise.all([
+      this.prisma.unificacionCruzadaPar.findUnique({ where: { pedidoPanalId: datos.pedidoPanalId } }),
+      this.prisma.unificacionCruzadaPar.findUnique({ where: { pedidoMedicamentoId: datos.pedidoMedicamentoId } }),
+    ]);
+    if (existentePanal && existentePanal.pedidoMedicamentoId !== datos.pedidoMedicamentoId) {
+      throw new BadRequestException(
+        `El pedido ${datos.pedidoPanalId} ya está vinculado con otro pedido de medicamentos distinto.`,
+      );
+    }
+    if (existenteMedicamento && existenteMedicamento.pedidoPanalId !== datos.pedidoPanalId) {
+      throw new BadRequestException(
+        `El pedido ${datos.pedidoMedicamentoId} ya está vinculado con otro pedido de pañal distinto.`,
+      );
+    }
+    if (existentePanal) return; // ya existe exactamente este mismo par — nada que hacer.
+    await this.prisma.unificacionCruzadaPar.create({ data: datos });
   }
 
   listarTarifasTransportista(): Promise<TarifaTransportista[]> {

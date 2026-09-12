@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { AxiosError } from "axios";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { TipoServicio, TipoServicioCliente } from "@mym/shared-types";
@@ -24,6 +25,14 @@ const ETIQUETA_TIPO: Record<TipoServicio, string> = {
   [TipoServicio.PANAL]: "Pañales",
   [TipoServicio.MEDICAMENTO]: "Medicamentos",
 };
+
+function mensajeError(error: unknown): string {
+  if (error instanceof AxiosError && error.response?.data?.message) {
+    const mensaje = error.response.data.message;
+    return Array.isArray(mensaje) ? mensaje.join(" ") : mensaje;
+  }
+  return "No se pudo habilitar. Probá de nuevo en unos segundos.";
+}
 
 function descripcionTipoTarifa(tarifa: { tipoServicio: TipoServicio; tipoEnvase: string | null }): string {
   if (tarifa.tipoServicio === TipoServicio.PANAL) return ETIQUETA_TIPO.PANAL;
@@ -217,7 +226,7 @@ function CombinacionesUnificacion() {
       setClienteMedicamentoId("");
       setClientePanalId("");
     },
-    onError: () => toast.error("No se pudo habilitar — ¿ya existe esa combinación?"),
+    onError: (error) => toast.error(mensajeError(error)),
   });
 
   const mutacionEliminar = useMutation({

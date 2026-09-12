@@ -1,5 +1,5 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { TipoEnvase, TipoServicio } from "@mym/shared-types";
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { TipoEnvase, TipoServicio, TipoServicioCliente } from "@mym/shared-types";
 import { ClientesService } from "../../clientes/application/clientes.service";
 import { PedidoFacturable } from "../../pedidos/domain/pedido";
 import { PedidosService } from "../../pedidos/application/pedidos.service";
@@ -9,6 +9,7 @@ import {
   FACTURACION_REPOSITORIO,
   FacturacionRepositorio,
 } from "../domain/facturacion.repositorio";
+import { GrupoFacturacion } from "../domain/grupo-facturacion";
 import {
   PedidoParaFacturar,
   TarifasPorTipo,
@@ -20,7 +21,7 @@ import {
   ResumenChofer,
   calcularLiquidacionTransportistas,
 } from "../domain/motor-liquidacion-transportistas";
-import { calcularUnificacionesEntreClientes } from "../domain/unificacion-cruzada";
+import { calcularUnificacionesEntreClientes, construirViajeUnificacionCruzada } from "../domain/unificacion-cruzada";
 import { generarReporteMensualExcel } from "../infrastructure/reporte-mensual-excel.generador";
 
 export interface PedidoExcluido {
@@ -42,6 +43,8 @@ function rangoDelMes(mes: number, anio: number): { fechaDesde: Date; fechaHasta:
 
 @Injectable()
 export class FacturacionService {
+  private readonly logger = new Logger(FacturacionService.name);
+
   constructor(
     @Inject(FACTURACION_REPOSITORIO) private readonly repositorio: FacturacionRepositorio,
     private pedidosService: PedidosService,
@@ -86,7 +89,30 @@ export class FacturacionService {
     return this.repositorio.listarCombinaciones();
   }
 
-  crearCombinacion(clienteMedicamentoId: string, clientePanalId: string) {
+  // Decisión 2026-09-11 (riesgo #3 charlado con Leonardo): antes no se
+  // validaba nada al crear una combinación — un error de tipeo (clientes al
+  // revés, o un cliente que en realidad no maneja ese tipo de servicio)
+  // rompía en silencio todo el emparejamiento de unificación cruzada.
+  async crearCombinacion(clienteMedicamentoId: string, clientePanalId: string) {
+    if (clienteMedicamentoId === clientePanalId) {
+      throw new BadRequestException("No se puede combinar un cliente consigo mismo.");
+    }
+    const [clienteMedicamento, clientePanal] = await Promise.all([
+      this.clientesService.buscarPorId(clienteMedicamentoId),
+      this.clientesService.buscarPorId(clientePanalId),
+    ]);
+    if (!clienteMedicamento) throw new NotFoundException(`Cliente ${clienteMedicamentoId} no encontrado.`);
+    if (!clientePanal) throw new NotFoundException(`Cliente ${clientePanalId} no encontrado.`);
+    if (clienteMedicamento.tipoServicio === TipoServicioCliente.PANAL) {
+      throw new BadRequestException(
+        `"${clienteMedicamento.nombre}" está configurado como Pañal — no puede ser el lado Medicamento de una combinación.`,
+      );
+    }
+    if (clientePanal.tipoServicio === TipoServicioCliente.MEDICAMENTO) {
+      throw new BadRequestException(
+        `"${clientePanal.nombre}" está configurado como Medicamento — no puede ser el lado Pañal de una combinación.`,
+      );
+    }
     return this.repositorio.crearCombinacion({ clienteMedicamentoId, clientePanalId });
   }
 
@@ -159,10 +185,65 @@ export class FacturacionService {
         fechaProgramada: pedido.fechaProgramada.toISOString().slice(0, 10),
         direccionUsada: pedido.direccionUsada,
         zonaTarifariaId: pedido.zonaTarifariaId,
+        latitudEntrega: pedido.latitudEntrega,
+        longitudEntrega: pedido.longitudEntrega,
       });
     }
 
     return { pedidosParaFacturar, excluidos };
+  }
+
+  // Guia Arbet paso 4, riesgo #2 charlado con Leonardo (ver
+  // UnificacionCruzadaPar en schema.prisma): antes de buscar un match nuevo
+  // por fecha/ubicación, hay que respetar cualquier par YA decidido en una
+  // confirmación anterior (de cualquiera de los dos clientes) — si no, dos
+  // clientes que comparten un viaje pueden terminar con reglas distintas
+  // según en qué momento del mes confirmó cada uno. Los candidatos socio que
+  // ya están comprometidos con otro pedido, o que su cliente ya los facturó
+  // en firme con otra regla (confirmados sin par), quedan afuera del
+  // emparejamiento nuevo — unificarlos ahora los dejaría inconsistentes con
+  // lo que ya cerró ese cliente.
+  private async resolverUnificacionesCruzadas(
+    propios: PedidoParaFacturar[],
+    obtenerSocios: () => Promise<PedidoParaFacturar[]>,
+    tarifas: TarifasPorTipo,
+    porcentajePropio: number,
+  ): Promise<{ viajes: ViajeFacturable[]; propiosRestantes: PedidoParaFacturar[] }> {
+    if (propios.length === 0) return { viajes: [], propiosRestantes: [] };
+
+    const socios = await obtenerSocios();
+    const sociosPorId = new Map(socios.map((socio) => [socio.id, socio]));
+    const pares = await this.repositorio.obtenerParesPorPedidos([
+      ...propios.map((propio) => propio.id),
+      ...socios.map((socio) => socio.id),
+    ]);
+
+    const viajes: ViajeFacturable[] = [];
+    const propiosSinResolver: PedidoParaFacturar[] = [];
+    for (const propio of propios) {
+      const idSocio = pares.get(propio.id);
+      const socio = idSocio ? sociosPorId.get(idSocio) : undefined;
+      if (socio) {
+        viajes.push(construirViajeUnificacionCruzada(propio, socio, tarifas, porcentajePropio));
+      } else {
+        propiosSinResolver.push(propio);
+      }
+    }
+
+    const sociosSinPar = socios.filter((socio) => !pares.has(socio.id));
+    const confirmadosSinPar = await this.repositorio.listarPedidosConGrupoConfirmado(
+      sociosSinPar.map((socio) => socio.id),
+    );
+    const sociosDisponibles = sociosSinPar.filter((socio) => !confirmadosSinPar.has(socio.id));
+
+    const { viajes: viajesNuevos, propiosRestantes } = calcularUnificacionesEntreClientes(
+      propiosSinResolver,
+      sociosDisponibles,
+      tarifas,
+      porcentajePropio,
+    );
+
+    return { viajes: [...viajes, ...viajesNuevos], propiosRestantes };
   }
 
   // §27 funcional: corre el motor de reglas sobre los pedidos ENTREGADOS del
@@ -250,19 +331,21 @@ export class FacturacionService {
     if (combosComoPanal.length > 0) {
       const propiosPanal = pedidosRestantes.filter((p) => p.tipoServicio === TipoServicio.PANAL);
       const otros = pedidosRestantes.filter((p) => p.tipoServicio !== TipoServicio.PANAL);
-      const socios: PedidoParaFacturar[] = [];
-      for (const combo of combosComoPanal) {
-        const pedidosSocioCrudos = await this.pedidosService.listarEntregadosEnPeriodo({
-          clienteId: combo.clienteMedicamentoId,
-          fechaDesde,
-          fechaHasta,
-        });
-        const { pedidosParaFacturar } = this.construirPedidosParaFacturar(pedidosSocioCrudos);
-        socios.push(...pedidosParaFacturar.filter((p) => p.tipoServicio === TipoServicio.MEDICAMENTO));
-      }
-      const { viajes, propiosRestantes: sinUnificar } = calcularUnificacionesEntreClientes(
+      const { viajes, propiosRestantes: sinUnificar } = await this.resolverUnificacionesCruzadas(
         propiosPanal,
-        socios,
+        async () => {
+          const socios: PedidoParaFacturar[] = [];
+          for (const combo of combosComoPanal) {
+            const pedidosSocioCrudos = await this.pedidosService.listarEntregadosEnPeriodo({
+              clienteId: combo.clienteMedicamentoId,
+              fechaDesde,
+              fechaHasta,
+            });
+            const { pedidosParaFacturar } = this.construirPedidosParaFacturar(pedidosSocioCrudos);
+            socios.push(...pedidosParaFacturar.filter((p) => p.tipoServicio === TipoServicio.MEDICAMENTO));
+          }
+          return socios;
+        },
         tarifas,
         porcentajeActivoCliente?.porcentajePanal ?? 0,
       );
@@ -273,19 +356,21 @@ export class FacturacionService {
     if (combosComoMedicamento.length > 0) {
       const propiosMedicamento = pedidosRestantes.filter((p) => p.tipoServicio === TipoServicio.MEDICAMENTO);
       const otros = pedidosRestantes.filter((p) => p.tipoServicio !== TipoServicio.MEDICAMENTO);
-      const socios: PedidoParaFacturar[] = [];
-      for (const combo of combosComoMedicamento) {
-        const pedidosSocioCrudos = await this.pedidosService.listarEntregadosEnPeriodo({
-          clienteId: combo.clientePanalId,
-          fechaDesde,
-          fechaHasta,
-        });
-        const { pedidosParaFacturar } = this.construirPedidosParaFacturar(pedidosSocioCrudos);
-        socios.push(...pedidosParaFacturar.filter((p) => p.tipoServicio === TipoServicio.PANAL));
-      }
-      const { viajes, propiosRestantes: sinUnificar } = calcularUnificacionesEntreClientes(
+      const { viajes, propiosRestantes: sinUnificar } = await this.resolverUnificacionesCruzadas(
         propiosMedicamento,
-        socios,
+        async () => {
+          const socios: PedidoParaFacturar[] = [];
+          for (const combo of combosComoMedicamento) {
+            const pedidosSocioCrudos = await this.pedidosService.listarEntregadosEnPeriodo({
+              clienteId: combo.clientePanalId,
+              fechaDesde,
+              fechaHasta,
+            });
+            const { pedidosParaFacturar } = this.construirPedidosParaFacturar(pedidosSocioCrudos);
+            socios.push(...pedidosParaFacturar.filter((p) => p.tipoServicio === TipoServicio.PANAL));
+          }
+          return socios;
+        },
         tarifas,
         porcentajeActivoCliente?.porcentajeMedicamento ?? 0,
       );
@@ -334,7 +419,48 @@ export class FacturacionService {
     if (grupos.every((grupo) => grupo.estado !== "BORRADOR")) {
       throw new BadRequestException("Este mes ya está confirmado.");
     }
-    return this.repositorio.confirmar(clienteId, mes, anio, usuarioId);
+    const confirmados = await this.repositorio.confirmar(clienteId, mes, anio, usuarioId);
+    await this.grabarParesDeUnificacionCruzada(confirmados);
+    return confirmados;
+  }
+
+  // Guia Arbet paso 4, riesgo #2 (ver UnificacionCruzadaPar en schema.prisma):
+  // la primera vez que una unificación cruzada queda CONFIRMADA, se graba el
+  // par pañal/medicamento para siempre. Cuando el otro cliente de la
+  // combinación corra su propia vista previa (antes o después, no importa el
+  // orden), `resolverUnificacionesCruzadas` va a encontrar este par y
+  // respetarlo en vez de volver a adivinar por fecha/ubicación — así los dos
+  // lados quedan garantizados consistentes. Si grabar un par falla (debería
+  // ser rarísimo: significaría que otro pedido ya se adelantó y se quedó con
+  // el mismo socio en el instante entre calcular y confirmar), no se bloquea
+  // la confirmación por esto — el peor caso es quedar sin la red de
+  // seguridad para ESE par puntual, no perder la confirmación ya hecha.
+  private async grabarParesDeUnificacionCruzada(grupos: GrupoFacturacion[]): Promise<void> {
+    for (const grupo of grupos) {
+      if (grupo.reglaAplicada !== "UNIFICADA" || !grupo.pedidoSocioId || !grupo.clienteSocioId) continue;
+      try {
+        const combinacion = await this.repositorio.buscarCombinacionEntreClientes(
+          grupo.clienteId,
+          grupo.clienteSocioId,
+        );
+        if (!combinacion) continue;
+        const propioEsMedicamento = combinacion.clienteMedicamentoId === grupo.clienteId;
+        await this.repositorio.crearParUnificacion({
+          combinacionId: combinacion.id,
+          pedidoPanalId: propioEsMedicamento ? grupo.pedidoSocioId : grupo.pedidoIds[0],
+          pedidoMedicamentoId: propioEsMedicamento ? grupo.pedidoIds[0] : grupo.pedidoSocioId,
+        });
+      } catch (error) {
+        // Ver comentario de arriba — no se propaga, la confirmación ya se
+        // hizo. Se loguea sí o sí: sin esto, un conflicto real quedaba sin
+        // ningún rastro (encontrado charlando riesgos con Leonardo).
+        this.logger.warn(
+          `No se pudo grabar el par de unificación cruzada para el grupo ${grupo.id} (cliente ${grupo.clienteId}): ${
+            error instanceof Error ? error.message : error
+          }`,
+        );
+      }
+    }
   }
 
   // §31 funcional: reporte mensual por cliente, exportable a Excel. Sirve

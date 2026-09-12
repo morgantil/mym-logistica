@@ -28,25 +28,107 @@ export interface ResultadoUnificacionCruzada {
   propiosRestantes: PedidoParaFacturar[];
 }
 
+// Radio de tolerancia para considerar "la misma entrega" — decisión
+// 2026-09-11 (ver DOCUMENTO TECNICO.md historial): dos empresas distintas
+// tipeando la misma dirección real en sus propios Excel casi nunca coinciden
+// letra por letra ("5º" vs "5to", "Depto" vs "Dpto"), así que emparejar por
+// texto exacto (como se hacía antes) pierde matches reales en silencio, sin
+// avisar. La coordenada real de entrega (geocodificada por SimpliRoute al
+// enviar, ver Pedido.latitudEntrega) no depende de cómo cada empresa tipeó
+// la dirección. No hay todavía datos reales de Farmaet para calibrar el
+// número "correcto" — Leonardo eligió 100 metros directamente como margen
+// suficiente en vez de esperar a tener casos reales para ajustarlo.
+const RADIO_MISMA_UBICACION_METROS = 100;
+
+type PedidoConCoordenadas = PedidoParaFacturar & { latitudEntrega: number; longitudEntrega: number };
+
+function tieneCoordenadas(pedido: PedidoParaFacturar): pedido is PedidoConCoordenadas {
+  return pedido.latitudEntrega !== null && pedido.longitudEntrega !== null;
+}
+
+// Distancia entre dos coordenadas en metros (fórmula de Haversine — la
+// Tierra no es plana, pero a la escala de una ciudad el error de asumir una
+// esfera es insignificante para lo que necesitamos: distinguir "mismo
+// edificio" de "otra cuadra").
+function distanciaMetros(
+  a: { lat: number; lon: number },
+  b: { lat: number; lon: number },
+): number {
+  const RADIO_TIERRA_METROS = 6371000;
+  const aRadianes = (grados: number) => (grados * Math.PI) / 180;
+  const deltaLat = aRadianes(b.lat - a.lat);
+  const deltaLon = aRadianes(b.lon - a.lon);
+  const haversine =
+    Math.sin(deltaLat / 2) ** 2 +
+    Math.cos(aRadianes(a.lat)) * Math.cos(aRadianes(b.lat)) * Math.sin(deltaLon / 2) ** 2;
+  return 2 * RADIO_TIERRA_METROS * Math.asin(Math.sqrt(haversine));
+}
+
+// Elige, de los candidatos disponibles en la misma fecha, cuál es "el mismo
+// domicilio" que `propio`. Prioriza coordenadas reales (más confiable, ver
+// comentario de RADIO_MISMA_UBICACION_METROS); si a `propio` o a un
+// candidato le falta la coordenada (todavía no se envió a SimpliRoute, o no
+// pudo geocodificar), cae al texto exacto como red de seguridad — nunca deja
+// de intentar emparejar solo porque falta un dato.
+function elegirSocio(
+  propio: PedidoParaFacturar,
+  candidatos: PedidoParaFacturar[],
+): PedidoParaFacturar | undefined {
+  if (tieneCoordenadas(propio)) {
+    let mejorCandidato: PedidoConCoordenadas | undefined;
+    let mejorDistancia = RADIO_MISMA_UBICACION_METROS;
+    const sinCoordenadas: PedidoParaFacturar[] = [];
+
+    for (const candidato of candidatos) {
+      if (!tieneCoordenadas(candidato)) {
+        sinCoordenadas.push(candidato);
+        continue;
+      }
+      const distancia = distanciaMetros(
+        { lat: propio.latitudEntrega, lon: propio.longitudEntrega },
+        { lat: candidato.latitudEntrega, lon: candidato.longitudEntrega },
+      );
+      if (distancia <= mejorDistancia) {
+        mejorCandidato = candidato;
+        mejorDistancia = distancia;
+      }
+    }
+    if (mejorCandidato) return mejorCandidato;
+
+    // Ningún candidato con coordenada cayó dentro del radio — solo probamos
+    // texto contra los que NO tienen coordenada (si uno con coordenada no
+    // matcheó por distancia, confiamos en esa señal antes que en el texto).
+    return sinCoordenadas.find(
+      (candidato) => normalizarDireccion(candidato.direccionUsada) === normalizarDireccion(propio.direccionUsada),
+    );
+  }
+
+  // `propio` no tiene coordenada todavía (no se envió a SimpliRoute) — el
+  // único dato disponible para comparar es el texto de la dirección.
+  return candidatos.find(
+    (candidato) => normalizarDireccion(candidato.direccionUsada) === normalizarDireccion(propio.direccionUsada),
+  );
+}
+
 export function buscarUnificacionesEntreClientes(
   propios: PedidoParaFacturar[],
   socios: PedidoParaFacturar[],
 ): ResultadoUnificacionCruzada {
-  const disponiblesPorClave = new Map<string, PedidoParaFacturar[]>();
+  const disponiblesPorFecha = new Map<string, PedidoParaFacturar[]>();
   for (const socio of socios) {
-    const clave = [socio.fechaProgramada, normalizarDireccion(socio.direccionUsada)].join("|");
-    const lista = disponiblesPorClave.get(clave);
+    const lista = disponiblesPorFecha.get(socio.fechaProgramada);
     if (lista) lista.push(socio);
-    else disponiblesPorClave.set(clave, [socio]);
+    else disponiblesPorFecha.set(socio.fechaProgramada, [socio]);
   }
 
   const unificaciones: { propio: PedidoParaFacturar; socio: PedidoParaFacturar }[] = [];
   const propiosRestantes: PedidoParaFacturar[] = [];
 
   for (const propio of propios) {
-    const clave = [propio.fechaProgramada, normalizarDireccion(propio.direccionUsada)].join("|");
-    const socio = disponiblesPorClave.get(clave)?.shift();
+    const candidatos = disponiblesPorFecha.get(propio.fechaProgramada) ?? [];
+    const socio = elegirSocio(propio, candidatos);
     if (socio) {
+      candidatos.splice(candidatos.indexOf(socio), 1);
       unificaciones.push({ propio, socio });
     } else {
       propiosRestantes.push(propio);
@@ -56,10 +138,45 @@ export function buscarUnificacionesEntreClientes(
   return { unificaciones, propiosRestantes };
 }
 
-// Arma las ViajeFacturable de las unificaciones cruzadas encontradas, usando
-// SOLO la tarifa/porcentaje propios del cliente que se está facturando
-// (`porcentajePropio` ya viene resuelto por el llamador: porcentajePanal si
-// `propios` son pañales, porcentajeMedicamento si son medicamentos).
+// Arma la ViajeFacturable de UNA unificación cruzada ya decidida (propio +
+// socio), usando SOLO la tarifa/porcentaje propios del cliente que se está
+// facturando (`porcentajePropio` ya viene resuelto por el llamador:
+// porcentajePanal si `propio` es pañal, porcentajeMedicamento si es
+// medicamento). Separado de `calcularUnificacionesEntreClientes` para que
+// FacturacionService también lo pueda usar directo cuando el par ya viene
+// decidido de antes (ver UnificacionCruzadaPar, riesgo #2) y no hace falta
+// volver a buscarlo por fecha/ubicación.
+export function construirViajeUnificacionCruzada(
+  propio: PedidoParaFacturar,
+  socio: PedidoParaFacturar,
+  tarifas: TarifasPorTipo,
+  porcentajePropio: number,
+): ViajeFacturable {
+  const tarifa = tarifas[claveTarifaDePedido(propio)];
+  if (tarifa === undefined) {
+    throw new Error(
+      `Falta tarifa vigente para zona=${propio.zonaTarifariaId} tipoServicio=${propio.tipoServicio} tipoEnvase=${propio.tipoEnvase ?? "-"}.`,
+    );
+  }
+  const importe = tarifa * (porcentajePropio / 100);
+  return {
+    clienteId: propio.clienteId,
+    fecha: propio.fechaProgramada,
+    direccion: propio.direccionUsada,
+    zonaTarifariaId: propio.zonaTarifariaId,
+    pedidoIds: [propio.id],
+    reglaAplicada: "UNIFICADA",
+    cantidadViajes: 1,
+    tarifaUtilizada: tarifa,
+    porcentajeAplicado: porcentajePropio,
+    importeCalculado: importe,
+    socioEntreClientes: { pedidoId: socio.id, clienteId: socio.clienteId },
+  };
+}
+
+// Arma las ViajeFacturable de las unificaciones cruzadas encontradas por
+// fecha/ubicación (ver buscarUnificacionesEntreClientes) — usado para los
+// pedidos que todavía NO tienen un par decidido de antes.
 export function calcularUnificacionesEntreClientes(
   propios: PedidoParaFacturar[],
   socios: PedidoParaFacturar[],
@@ -67,29 +184,8 @@ export function calcularUnificacionesEntreClientes(
   porcentajePropio: number,
 ): { viajes: ViajeFacturable[]; propiosRestantes: PedidoParaFacturar[] } {
   const { unificaciones, propiosRestantes } = buscarUnificacionesEntreClientes(propios, socios);
-
-  const viajes: ViajeFacturable[] = unificaciones.map(({ propio, socio }) => {
-    const tarifa = tarifas[claveTarifaDePedido(propio)];
-    if (tarifa === undefined) {
-      throw new Error(
-        `Falta tarifa vigente para zona=${propio.zonaTarifariaId} tipoServicio=${propio.tipoServicio} tipoEnvase=${propio.tipoEnvase ?? "-"}.`,
-      );
-    }
-    const importe = tarifa * (porcentajePropio / 100);
-    return {
-      clienteId: propio.clienteId,
-      fecha: propio.fechaProgramada,
-      direccion: propio.direccionUsada,
-      zonaTarifariaId: propio.zonaTarifariaId,
-      pedidoIds: [propio.id],
-      reglaAplicada: "UNIFICADA",
-      cantidadViajes: 1,
-      tarifaUtilizada: tarifa,
-      porcentajeAplicado: porcentajePropio,
-      importeCalculado: importe,
-      socioEntreClientes: { pedidoId: socio.id, clienteId: socio.clienteId },
-    };
-  });
-
+  const viajes = unificaciones.map(({ propio, socio }) =>
+    construirViajeUnificacionCruzada(propio, socio, tarifas, porcentajePropio),
+  );
   return { viajes, propiosRestantes };
 }

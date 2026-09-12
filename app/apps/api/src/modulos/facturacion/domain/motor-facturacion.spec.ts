@@ -49,6 +49,8 @@ function pedido(overrides: Partial<PedidoParaFacturar> & { id: string }): Pedido
     fechaProgramada: "2026-08-01",
     direccionUsada: "Av. Siempre Viva 123",
     zonaTarifariaId: ZONA_CABA,
+    latitudEntrega: null,
+    longitudEntrega: null,
     ...overrides,
   };
 }
