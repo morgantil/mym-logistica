@@ -8,12 +8,6 @@ export class ActualizarPorcentajeDto {
   porcentajePanal?: number;
 
   @IsOptional()
-  @IsNumber()
-  @Min(0)
-  @Max(100)
-  porcentajeMedicamento?: number;
-
-  @IsOptional()
   @IsBoolean()
   activa?: boolean;
 }

@@ -21,17 +21,39 @@ export interface TarifaCliente {
   activa: boolean;
 }
 
-// Porcentaje aplicado en una entrega unificada — DOCUMENTO FUNCIONAL.md §25.
-// Dos columnas (no una) desde 2026-09-08: el negocio real cobra un %
-// configurable de CADA lado (pañal y medicamento), no solo un "% adicional"
-// sobre un pañal fijo al 100% como asume el documento Arbet — ver DOCUMENTO
-// TECNICO.md historial de esa fecha. Sin vigencia desde 2026-09-11 (mismo
-// criterio que TarifaCliente): una fila por cliente, editable, activa/inactiva.
+// Porcentaje aplicado al lado PAÑAL de una entrega unificada — DOCUMENTO
+// FUNCIONAL.md §25. Decisión 2026-09-08: el negocio real cobra un %
+// configurable del pañal, no un pañal fijo al 100% como asume el documento
+// Arbet — ver DOCUMENTO TECNICO.md historial de esa fecha. Decisión
+// 2026-09-12 (ping-pong con Leonardo): el lado MEDICAMENTO dejó de usar un
+// segundo porcentaje acá — pasa a ser un monto fijo en pesos que varía por
+// zona (ver MontoUnificadoMedicamento más abajo), "un plus editable por
+// llevar el medicamento de paso" en sus palabras, no un % de ninguna tarifa.
+// Sin vigencia desde 2026-09-11 (mismo criterio que TarifaCliente): una fila
+// por cliente, editable, activa/inactiva.
 export interface PorcentajeSegundoServicio {
   id: string;
   clienteId: string;
   porcentajePanal: number;
-  porcentajeMedicamento: number;
+  activa: boolean;
+}
+
+// Monto fijo que cobra el lado MEDICAMENTO de una entrega unificada, "de
+// paso" por compartir el viaje con el pañal — decisión 2026-09-12. Varía por
+// zona tarifaria (Leonardo: 2 valores CABA/Provincia para Farmaet, Farmapal,
+// Biosíntesis y el lado pañal de Bella Vista; 4 valores, uno por Cordón,
+// específicamente para Bella Vista Medicamentos). `tipoEnvase` es opcional
+// a propósito — hoy el monto es el mismo sea Bolsa o Bulto (una sola fila
+// con tipoEnvase null cubre los dos), pero Leonardo pidió dejar la puerta
+// abierta a diferenciarlo en el futuro sin otra migración: alcanzaría con
+// cargar una fila para BOLSA y otra para BULTO en esa misma zona.
+export interface MontoUnificadoMedicamento {
+  id: string;
+  clienteId: string;
+  zonaTarifariaId: string;
+  zonaTarifariaNombre?: string;
+  tipoEnvase: TipoEnvase | null;
+  monto: number;
   activa: boolean;
 }
 

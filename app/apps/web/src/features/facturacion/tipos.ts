@@ -15,7 +15,19 @@ export interface PorcentajeSegundoServicio {
   id: string;
   clienteId: string;
   porcentajePanal: number;
-  porcentajeMedicamento: number;
+  activa: boolean;
+}
+
+// Monto fijo del lado medicamento en una entrega unificada — decisión
+// 2026-09-12 (reemplaza al % que usaba antes, ver DOCUMENTO TECNICO.md
+// historial). `tipoEnvase` null = aplica igual a Bolsa y Bulto.
+export interface MontoUnificadoMedicamento {
+  id: string;
+  clienteId: string;
+  zonaTarifariaId: string;
+  zonaTarifariaNombre?: string;
+  tipoEnvase: TipoEnvase | null;
+  monto: number;
   activa: boolean;
 }
 
@@ -50,7 +62,7 @@ export interface GrupoFacturacion {
   tarifaUtilizada: number | null;
   porcentajeAplicado: number | null;
   porcentajePanalAplicado: number | null;
-  porcentajeMedicamentoAplicado: number | null;
+  montoFijoMedicamentoAplicado: number | null;
   pedidoSocioId: string | null;
   clienteSocioId: string | null;
   cantidadViajes: number;
@@ -82,7 +94,7 @@ export interface PedidoFacturado {
   tarifaUtilizada: number | null;
   porcentajeAplicado: number | null;
   porcentajePanalAplicado: number | null;
-  porcentajeMedicamentoAplicado: number | null;
+  montoFijoMedicamentoAplicado: number | null;
   cantidadViajes: number;
   importeViaje: number;
 }

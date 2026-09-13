@@ -53,7 +53,7 @@ export async function generarReporteMensualExcel(datos: {
     { header: "Tarifa del viaje", key: "tarifa", width: 16 },
     { header: "Porcentaje aplicado", key: "porcentaje", width: 18 },
     { header: "% Pañal (unificada)", key: "porcentajePanal", width: 18 },
-    { header: "% Medicamento (unificada)", key: "porcentajeMedicamento", width: 22 },
+    { header: "Monto fijo Medicamento (unificada)", key: "montoFijoMedicamento", width: 26 },
     { header: "Importe del viaje", key: "importe", width: 16 },
   ];
   hojaDetalle.getRow(1).font = { bold: true };
@@ -73,7 +73,7 @@ export async function generarReporteMensualExcel(datos: {
       tarifa: pedido.tarifaUtilizada,
       porcentaje: pedido.porcentajeAplicado,
       porcentajePanal: pedido.porcentajePanalAplicado,
-      porcentajeMedicamento: pedido.porcentajeMedicamentoAplicado,
+      montoFijoMedicamento: pedido.montoFijoMedicamentoAplicado,
       importe: pedido.importeViaje,
     });
   }

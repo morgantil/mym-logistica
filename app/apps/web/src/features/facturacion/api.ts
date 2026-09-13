@@ -3,6 +3,7 @@ import { apiClient } from "@/lib/api-client";
 import type {
   CombinacionUnificacionClientes,
   GrupoFacturacion,
+  MontoUnificadoMedicamento,
   PedidoFacturado,
   PorcentajeSegundoServicio,
   ResultadoVistaPrevia,
@@ -45,7 +46,6 @@ export async function listarPorcentajes(clienteId: string): Promise<PorcentajeSe
 export async function crearPorcentaje(datos: {
   clienteId: string;
   porcentajePanal: number;
-  porcentajeMedicamento: number;
 }): Promise<PorcentajeSegundoServicio> {
   const { data } = await apiClient.post<PorcentajeSegundoServicio>(
     "/facturacion/porcentaje-segundo-servicio",
@@ -56,10 +56,41 @@ export async function crearPorcentaje(datos: {
 
 export async function actualizarPorcentaje(
   id: string,
-  datos: Partial<{ porcentajePanal: number; porcentajeMedicamento: number; activa: boolean }>,
+  datos: Partial<{ porcentajePanal: number; activa: boolean }>,
 ): Promise<PorcentajeSegundoServicio> {
   const { data } = await apiClient.patch<PorcentajeSegundoServicio>(
     `/facturacion/porcentaje-segundo-servicio/${id}`,
+    datos,
+  );
+  return data;
+}
+
+export async function listarMontosUnificadoMedicamento(clienteId: string): Promise<MontoUnificadoMedicamento[]> {
+  const { data } = await apiClient.get<MontoUnificadoMedicamento[]>("/facturacion/monto-unificado-medicamento", {
+    params: { clienteId },
+  });
+  return data;
+}
+
+export async function crearMontoUnificadoMedicamento(datos: {
+  clienteId: string;
+  zonaTarifariaId: string;
+  tipoEnvase?: TipoEnvase;
+  monto: number;
+}): Promise<MontoUnificadoMedicamento> {
+  const { data } = await apiClient.post<MontoUnificadoMedicamento>(
+    "/facturacion/monto-unificado-medicamento",
+    datos,
+  );
+  return data;
+}
+
+export async function actualizarMontoUnificadoMedicamento(
+  id: string,
+  datos: Partial<{ monto: number; activa: boolean }>,
+): Promise<MontoUnificadoMedicamento> {
+  const { data } = await apiClient.patch<MontoUnificadoMedicamento>(
+    `/facturacion/monto-unificado-medicamento/${id}`,
     datos,
   );
   return data;

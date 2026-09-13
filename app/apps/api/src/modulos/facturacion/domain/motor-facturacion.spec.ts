@@ -1,5 +1,6 @@
 import { TipoEnvase, TipoServicio } from "@mym/shared-types";
 import {
+  ConfigUnificacionInterna,
   PedidoParaFacturar,
   TarifasPorTipo,
   agruparPorClienteFechaDireccion,
@@ -34,11 +35,29 @@ const TARIFAS: TarifasPorTipo = {
   })]: 1200,
 };
 
-// Reproduce el caso "tal cual viene del documento Arbet": pañal 100% + un %
-// adicional de medicamento. Los tests que quieren el % configurable de ambos
-// lados (regla real del negocio, ver DOCUMENTO TECNICO.md 2026-09-08) usan
-// PORCENTAJES_CONFIGURABLES en su lugar.
-const PORCENTAJES_DOCUMENTO_ARBET = { panal: 100, medicamento: 50 };
+// Monto fijo del lado medicamento en una entrega unificada (decisión
+// 2026-09-12, reemplaza al % que usaba antes) — 400 para Bolsa y 600 para
+// Bulto, elegidos para no tener que recalcular a mano los importes de los
+// casos de ejemplo de abajo (coinciden con lo que antes daba el 50%).
+const MONTOS_UNIFICADO: TarifasPorTipo = {
+  [construirClaveTarifa({
+    zonaTarifariaId: ZONA_CABA,
+    tipoServicio: TipoServicio.MEDICAMENTO,
+    tipoEnvase: TipoEnvase.BOLSA,
+  })]: 400,
+  [construirClaveTarifa({
+    zonaTarifariaId: ZONA_CABA,
+    tipoServicio: TipoServicio.MEDICAMENTO,
+    tipoEnvase: TipoEnvase.BULTO,
+  })]: 600,
+};
+
+// Reproduce el caso "tal cual viene del documento Arbet": pañal 100% + un
+// monto fijo de medicamento.
+const CONFIG_UNIFICACION_ARBET: ConfigUnificacionInterna = {
+  porcentajePanal: 100,
+  montosUnificadoMedicamento: MONTOS_UNIFICADO,
+};
 
 function pedido(overrides: Partial<PedidoParaFacturar> & { id: string }): PedidoParaFacturar {
   return {
@@ -61,7 +80,7 @@ function pedidos(cantidad: number, overrides: Partial<PedidoParaFacturar> = {}):
 
 describe("motor-facturacion — casos de ejemplo del §28 funcional / Guia Arbet §9", () => {
   it("caso 1: 10 pedidos de pañales, mismo cliente/fecha/dirección → 1 fila, 5 viajes 2x1, sin unificación", () => {
-    const viajes = calcularFacturacionCliente(pedidos(10), TARIFAS, PORCENTAJES_DOCUMENTO_ARBET);
+    const viajes = calcularFacturacionCliente(pedidos(10), TARIFAS, CONFIG_UNIFICACION_ARBET);
 
     expect(viajes).toHaveLength(1);
     expect(viajes[0].reglaAplicada).toBe("2x1");
@@ -74,7 +93,7 @@ describe("motor-facturacion — casos de ejemplo del §28 funcional / Guia Arbet
     const viajes = calcularFacturacionCliente(
       pedidos(3, { tipoServicio: TipoServicio.MEDICAMENTO, tipoEnvase: TipoEnvase.BOLSA }),
       TARIFAS,
-      PORCENTAJES_DOCUMENTO_ARBET,
+      CONFIG_UNIFICACION_ARBET,
     );
 
     expect(viajes).toHaveLength(1);
@@ -90,20 +109,19 @@ describe("motor-facturacion — casos de ejemplo del §28 funcional / Guia Arbet
         pedido({ id: "medicamento", tipoServicio: TipoServicio.MEDICAMENTO, tipoEnvase: TipoEnvase.BOLSA }),
       ],
       TARIFAS,
-      PORCENTAJES_DOCUMENTO_ARBET,
+      CONFIG_UNIFICACION_ARBET,
     );
 
     expect(viajes).toHaveLength(1);
     expect(viajes[0].reglaAplicada).toBe("UNIFICADA");
     expect(viajes[0].cantidadViajes).toBe(1);
     expect(viajes[0].pedidoIds).toEqual(expect.arrayContaining(["panal", "medicamento"]));
-    expect(viajes[0].importeCalculado).toBe(1400); // 1000 (100% panal) + 400 (50% de 800 bolsa)
+    expect(viajes[0].importeCalculado).toBe(1400); // 1000 (100% panal) + 400 (monto fijo bolsa)
     expect(viajes[0].detalleUnificacion).toEqual({
       tarifaPanal: 1000,
       porcentajePanal: 100,
       importePanal: 1000,
-      tarifaMedicamento: 800,
-      porcentajeMedicamento: 50,
+      montoFijoMedicamento: 400,
       importeMedicamento: 400,
     });
   });
@@ -115,7 +133,7 @@ describe("motor-facturacion — casos de ejemplo del §28 funcional / Guia Arbet
         pedido({ id: "medicamento", tipoServicio: TipoServicio.MEDICAMENTO, tipoEnvase: TipoEnvase.BOLSA }),
       ],
       TARIFAS,
-      PORCENTAJES_DOCUMENTO_ARBET,
+      CONFIG_UNIFICACION_ARBET,
     );
 
     expect(viajes).toHaveLength(2);
@@ -138,7 +156,7 @@ describe("motor-facturacion — casos de ejemplo del §28 funcional / Guia Arbet
         ...pedidos(4, { clienteId: "farmacia-b" }).map((p, i) => ({ ...p, id: `b${i}` })),
       ],
       TARIFAS,
-      PORCENTAJES_DOCUMENTO_ARBET,
+      CONFIG_UNIFICACION_ARBET,
     );
 
     const viajesA = viajes.filter((v) => v.clienteId === "farmacia-a");
@@ -158,7 +176,7 @@ describe("motor-facturacion — peso por pedidos originales (decisión 2026-09-1
     const viajes = calcularFacturacionCliente(
       [pedido({ id: "pedido-agrupado", cantidadPedidoOriginal: 4 })],
       TARIFAS,
-      PORCENTAJES_DOCUMENTO_ARBET,
+      CONFIG_UNIFICACION_ARBET,
     );
 
     expect(viajes).toHaveLength(1);
@@ -172,7 +190,7 @@ describe("motor-facturacion — peso por pedidos originales (decisión 2026-09-1
     const viajes = calcularFacturacionCliente(
       [pedido({ id: "pedido-agrupado", cantidadPedidoOriginal: 3 })],
       TARIFAS,
-      PORCENTAJES_DOCUMENTO_ARBET,
+      CONFIG_UNIFICACION_ARBET,
     );
 
     expect(viajes[0].cantidadViajes).toBe(2); // ceil(3/2)
@@ -183,7 +201,7 @@ describe("motor-facturacion — peso por pedidos originales (decisión 2026-09-1
     const viajes = calcularFacturacionCliente(
       [pedido({ id: "solo", cantidadPedidoOriginal: 1 })],
       TARIFAS,
-      PORCENTAJES_DOCUMENTO_ARBET,
+      CONFIG_UNIFICACION_ARBET,
     );
 
     expect(viajes[0].reglaAplicada).toBe("INDIVIDUAL");
@@ -201,7 +219,7 @@ describe("motor-facturacion — peso por pedidos originales (decisión 2026-09-1
         pedido({ id: "suelto", cantidadPedidoOriginal: 1 }),
       ],
       TARIFAS,
-      PORCENTAJES_DOCUMENTO_ARBET,
+      CONFIG_UNIFICACION_ARBET,
     );
 
     expect(viajes).toHaveLength(1);
@@ -219,7 +237,7 @@ describe("motor-facturacion — Bolsa/Bulto (Guia Arbet paso 2 y 5)", () => {
         pedido({ id: "bulto", tipoServicio: TipoServicio.MEDICAMENTO, tipoEnvase: TipoEnvase.BULTO }),
       ],
       TARIFAS,
-      PORCENTAJES_DOCUMENTO_ARBET,
+      CONFIG_UNIFICACION_ARBET,
     );
 
     // Bolsa y Bulto en el mismo grupo fecha+dirección no pueden compartir
@@ -240,29 +258,29 @@ describe("motor-facturacion — Bolsa/Bulto (Guia Arbet paso 2 y 5)", () => {
         pedido({ id: "medicamento", tipoServicio: TipoServicio.MEDICAMENTO, tipoEnvase: TipoEnvase.BULTO }),
       ],
       TARIFAS,
-      PORCENTAJES_DOCUMENTO_ARBET,
+      CONFIG_UNIFICACION_ARBET,
     );
 
-    expect(viajes[0].detalleUnificacion?.tarifaMedicamento).toBe(1200);
+    expect(viajes[0].detalleUnificacion?.montoFijoMedicamento).toBe(600);
   });
 });
 
-describe("motor-facturacion — porcentaje configurable de ambos lados (decisión 2026-09-08)", () => {
-  it("aplica un % distinto de 100 también al lado de pañales cuando así se configura", () => {
-    const porcentajes = { panal: 80, medicamento: 30 };
+describe("motor-facturacion — % de pañal configurable + monto fijo de medicamento (decisión 2026-09-12)", () => {
+  it("aplica un % distinto de 100 al lado pañal, y el monto fijo de medicamento se suma tal cual está configurado", () => {
+    const config: ConfigUnificacionInterna = { porcentajePanal: 80, montosUnificadoMedicamento: MONTOS_UNIFICADO };
     const viajes = calcularFacturacionCliente(
       [
         pedido({ id: "panal" }),
         pedido({ id: "medicamento", tipoServicio: TipoServicio.MEDICAMENTO, tipoEnvase: TipoEnvase.BOLSA }),
       ],
       TARIFAS,
-      porcentajes,
+      config,
     );
 
-    // 1000 * 0.8 = 800 (panal) + 800 * 0.3 = 240 (medicamento) = 1040
-    expect(viajes[0].importeCalculado).toBe(1040);
+    // 1000 * 0.8 = 800 (panal) + 400 (monto fijo, no depende del %) = 1200
+    expect(viajes[0].importeCalculado).toBe(1200);
     expect(viajes[0].detalleUnificacion?.porcentajePanal).toBe(80);
-    expect(viajes[0].detalleUnificacion?.porcentajeMedicamento).toBe(30);
+    expect(viajes[0].detalleUnificacion?.montoFijoMedicamento).toBe(400);
   });
 });
 
@@ -367,7 +385,7 @@ describe("calcularFacturacionCliente — tarifa por zona tarifaria", () => {
         }),
       ],
       TARIFAS,
-      PORCENTAJES_DOCUMENTO_ARBET,
+      CONFIG_UNIFICACION_ARBET,
     );
 
     const viajeCaba = viajes.find((v) => v.pedidoIds.includes("caba"));

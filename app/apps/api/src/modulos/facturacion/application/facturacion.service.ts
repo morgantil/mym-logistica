@@ -21,7 +21,11 @@ import {
   ResumenChofer,
   calcularLiquidacionTransportistas,
 } from "../domain/motor-liquidacion-transportistas";
-import { calcularUnificacionesEntreClientes, construirViajeUnificacionCruzada } from "../domain/unificacion-cruzada";
+import {
+  buscarUnificacionesEntreClientes,
+  construirViajeUnificacionCruzadaMedicamento,
+  construirViajeUnificacionCruzadaPanal,
+} from "../domain/unificacion-cruzada";
 import { generarReporteMensualExcel } from "../infrastructure/reporte-mensual-excel.generador";
 
 export interface PedidoExcluido {
@@ -74,15 +78,29 @@ export class FacturacionService {
     return this.repositorio.listarPorcentajes(clienteId);
   }
 
-  crearPorcentaje(clienteId: string, porcentajePanal: number, porcentajeMedicamento: number) {
-    return this.repositorio.crearPorcentaje({ clienteId, porcentajePanal, porcentajeMedicamento });
+  crearPorcentaje(clienteId: string, porcentajePanal: number) {
+    return this.repositorio.crearPorcentaje({ clienteId, porcentajePanal });
   }
 
-  actualizarPorcentaje(
-    id: string,
-    datos: { porcentajePanal?: number; porcentajeMedicamento?: number; activa?: boolean },
-  ) {
+  actualizarPorcentaje(id: string, datos: { porcentajePanal?: number; activa?: boolean }) {
     return this.repositorio.actualizarPorcentaje(id, datos);
+  }
+
+  listarMontosUnificadoMedicamento(clienteId: string) {
+    return this.repositorio.listarMontosUnificadoMedicamento(clienteId);
+  }
+
+  crearMontoUnificadoMedicamento(
+    clienteId: string,
+    zonaTarifariaId: string,
+    tipoEnvase: TipoEnvase | null,
+    monto: number,
+  ) {
+    return this.repositorio.crearMontoUnificadoMedicamento({ clienteId, zonaTarifariaId, tipoEnvase, monto });
+  }
+
+  actualizarMontoUnificadoMedicamento(id: string, datos: { monto?: number; activa?: boolean }) {
+    return this.repositorio.actualizarMontoUnificadoMedicamento(id, datos);
   }
 
   listarCombinaciones() {
@@ -203,11 +221,14 @@ export class FacturacionService {
   // en firme con otra regla (confirmados sin par), quedan afuera del
   // emparejamiento nuevo — unificarlos ahora los dejaría inconsistentes con
   // lo que ya cerró ese cliente.
+  // `construirViaje` decide cómo se calcula la porción propia — pañal (tarifa
+  // × %) y medicamento (monto fijo por zona, decisión 2026-09-12) ya no
+  // comparten la misma fórmula, así que el llamador (que sabe de qué lado
+  // está parado) arma el viaje, esta función solo resuelve CON QUIÉN.
   private async resolverUnificacionesCruzadas(
     propios: PedidoParaFacturar[],
     obtenerSocios: () => Promise<PedidoParaFacturar[]>,
-    tarifas: TarifasPorTipo,
-    porcentajePropio: number,
+    construirViaje: (propio: PedidoParaFacturar, socio: PedidoParaFacturar) => ViajeFacturable,
   ): Promise<{ viajes: ViajeFacturable[]; propiosRestantes: PedidoParaFacturar[] }> {
     if (propios.length === 0) return { viajes: [], propiosRestantes: [] };
 
@@ -224,7 +245,7 @@ export class FacturacionService {
       const idSocio = pares.get(propio.id);
       const socio = idSocio ? sociosPorId.get(idSocio) : undefined;
       if (socio) {
-        viajes.push(construirViajeUnificacionCruzada(propio, socio, tarifas, porcentajePropio));
+        viajes.push(construirViaje(propio, socio));
       } else {
         propiosSinResolver.push(propio);
       }
@@ -236,14 +257,15 @@ export class FacturacionService {
     );
     const sociosDisponibles = sociosSinPar.filter((socio) => !confirmadosSinPar.has(socio.id));
 
-    const { viajes: viajesNuevos, propiosRestantes } = calcularUnificacionesEntreClientes(
+    const { unificaciones, propiosRestantes } = buscarUnificacionesEntreClientes(
       propiosSinResolver,
       sociosDisponibles,
-      tarifas,
-      porcentajePropio,
     );
+    for (const { propio, socio } of unificaciones) {
+      viajes.push(construirViaje(propio, socio));
+    }
 
-    return { viajes: [...viajes, ...viajesNuevos], propiosRestantes };
+    return { viajes, propiosRestantes };
   }
 
   // §27 funcional: corre el motor de reglas sobre los pedidos ENTREGADOS del
@@ -320,6 +342,28 @@ export class FacturacionService {
       );
     }
 
+    // Montos fijos del lado medicamento en un unificado (decisión 2026-09-12
+    // — ver MontoUnificadoMedicamento en tarifa.ts): se prefetchean para las
+    // zonas/envases que efectivamente aparecen entre los pedidos de
+    // medicamentos de este cliente, igual criterio que `tarifas`. No se exige
+    // de antemano (a diferencia de la tarifa normal): un pedido de
+    // medicamentos que nunca termina unificado no lo necesita.
+    const montosUnificadoMedicamento: TarifasPorTipo = {};
+    const clavesMedicamentoUsadas = new Map<string, PedidoParaFacturar>();
+    for (const pedido of propios) {
+      if (pedido.tipoServicio === TipoServicio.MEDICAMENTO) {
+        clavesMedicamentoUsadas.set(claveTarifaDePedido(pedido), pedido);
+      }
+    }
+    for (const [clave, pedido] of clavesMedicamentoUsadas) {
+      const monto = await this.repositorio.montoUnificadoMedicamentoActivo(
+        clienteId,
+        pedido.zonaTarifariaId,
+        pedido.tipoEnvase,
+      );
+      if (monto) montosUnificadoMedicamento[clave] = monto.monto;
+    }
+
     // Unificación ENTRE clientes distintos (Guia Arbet paso 4) — antes del
     // motor de un solo cliente, que sigue resolviendo la unificación INTERNA
     // de un cliente AMBOS (ej. Bella Vista, que no usa combinaciones porque
@@ -346,8 +390,8 @@ export class FacturacionService {
           }
           return socios;
         },
-        tarifas,
-        porcentajeActivoCliente?.porcentajePanal ?? 0,
+        (propio, socio) =>
+          construirViajeUnificacionCruzadaPanal(propio, socio, tarifas, porcentajeActivoCliente?.porcentajePanal ?? 0),
       );
       viajesCruzados.push(...viajes);
       pedidosRestantes = [...otros, ...sinUnificar];
@@ -371,16 +415,15 @@ export class FacturacionService {
           }
           return socios;
         },
-        tarifas,
-        porcentajeActivoCliente?.porcentajeMedicamento ?? 0,
+        (propio, socio) => construirViajeUnificacionCruzadaMedicamento(propio, socio, montosUnificadoMedicamento),
       );
       viajesCruzados.push(...viajes);
       pedidosRestantes = [...otros, ...sinUnificar];
     }
 
     const viajesPropios = calcularFacturacionCliente(pedidosRestantes, tarifas, {
-      panal: porcentajeActivoCliente?.porcentajePanal ?? 0,
-      medicamento: porcentajeActivoCliente?.porcentajeMedicamento ?? 0,
+      porcentajePanal: porcentajeActivoCliente?.porcentajePanal ?? 0,
+      montosUnificadoMedicamento,
     });
 
     const viajes = [...viajesCruzados, ...viajesPropios];
@@ -397,7 +440,7 @@ export class FacturacionService {
         tarifaUtilizada: viaje.tarifaUtilizada,
         porcentajeAplicado: viaje.porcentajeAplicado,
         porcentajePanalAplicado: viaje.detalleUnificacion?.porcentajePanal ?? null,
-        porcentajeMedicamentoAplicado: viaje.detalleUnificacion?.porcentajeMedicamento ?? null,
+        montoFijoMedicamentoAplicado: viaje.detalleUnificacion?.montoFijoMedicamento ?? viaje.montoFijoMedicamentoAplicado ?? null,
         pedidoSocioId: viaje.socioEntreClientes?.pedidoId ?? null,
         clienteSocioId: viaje.socioEntreClientes?.clienteId ?? null,
         cantidadViajes: viaje.cantidadViajes,

@@ -45,7 +45,7 @@ describe("intentarMapeoAutomatico", () => {
     const { camposObligatoriosFaltantes } = intentarMapeoAutomatico(encabezados);
 
     expect(camposObligatoriosFaltantes).toEqual(
-      expect.arrayContaining(["direccion", "localidad", "fechaEntrega", "descripcionProducto"]),
+      expect.arrayContaining(["direccion", "localidad", "descripcionProducto"]),
     );
   });
 

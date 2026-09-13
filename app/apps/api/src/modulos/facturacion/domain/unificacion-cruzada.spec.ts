@@ -1,6 +1,10 @@
 import { TipoEnvase, TipoServicio } from "@mym/shared-types";
 import { PedidoParaFacturar, TarifasPorTipo, construirClaveTarifa } from "./motor-facturacion";
-import { buscarUnificacionesEntreClientes, calcularUnificacionesEntreClientes } from "./unificacion-cruzada";
+import {
+  buscarUnificacionesEntreClientes,
+  construirViajeUnificacionCruzadaMedicamento,
+  construirViajeUnificacionCruzadaPanal,
+} from "./unificacion-cruzada";
 
 const ZONA_CABA = "zona-caba";
 
@@ -215,23 +219,64 @@ describe("buscarUnificacionesEntreClientes", () => {
   });
 });
 
-describe("calcularUnificacionesEntreClientes", () => {
-  it("factura solo la porción propia, con su propia tarifa/%, y deja trazabilidad del socio", () => {
+describe("construirViajeUnificacionCruzadaPanal", () => {
+  it("factura solo la porción propia (tarifa × %) y deja trazabilidad del socio", () => {
     const tarifas: TarifasPorTipo = {
       [construirClaveTarifa({ zonaTarifariaId: ZONA_CABA, tipoServicio: TipoServicio.PANAL, tipoEnvase: null })]: 1000,
     };
-    const propios = [pedido({ id: "farmapal-1", clienteId: "farmapal" })];
-    const socios = [
-      pedido({ id: "farmaet-1", clienteId: "farmaet", tipoServicio: TipoServicio.MEDICAMENTO, tipoEnvase: TipoEnvase.BOLSA }),
-    ];
+    const propio = pedido({ id: "farmapal-1", clienteId: "farmapal" });
+    const socio = pedido({
+      id: "farmaet-1",
+      clienteId: "farmaet",
+      tipoServicio: TipoServicio.MEDICAMENTO,
+      tipoEnvase: TipoEnvase.BOLSA,
+    });
 
-    const { viajes, propiosRestantes } = calcularUnificacionesEntreClientes(propios, socios, tarifas, 80);
+    const viaje = construirViajeUnificacionCruzadaPanal(propio, socio, tarifas, 80);
 
-    expect(propiosRestantes).toHaveLength(0);
-    expect(viajes).toHaveLength(1);
-    expect(viajes[0].clienteId).toBe("farmapal");
-    expect(viajes[0].pedidoIds).toEqual(["farmapal-1"]);
-    expect(viajes[0].importeCalculado).toBe(800); // 1000 * 80%
-    expect(viajes[0].socioEntreClientes).toEqual({ pedidoId: "farmaet-1", clienteId: "farmaet" });
+    expect(viaje.clienteId).toBe("farmapal");
+    expect(viaje.pedidoIds).toEqual(["farmapal-1"]);
+    expect(viaje.importeCalculado).toBe(800); // 1000 * 80%
+    expect(viaje.socioEntreClientes).toEqual({ pedidoId: "farmaet-1", clienteId: "farmaet" });
+  });
+});
+
+describe("construirViajeUnificacionCruzadaMedicamento", () => {
+  it("factura un monto fijo por zona (decisión 2026-09-12), no un % de ninguna tarifa", () => {
+    const montos: TarifasPorTipo = {
+      [construirClaveTarifa({
+        zonaTarifariaId: ZONA_CABA,
+        tipoServicio: TipoServicio.MEDICAMENTO,
+        tipoEnvase: TipoEnvase.BOLSA,
+      })]: 100,
+    };
+    const propio = pedido({
+      id: "farmaet-1",
+      clienteId: "farmaet",
+      tipoServicio: TipoServicio.MEDICAMENTO,
+      tipoEnvase: TipoEnvase.BOLSA,
+    });
+    const socio = pedido({ id: "farmapal-1", clienteId: "farmapal" });
+
+    const viaje = construirViajeUnificacionCruzadaMedicamento(propio, socio, montos);
+
+    expect(viaje.clienteId).toBe("farmaet");
+    expect(viaje.pedidoIds).toEqual(["farmaet-1"]);
+    expect(viaje.importeCalculado).toBe(100);
+    expect(viaje.porcentajeAplicado).toBeNull();
+    expect(viaje.montoFijoMedicamentoAplicado).toBe(100);
+    expect(viaje.socioEntreClientes).toEqual({ pedidoId: "farmapal-1", clienteId: "farmapal" });
+  });
+
+  it("rechaza si no hay un monto configurado para esa zona/envase", () => {
+    const propio = pedido({
+      id: "farmaet-1",
+      clienteId: "farmaet",
+      tipoServicio: TipoServicio.MEDICAMENTO,
+      tipoEnvase: TipoEnvase.BULTO,
+    });
+    const socio = pedido({ id: "farmapal-1", clienteId: "farmapal" });
+
+    expect(() => construirViajeUnificacionCruzadaMedicamento(propio, socio, {})).toThrow(/monto fijo/i);
   });
 });

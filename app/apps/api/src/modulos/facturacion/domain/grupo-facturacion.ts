@@ -13,10 +13,14 @@ export interface GrupoFacturacion {
   tarifaUtilizada: number | null;
   porcentajeAplicado: number | null;
   // Solo en UNIFICADA (ver ViajeFacturable.detalleUnificacion en el motor):
-  // reemplaza a porcentajeAplicado cuando pañal y medicamento tienen cada uno
-  // su propio % — ver DOCUMENTO TECNICO.md historial 2026-09-08.
+  // reemplaza a porcentajeAplicado — el lado pañal sigue siendo un %, ver
+  // DOCUMENTO TECNICO.md historial 2026-09-08.
   porcentajePanalAplicado: number | null;
+  // Decisión 2026-09-12: el lado medicamento dejó de ser un % (ver
+  // montoFijoMedicamentoAplicado) — este campo queda solo por filas
+  // históricas, no se escribe más para viajes nuevos.
   porcentajeMedicamentoAplicado: number | null;
+  montoFijoMedicamentoAplicado: number | null;
   // Solo en una unificación ENTRE clientes distintos — trazabilidad del
   // pedido/cliente "socio" que generó la unificación (ver unificacion-cruzada.ts).
   pedidoSocioId: string | null;
@@ -56,6 +60,7 @@ export interface PedidoFacturado {
   porcentajeAplicado: number | null;
   porcentajePanalAplicado: number | null;
   porcentajeMedicamentoAplicado: number | null;
+  montoFijoMedicamentoAplicado: number | null;
   cantidadViajes: number;
   importeViaje: number;
 }

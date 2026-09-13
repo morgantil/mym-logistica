@@ -3,10 +3,12 @@ import { Rol } from "@prisma/client";
 import { Roles } from "../../../common/decorators/roles.decorator";
 import { UsuarioActual, UsuarioAutenticado } from "../../../common/decorators/usuario-actual.decorator";
 import { FacturacionService } from "../application/facturacion.service";
+import { ActualizarMontoUnificadoMedicamentoDto } from "./dto/actualizar-monto-unificado-medicamento.dto";
 import { ActualizarPorcentajeDto } from "./dto/actualizar-porcentaje.dto";
 import { ActualizarTarifaDto } from "./dto/actualizar-tarifa.dto";
 import { ActualizarTarifaTransportistaDto } from "./dto/actualizar-tarifa-transportista.dto";
 import { CrearCombinacionDto } from "./dto/crear-combinacion.dto";
+import { CrearMontoUnificadoMedicamentoDto } from "./dto/crear-monto-unificado-medicamento.dto";
 import { CrearPorcentajeDto } from "./dto/crear-porcentaje.dto";
 import { CrearTarifaDto } from "./dto/crear-tarifa.dto";
 import { CrearTarifaTransportistaDto } from "./dto/crear-tarifa-transportista.dto";
@@ -49,12 +51,37 @@ export class FacturacionController {
 
   @Post("porcentaje-segundo-servicio")
   crearPorcentaje(@Body() dto: CrearPorcentajeDto) {
-    return this.facturacionService.crearPorcentaje(dto.clienteId, dto.porcentajePanal, dto.porcentajeMedicamento);
+    return this.facturacionService.crearPorcentaje(dto.clienteId, dto.porcentajePanal);
   }
 
   @Patch("porcentaje-segundo-servicio/:id")
   actualizarPorcentaje(@Param("id") id: string, @Body() dto: ActualizarPorcentajeDto) {
     return this.facturacionService.actualizarPorcentaje(id, dto);
+  }
+
+  // Monto fijo del lado medicamento en una entrega unificada — decisión
+  // 2026-09-12, ver tarifa.ts (reemplaza al % que usaba antes).
+  @Get("monto-unificado-medicamento")
+  listarMontosUnificadoMedicamento(@Query("clienteId") clienteId: string) {
+    return this.facturacionService.listarMontosUnificadoMedicamento(clienteId);
+  }
+
+  @Post("monto-unificado-medicamento")
+  crearMontoUnificadoMedicamento(@Body() dto: CrearMontoUnificadoMedicamentoDto) {
+    return this.facturacionService.crearMontoUnificadoMedicamento(
+      dto.clienteId,
+      dto.zonaTarifariaId,
+      dto.tipoEnvase ?? null,
+      dto.monto,
+    );
+  }
+
+  @Patch("monto-unificado-medicamento/:id")
+  actualizarMontoUnificadoMedicamento(
+    @Param("id") id: string,
+    @Body() dto: ActualizarMontoUnificadoMedicamentoDto,
+  ) {
+    return this.facturacionService.actualizarMontoUnificadoMedicamento(id, dto);
   }
 
   // Guia Arbet paso 4/8: combinaciones habilitadas de unificación ENTRE

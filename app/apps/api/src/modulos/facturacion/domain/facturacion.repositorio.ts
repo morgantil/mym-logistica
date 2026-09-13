@@ -3,6 +3,7 @@ import { GrupoFacturacion, PedidoFacturado } from "./grupo-facturacion";
 import { PedidoParaLiquidarTransportista } from "./motor-liquidacion-transportistas";
 import {
   CombinacionUnificacionClientes,
+  MontoUnificadoMedicamento,
   PorcentajeSegundoServicio,
   TarifaCliente,
   TarifaTransportista,
@@ -24,12 +25,22 @@ export interface DatosActualizarTarifa {
 export interface DatosCrearPorcentaje {
   clienteId: string;
   porcentajePanal: number;
-  porcentajeMedicamento: number;
 }
 
 export interface DatosActualizarPorcentaje {
   porcentajePanal?: number;
-  porcentajeMedicamento?: number;
+  activa?: boolean;
+}
+
+export interface DatosCrearMontoUnificadoMedicamento {
+  clienteId: string;
+  zonaTarifariaId: string;
+  tipoEnvase: TipoEnvase | null;
+  monto: number;
+}
+
+export interface DatosActualizarMontoUnificadoMedicamento {
+  monto?: number;
   activa?: boolean;
 }
 
@@ -50,7 +61,7 @@ export interface DatosCrearGrupoFacturacion {
   tarifaUtilizada: number;
   porcentajeAplicado: number | null;
   porcentajePanalAplicado?: number | null;
-  porcentajeMedicamentoAplicado?: number | null;
+  montoFijoMedicamentoAplicado?: number | null;
   pedidoSocioId?: string | null;
   clienteSocioId?: string | null;
   cantidadViajes: number;
@@ -87,13 +98,33 @@ export interface FacturacionRepositorio {
   crearTarifa(datos: DatosCrearTarifa): Promise<TarifaCliente>;
   actualizarTarifa(id: string, datos: DatosActualizarTarifa): Promise<TarifaCliente>;
 
-  // Porcentaje aplicado en entregas unificadas — §25 funcional. Un solo
-  // registro por cliente, con los dos valores (panal y medicamento). Sin
-  // vigencia desde 2026-09-11, mismo criterio que las tarifas.
+  // Porcentaje aplicado al lado PAÑAL en entregas unificadas — §25 funcional.
+  // Un solo registro por cliente. Sin vigencia desde 2026-09-11, mismo
+  // criterio que las tarifas.
   listarPorcentajes(clienteId: string): Promise<PorcentajeSegundoServicio[]>;
   porcentajeActivo(clienteId: string): Promise<PorcentajeSegundoServicio | null>;
   crearPorcentaje(datos: DatosCrearPorcentaje): Promise<PorcentajeSegundoServicio>;
   actualizarPorcentaje(id: string, datos: DatosActualizarPorcentaje): Promise<PorcentajeSegundoServicio>;
+
+  // Monto fijo aplicado al lado MEDICAMENTO en entregas unificadas — decisión
+  // 2026-09-12, ver tarifa.ts. Una fila por cliente+zona+envase (envase
+  // nullable — null cubre Bolsa y Bulto por igual).
+  listarMontosUnificadoMedicamento(clienteId: string): Promise<MontoUnificadoMedicamento[]>;
+  // Busca primero una fila específica para ese envase; si no hay, cae a la
+  // fila con envase null (aplica a los dos) — deja la puerta abierta a
+  // diferenciar Bolsa/Bulto en el futuro sin que se rompa lo ya cargado.
+  montoUnificadoMedicamentoActivo(
+    clienteId: string,
+    zonaTarifariaId: string,
+    tipoEnvase: TipoEnvase | null,
+  ): Promise<MontoUnificadoMedicamento | null>;
+  crearMontoUnificadoMedicamento(
+    datos: DatosCrearMontoUnificadoMedicamento,
+  ): Promise<MontoUnificadoMedicamento>;
+  actualizarMontoUnificadoMedicamento(
+    id: string,
+    datos: DatosActualizarMontoUnificadoMedicamento,
+  ): Promise<MontoUnificadoMedicamento>;
 
   // Combinaciones habilitadas de unificación ENTRE clientes — Guia Arbet
   // paso 4/8 ("Combinaciones habilitadas de Pañales + Medicamentos").

@@ -3,11 +3,13 @@ import { Prisma } from "@prisma/client";
 import { TipoEnvase, TipoServicio } from "@mym/shared-types";
 import { PrismaService } from "../../../common/prisma/prisma.service";
 import {
+  DatosActualizarMontoUnificadoMedicamento,
   DatosActualizarPorcentaje,
   DatosActualizarTarifa,
   DatosActualizarTarifaTransportista,
   DatosCrearCombinacion,
   DatosCrearGrupoFacturacion,
+  DatosCrearMontoUnificadoMedicamento,
   DatosCrearParUnificacion,
   DatosCrearPorcentaje,
   DatosCrearTarifa,
@@ -18,6 +20,7 @@ import { GrupoFacturacion, PedidoFacturado } from "../domain/grupo-facturacion";
 import { PedidoParaLiquidarTransportista } from "../domain/motor-liquidacion-transportistas";
 import {
   CombinacionUnificacionClientes,
+  MontoUnificadoMedicamento,
   PorcentajeSegundoServicio,
   TarifaCliente,
   TarifaTransportista,
@@ -38,6 +41,9 @@ function mapearGrupo(fila: FilaGrupo): GrupoFacturacion {
     porcentajePanalAplicado: fila.porcentajePanalAplicado ? Number(fila.porcentajePanalAplicado) : null,
     porcentajeMedicamentoAplicado: fila.porcentajeMedicamentoAplicado
       ? Number(fila.porcentajeMedicamentoAplicado)
+      : null,
+    montoFijoMedicamentoAplicado: fila.montoFijoMedicamentoAplicado
+      ? Number(fila.montoFijoMedicamentoAplicado)
       : null,
     pedidoSocioId: fila.pedidoSocioId,
     clienteSocioId: fila.clienteSocioId,
@@ -169,7 +175,6 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
       data: {
         clienteId: datos.clienteId,
         porcentajePanal: datos.porcentajePanal,
-        porcentajeMedicamento: datos.porcentajeMedicamento,
       },
     });
     return mapearPorcentaje(creado);
@@ -180,6 +185,83 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
     if (!existente) throw new NotFoundException(`Porcentaje ${id} no encontrado.`);
     const actualizado = await this.prisma.porcentajeSegundoServicio.update({ where: { id }, data: datos });
     return mapearPorcentaje(actualizado);
+  }
+
+  listarMontosUnificadoMedicamento(clienteId: string): Promise<MontoUnificadoMedicamento[]> {
+    return this.prisma.montoUnificadoMedicamento
+      .findMany({
+        where: { clienteId },
+        orderBy: { creadoEn: "desc" },
+        include: { zonaTarifaria: { select: { nombre: true } } },
+      })
+      .then((filas) => filas.map(mapearMontoUnificadoMedicamento));
+  }
+
+  async montoUnificadoMedicamentoActivo(
+    clienteId: string,
+    zonaTarifariaId: string,
+    tipoEnvase: TipoEnvase | null,
+  ): Promise<MontoUnificadoMedicamento | null> {
+    if (tipoEnvase !== null) {
+      const filaEspecifica = await this.prisma.montoUnificadoMedicamento.findFirst({
+        where: {
+          clienteId,
+          zonaTarifariaId,
+          tipoEnvase: tipoEnvase as unknown as Prisma.MontoUnificadoMedicamentoWhereInput["tipoEnvase"],
+          activa: true,
+        },
+        include: { zonaTarifaria: { select: { nombre: true } } },
+      });
+      if (filaEspecifica) return mapearMontoUnificadoMedicamento(filaEspecifica);
+    }
+    // Sin fila específica para ese envase (o no aplica) — cae a la fila que
+    // cubre los dos (tipoEnvase null).
+    const filaGeneral = await this.prisma.montoUnificadoMedicamento.findFirst({
+      where: { clienteId, zonaTarifariaId, tipoEnvase: null, activa: true },
+      include: { zonaTarifaria: { select: { nombre: true } } },
+    });
+    return filaGeneral ? mapearMontoUnificadoMedicamento(filaGeneral) : null;
+  }
+
+  async crearMontoUnificadoMedicamento(
+    datos: DatosCrearMontoUnificadoMedicamento,
+  ): Promise<MontoUnificadoMedicamento> {
+    const existente = await this.prisma.montoUnificadoMedicamento.findFirst({
+      where: {
+        clienteId: datos.clienteId,
+        zonaTarifariaId: datos.zonaTarifariaId,
+        tipoEnvase: datos.tipoEnvase as unknown as Prisma.MontoUnificadoMedicamentoWhereInput["tipoEnvase"],
+      },
+    });
+    if (existente) {
+      throw new BadRequestException(
+        "Ya existe un monto para esa zona (y envase) — editá el que ya está en vez de crear otro.",
+      );
+    }
+    const creado = await this.prisma.montoUnificadoMedicamento.create({
+      data: {
+        clienteId: datos.clienteId,
+        zonaTarifariaId: datos.zonaTarifariaId,
+        tipoEnvase: datos.tipoEnvase as unknown as Prisma.MontoUnificadoMedicamentoCreateInput["tipoEnvase"],
+        monto: datos.monto,
+      },
+      include: { zonaTarifaria: { select: { nombre: true } } },
+    });
+    return mapearMontoUnificadoMedicamento(creado);
+  }
+
+  async actualizarMontoUnificadoMedicamento(
+    id: string,
+    datos: DatosActualizarMontoUnificadoMedicamento,
+  ): Promise<MontoUnificadoMedicamento> {
+    const existente = await this.prisma.montoUnificadoMedicamento.findUnique({ where: { id } });
+    if (!existente) throw new NotFoundException(`Monto de unificado ${id} no encontrado.`);
+    const actualizado = await this.prisma.montoUnificadoMedicamento.update({
+      where: { id },
+      data: datos,
+      include: { zonaTarifaria: { select: { nombre: true } } },
+    });
+    return mapearMontoUnificadoMedicamento(actualizado);
   }
 
   listarCombinaciones(): Promise<CombinacionUnificacionClientes[]> {
@@ -432,7 +514,7 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
               tarifaUtilizada: grupo.tarifaUtilizada,
               porcentajeAplicado: grupo.porcentajeAplicado,
               porcentajePanalAplicado: grupo.porcentajePanalAplicado ?? null,
-              porcentajeMedicamentoAplicado: grupo.porcentajeMedicamentoAplicado ?? null,
+              montoFijoMedicamentoAplicado: grupo.montoFijoMedicamentoAplicado ?? null,
               pedidoSocioId: grupo.pedidoSocioId ?? null,
               clienteSocioId: grupo.clienteSocioId ?? null,
               cantidadViajes: grupo.cantidadViajes,
@@ -515,6 +597,9 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
       porcentajeMedicamentoAplicado: pedido.grupoFacturacion!.porcentajeMedicamentoAplicado
         ? Number(pedido.grupoFacturacion!.porcentajeMedicamentoAplicado)
         : null,
+      montoFijoMedicamentoAplicado: pedido.grupoFacturacion!.montoFijoMedicamentoAplicado
+        ? Number(pedido.grupoFacturacion!.montoFijoMedicamentoAplicado)
+        : null,
       cantidadViajes: pedido.grupoFacturacion!.cantidadViajes,
       importeViaje: Number(pedido.grupoFacturacion!.importeCalculado),
     }));
@@ -547,14 +632,32 @@ function mapearPorcentaje(fila: {
   id: string;
   clienteId: string;
   porcentajePanal: Prisma.Decimal;
-  porcentajeMedicamento: Prisma.Decimal;
   activa: boolean;
 }): PorcentajeSegundoServicio {
   return {
     id: fila.id,
     clienteId: fila.clienteId,
     porcentajePanal: Number(fila.porcentajePanal),
-    porcentajeMedicamento: Number(fila.porcentajeMedicamento),
+    activa: fila.activa,
+  };
+}
+
+function mapearMontoUnificadoMedicamento(fila: {
+  id: string;
+  clienteId: string;
+  zonaTarifariaId: string;
+  zonaTarifaria?: { nombre: string };
+  tipoEnvase: unknown;
+  monto: Prisma.Decimal;
+  activa: boolean;
+}): MontoUnificadoMedicamento {
+  return {
+    id: fila.id,
+    clienteId: fila.clienteId,
+    zonaTarifariaId: fila.zonaTarifariaId,
+    zonaTarifariaNombre: fila.zonaTarifaria?.nombre,
+    tipoEnvase: fila.tipoEnvase as MontoUnificadoMedicamento["tipoEnvase"],
+    monto: Number(fila.monto),
     activa: fila.activa,
   };
 }

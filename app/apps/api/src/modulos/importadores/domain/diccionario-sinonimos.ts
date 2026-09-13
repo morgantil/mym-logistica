@@ -45,6 +45,27 @@ export const DICCIONARIO_SINONIMOS: Record<CampoCanonico, string[]> = {
     "REFERENCIA", // Biosíntesis/Bella Vista/Farmapal
   ],
   cantidad: ["CANTIDAD", "CANT", "UNIDADES"],
-  ticket: ["TICKET", "NRO TICKET", "NUMERO DE TICKET", "N TICKET", "NRO DE TKT"], // Farmapal
+  // "REMITO" (Farmaet, Bella Vista) cumple el mismo rol que el ticket de
+  // Farmapal — distingue pedidos originales agrupados en un mismo Pedido
+  // para el 2×1 (ver Pedido.cantidadPedidoOriginal). Verificado con datos
+  // reales de Farmaet: 45/86 pacientes con varios remitos distintos en la
+  // misma dirección.
+  ticket: ["TICKET", "NRO TICKET", "NUMERO DE TICKET", "N TICKET", "NRO DE TKT", "REMITO"],
   telefono: ["TELEFONO", "TEL", "CELULAR", "TELEFONO CONTACTO", "NRO DE TELEFONO"],
+  // --- Específicos de medicamentos (verificado contra los Excel reales de
+  // Farmaet y Bella Vista, 2026-09-13 — ver TEMAS_PENDIENTES.md §13.14) ---
+  receta: ["RECETA", "RECETAS"],
+  tipoPedido: ["TIPO DE PEDIDO"],
+  retiroDeReceta: ["RETIRO DE RECETA"],
+  tiempoDeEntrega: ["TIEMPO DE ENTREGA"],
+  horarioEntrega: ["HORARIO DE ENTREGA", "HORA"],
+  // OJO: "EMPRESA" es ambiguo entre clientes — en Farmaet trae Bolsa/Bulto
+  // (útil), en Bella Vista es una columna sin uso (siempre "PREVIVAX",
+  // constante). Es inofensivo que el mapeo automático lo detecte en los dos
+  // (es opcional, nunca bloquea), siempre que la lógica que deriva
+  // Bolsa/Bulto revise primero cantidadBulto/cantidadBolsa (Bella Vista) y
+  // solo caiga a envaseTexto si esos dos no vinieron mapeados.
+  envaseTexto: ["EMPRESA"], // Farmaet: texto tipo "M&M BOLSA"/"M&M BULTO"
+  cantidadBulto: ["BULTO"], // Bella Vista: cantidad
+  cantidadBolsa: ["BOLSA"], // Bella Vista: cantidad
 };

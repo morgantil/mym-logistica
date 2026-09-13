@@ -9,17 +9,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { listarClientesActivos } from "@/features/clientes/api";
 import {
+  actualizarMontoUnificadoMedicamento,
   actualizarTarifa,
   crearCombinacion,
   eliminarCombinacion,
   listarCombinaciones,
+  listarMontosUnificadoMedicamento,
   listarPorcentajes,
   listarTarifas,
 } from "./api";
 import { formatearMonto } from "./formato";
+import { MontoUnificadoMedicamentoFormSheet } from "./monto-unificado-medicamento-form-sheet";
 import { PorcentajeFormSheet } from "./porcentaje-form-sheet";
 import { TarifaFormSheet } from "./tarifa-form-sheet";
-import type { TarifaCliente } from "./tipos";
+import type { MontoUnificadoMedicamento, TarifaCliente } from "./tipos";
 
 const ETIQUETA_TIPO: Record<TipoServicio, string> = {
   [TipoServicio.PANAL]: "Pañales",
@@ -42,6 +45,7 @@ function descripcionTipoTarifa(tarifa: { tipoServicio: TipoServicio; tipoEnvase:
 export function TarifasTab({ clienteId }: { clienteId: string | null }) {
   const [tarifaEnEdicion, setTarifaEnEdicion] = useState<TarifaCliente | "nuevo" | null>(null);
   const [porcentajeAbierto, setPorcentajeAbierto] = useState(false);
+  const [montoEnEdicion, setMontoEnEdicion] = useState<MontoUnificadoMedicamento | "nuevo" | null>(null);
   const queryClient = useQueryClient();
 
   const { data: tarifas, isLoading: cargandoTarifas } = useQuery({
@@ -56,9 +60,23 @@ export function TarifasTab({ clienteId }: { clienteId: string | null }) {
   });
   const porcentajeActual = porcentajes?.[0] ?? null;
 
+  const { data: montosUnificado, isLoading: cargandoMontosUnificado } = useQuery({
+    queryKey: ["facturacion", "montos-unificado-medicamento", clienteId],
+    queryFn: () => listarMontosUnificadoMedicamento(clienteId!),
+    enabled: clienteId !== null,
+  });
+
   const mutacionActivaTarifa = useMutation({
     mutationFn: ({ id, activa }: { id: string; activa: boolean }) => actualizarTarifa(id, { activa }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["facturacion", "tarifas", clienteId] }),
+    onError: () => toast.error("No se pudo cambiar el estado."),
+  });
+
+  const mutacionActivaMontoUnificado = useMutation({
+    mutationFn: ({ id, activa }: { id: string; activa: boolean }) =>
+      actualizarMontoUnificadoMedicamento(id, { activa }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["facturacion", "montos-unificado-medicamento", clienteId] }),
     onError: () => toast.error("No se pudo cambiar el estado."),
   });
 
@@ -130,7 +148,7 @@ export function TarifasTab({ clienteId }: { clienteId: string | null }) {
 
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <h2 className="font-medium">Porcentajes de entrega unificada</h2>
+          <h2 className="font-medium">Porcentaje de pañal en entrega unificada</h2>
           <Button type="button" variant="outline" size="sm" onClick={() => setPorcentajeAbierto(true)}>
             {porcentajeActual ? "Editar porcentaje" : "Nuevo porcentaje"}
           </Button>
@@ -139,21 +157,20 @@ export function TarifasTab({ clienteId }: { clienteId: string | null }) {
           <TableHeader>
             <TableRow>
               <TableHead>% Pañal</TableHead>
-              <TableHead>% Medicamento</TableHead>
               <TableHead>Estado</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {cargandoPorcentajes ? (
               <TableRow>
-                <TableCell colSpan={3} className="text-muted-foreground">
+                <TableCell colSpan={2} className="text-muted-foreground">
                   Cargando…
                 </TableCell>
               </TableRow>
             ) : porcentajes?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={3} className="text-muted-foreground">
-                  Todavía no hay porcentajes cargados — solo hacen falta si este cliente tiene entregas
+                <TableCell colSpan={2} className="text-muted-foreground">
+                  Todavía no hay un porcentaje cargado — solo hace falta si este cliente tiene entregas
                   unificadas de pañales y medicamentos.
                 </TableCell>
               </TableRow>
@@ -161,13 +178,79 @@ export function TarifasTab({ clienteId }: { clienteId: string | null }) {
               porcentajes?.map((porcentaje) => (
                 <TableRow key={porcentaje.id}>
                   <TableCell>{porcentaje.porcentajePanal}%</TableCell>
-                  <TableCell>{porcentaje.porcentajeMedicamento}%</TableCell>
                   <TableCell>
                     {porcentaje.activa ? (
                       <Badge variant="secondary">Activo</Badge>
                     ) : (
                       <Badge variant="outline">Inactivo</Badge>
                     )}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="font-medium">Monto de medicamento en entrega unificada</h2>
+            <p className="text-sm text-muted-foreground">
+              Monto fijo "de paso" por compartir el viaje con el pañal — varía por zona, no por un porcentaje de
+              ninguna tarifa.
+            </p>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={() => setMontoEnEdicion("nuevo")}>
+            Nuevo monto
+          </Button>
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Zona</TableHead>
+              <TableHead>Bolsa / Bulto</TableHead>
+              <TableHead>Monto</TableHead>
+              <TableHead>Estado</TableHead>
+              <TableHead>Acciones</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {cargandoMontosUnificado ? (
+              <TableRow>
+                <TableCell colSpan={5} className="text-muted-foreground">
+                  Cargando…
+                </TableCell>
+              </TableRow>
+            ) : montosUnificado?.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="text-muted-foreground">
+                  Todavía no hay montos cargados — solo hacen falta si este cliente tiene entregas unificadas de
+                  pañales y medicamentos.
+                </TableCell>
+              </TableRow>
+            ) : (
+              montosUnificado?.map((monto) => (
+                <TableRow key={monto.id}>
+                  <TableCell>{monto.zonaTarifariaNombre ?? monto.zonaTarifariaId}</TableCell>
+                  <TableCell>{monto.tipoEnvase === "BULTO" ? "Bulto" : monto.tipoEnvase === "BOLSA" ? "Bolsa" : "Ambos"}</TableCell>
+                  <TableCell>{formatearMonto(monto.monto)}</TableCell>
+                  <TableCell>
+                    {monto.activa ? <Badge variant="secondary">Activo</Badge> : <Badge variant="outline">Inactivo</Badge>}
+                  </TableCell>
+                  <TableCell className="flex gap-1">
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setMontoEnEdicion(monto)}>
+                      Editar
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={mutacionActivaMontoUnificado.isPending}
+                      onClick={() => mutacionActivaMontoUnificado.mutate({ id: monto.id, activa: !monto.activa })}
+                    >
+                      {monto.activa ? "Desactivar" : "Activar"}
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))
@@ -188,6 +271,11 @@ export function TarifasTab({ clienteId }: { clienteId: string | null }) {
         porcentaje={porcentajeAbierto ? porcentajeActual : null}
         abierto={porcentajeAbierto}
         onOpenChange={setPorcentajeAbierto}
+      />
+      <MontoUnificadoMedicamentoFormSheet
+        clienteId={clienteId}
+        monto={montoEnEdicion}
+        onOpenChange={(abierto) => !abierto && setMontoEnEdicion(null)}
       />
     </div>
   );

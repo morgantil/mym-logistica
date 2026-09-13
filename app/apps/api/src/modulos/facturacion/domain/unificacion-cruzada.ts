@@ -138,19 +138,17 @@ export function buscarUnificacionesEntreClientes(
   return { unificaciones, propiosRestantes };
 }
 
-// Arma la ViajeFacturable de UNA unificación cruzada ya decidida (propio +
-// socio), usando SOLO la tarifa/porcentaje propios del cliente que se está
-// facturando (`porcentajePropio` ya viene resuelto por el llamador:
-// porcentajePanal si `propio` es pañal, porcentajeMedicamento si es
-// medicamento). Separado de `calcularUnificacionesEntreClientes` para que
-// FacturacionService también lo pueda usar directo cuando el par ya viene
-// decidido de antes (ver UnificacionCruzadaPar, riesgo #2) y no hace falta
-// volver a buscarlo por fecha/ubicación.
-export function construirViajeUnificacionCruzada(
+// Arma la ViajeFacturable del lado PAÑAL de una unificación cruzada ya
+// decidida (propio + socio) — tarifa propia × porcentaje propio, sin cambios
+// desde que se armó esto (decisión 2026-09-08). Separado de la búsqueda para
+// que FacturacionService también lo pueda usar directo cuando el par ya
+// viene decidido de antes (ver UnificacionCruzadaPar, riesgo #2) y no hace
+// falta volver a buscarlo por fecha/ubicación.
+export function construirViajeUnificacionCruzadaPanal(
   propio: PedidoParaFacturar,
   socio: PedidoParaFacturar,
   tarifas: TarifasPorTipo,
-  porcentajePropio: number,
+  porcentajePanal: number,
 ): ViajeFacturable {
   const tarifa = tarifas[claveTarifaDePedido(propio)];
   if (tarifa === undefined) {
@@ -158,7 +156,7 @@ export function construirViajeUnificacionCruzada(
       `Falta tarifa vigente para zona=${propio.zonaTarifariaId} tipoServicio=${propio.tipoServicio} tipoEnvase=${propio.tipoEnvase ?? "-"}.`,
     );
   }
-  const importe = tarifa * (porcentajePropio / 100);
+  const importe = tarifa * (porcentajePanal / 100);
   return {
     clienteId: propio.clienteId,
     fecha: propio.fechaProgramada,
@@ -168,24 +166,41 @@ export function construirViajeUnificacionCruzada(
     reglaAplicada: "UNIFICADA",
     cantidadViajes: 1,
     tarifaUtilizada: tarifa,
-    porcentajeAplicado: porcentajePropio,
+    porcentajeAplicado: porcentajePanal,
     importeCalculado: importe,
     socioEntreClientes: { pedidoId: socio.id, clienteId: socio.clienteId },
   };
 }
 
-// Arma las ViajeFacturable de las unificaciones cruzadas encontradas por
-// fecha/ubicación (ver buscarUnificacionesEntreClientes) — usado para los
-// pedidos que todavía NO tienen un par decidido de antes.
-export function calcularUnificacionesEntreClientes(
-  propios: PedidoParaFacturar[],
-  socios: PedidoParaFacturar[],
-  tarifas: TarifasPorTipo,
-  porcentajePropio: number,
-): { viajes: ViajeFacturable[]; propiosRestantes: PedidoParaFacturar[] } {
-  const { unificaciones, propiosRestantes } = buscarUnificacionesEntreClientes(propios, socios);
-  const viajes = unificaciones.map(({ propio, socio }) =>
-    construirViajeUnificacionCruzada(propio, socio, tarifas, porcentajePropio),
-  );
-  return { viajes, propiosRestantes };
+// Arma la ViajeFacturable del lado MEDICAMENTO de una unificación cruzada ya
+// decidida — decisión 2026-09-12: ya no es tarifa×%, es un monto fijo "de
+// paso por compartir el viaje", que varía por zona (y opcionalmente por
+// Bolsa/Bulto, ver MontoUnificadoMedicamento). `montosUnificadoMedicamento`
+// viene indexado con la misma clave que `TarifasPorTipo`
+// (zona+tipoServicio+envase, ver construirClaveTarifa).
+export function construirViajeUnificacionCruzadaMedicamento(
+  propio: PedidoParaFacturar,
+  socio: PedidoParaFacturar,
+  montosUnificadoMedicamento: TarifasPorTipo,
+): ViajeFacturable {
+  const monto = montosUnificadoMedicamento[claveTarifaDePedido(propio)];
+  if (monto === undefined) {
+    throw new Error(
+      `Falta un monto fijo de unificado para zona=${propio.zonaTarifariaId} tipoEnvase=${propio.tipoEnvase ?? "-"}.`,
+    );
+  }
+  return {
+    clienteId: propio.clienteId,
+    fecha: propio.fechaProgramada,
+    direccion: propio.direccionUsada,
+    zonaTarifariaId: propio.zonaTarifariaId,
+    pedidoIds: [propio.id],
+    reglaAplicada: "UNIFICADA",
+    cantidadViajes: 1,
+    tarifaUtilizada: monto,
+    porcentajeAplicado: null,
+    montoFijoMedicamentoAplicado: monto,
+    importeCalculado: monto,
+    socioEntreClientes: { pedidoId: socio.id, clienteId: socio.clienteId },
+  };
 }

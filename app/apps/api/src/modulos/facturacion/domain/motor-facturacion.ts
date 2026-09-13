@@ -53,16 +53,22 @@ export interface ViajeFacturable {
   cantidadViajes: number;
   tarifaUtilizada: number;
   porcentajeAplicado: number | null;
+  // Monto fijo del lado MEDICAMENTO de una unificación CRUZADA (decisión
+  // 2026-09-12, reemplaza al % que usaba antes) — solo poblado cuando
+  // `propio` es el lado medicamento en unificacion-cruzada.ts. Para la
+  // unificación INTERNA (mismo cliente, pañal+medicamento juntos en un solo
+  // viaje) ese monto vive en `detalleUnificacion.montoFijoMedicamento`.
+  montoFijoMedicamentoAplicado?: number;
   importeCalculado: number;
-  // Solo poblado en UNIFICADA: pañal y medicamento ahora tienen cada uno su
-  // propio % configurable (decisión 2026-09-08 — ver PorcentajeSegundoServicio),
-  // un solo `porcentajeAplicado` ya no alcanza para representar los dos.
+  // Solo poblado en UNIFICADA interna (mismo cliente, pañal+medicamento en
+  // un solo viaje): pañal sigue siendo tarifa×% (decisión 2026-09-08), pero
+  // medicamento pasó a un monto fijo por zona (decisión 2026-09-12) — un
+  // solo `porcentajeAplicado` ya no alcanza para representar los dos lados.
   detalleUnificacion?: {
     tarifaPanal: number;
     porcentajePanal: number;
     importePanal: number;
-    tarifaMedicamento: number;
-    porcentajeMedicamento: number;
+    montoFijoMedicamento: number;
     importeMedicamento: number;
   };
   // Solo poblado cuando la unificación fue ENTRE dos clientes distintos (una
@@ -222,9 +228,11 @@ function agruparPorClaveTarifa(pedidos: PedidoParaFacturar[]): Map<string, Pedid
   return grupos;
 }
 
-export interface PorcentajesUnificacion {
-  panal: number;
-  medicamento: number;
+export interface ConfigUnificacionInterna {
+  porcentajePanal: number;
+  // Monto fijo por zona (y opcionalmente envase) del lado medicamento —
+  // decisión 2026-09-12, misma clave que `tarifas` (construirClaveTarifa).
+  montosUnificadoMedicamento: TarifasPorTipo;
 }
 
 // §27 completo: orquesta los pasos para UN cliente. El llamador ya filtró
@@ -238,7 +246,7 @@ export interface PorcentajesUnificacion {
 export function calcularFacturacionCliente(
   pedidos: PedidoParaFacturar[],
   tarifas: TarifasPorTipo,
-  porcentajes: PorcentajesUnificacion,
+  config: ConfigUnificacionInterna,
 ): ViajeFacturable[] {
   const viajes: ViajeFacturable[] = [];
 
@@ -261,9 +269,13 @@ export function calcularFacturacionCliente(
 
     for (const { panal, medicamento } of unificaciones) {
       const tarifaPanal = tarifaDe(panal);
-      const tarifaMedicamento = tarifaDe(medicamento);
-      const importePanal = tarifaPanal * (porcentajes.panal / 100);
-      const importeMedicamento = tarifaMedicamento * (porcentajes.medicamento / 100);
+      const importePanal = tarifaPanal * (config.porcentajePanal / 100);
+      const montoFijoMedicamento = config.montosUnificadoMedicamento[claveTarifaDePedido(medicamento)];
+      if (montoFijoMedicamento === undefined) {
+        throw new Error(
+          `Falta un monto fijo de unificado para zona=${medicamento.zonaTarifariaId} tipoEnvase=${medicamento.tipoEnvase ?? "-"}.`,
+        );
+      }
       viajes.push({
         clienteId: grupo.clienteId,
         fecha: grupo.fecha,
@@ -272,16 +284,15 @@ export function calcularFacturacionCliente(
         pedidoIds: [panal.id, medicamento.id],
         reglaAplicada: "UNIFICADA",
         cantidadViajes: 1,
-        tarifaUtilizada: tarifaPanal + tarifaMedicamento,
+        tarifaUtilizada: tarifaPanal + montoFijoMedicamento,
         porcentajeAplicado: null,
-        importeCalculado: importePanal + importeMedicamento,
+        importeCalculado: importePanal + montoFijoMedicamento,
         detalleUnificacion: {
           tarifaPanal,
-          porcentajePanal: porcentajes.panal,
+          porcentajePanal: config.porcentajePanal,
           importePanal,
-          tarifaMedicamento,
-          porcentajeMedicamento: porcentajes.medicamento,
-          importeMedicamento,
+          montoFijoMedicamento,
+          importeMedicamento: montoFijoMedicamento,
         },
       });
     }

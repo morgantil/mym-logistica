@@ -192,6 +192,7 @@ model Cliente {
   perfilImportacion            PerfilImportacion?
   combinacionesComoMedicamento CombinacionUnificacionClientes[] @relation("CombinacionMedicamento")
   combinacionesComoPanal       CombinacionUnificacionClientes[] @relation("CombinacionPanal")
+  montosUnificadoMedicamento   MontoUnificadoMedicamento[]
 
   @@map("clientes")
 }
@@ -215,6 +216,29 @@ model PerfilImportacion {
   cliente Cliente @relation(fields: [clienteId], references: [id])
 
   @@map("perfiles_importacion")
+}
+
+// ABM de sinónimos de "Receta" — decisión 2026-09-13 (Leonardo, viendo el
+// Excel real de Farmaet con valores tipo "EV"/"ENV"/"RR"/"FIS" y el de Bella
+// Vista con "Digital"/"Fisica"/"Sin Receta"): NO es una lista fija en
+// código, es una tabla editable — "es parte del ABM, lo define el usuario".
+// `valorOrigen` se guarda normalizado (mismo criterio que los encabezados de
+// columna, ver normalizarEncabezado) para que la búsqueda no dependa de
+// mayúsculas/acentos. No tiene clienteId a propósito: un mismo valor crudo
+// ("EV", por ejemplo) debería resolver igual sin importar qué cliente lo
+// mande, salvo que aparezca un caso real que diga lo contrario.
+model SinonimoReceta {
+  id            String @id @default(uuid())
+  valorOrigen   String @unique
+  valorCanonico String
+
+  creadoEn         DateTime  @default(now())
+  actualizadoEn    DateTime  @updatedAt
+  creadoPorId      String?
+  actualizadoPorId String?
+  eliminadoEn      DateTime?
+
+  @@map("sinonimos_receta")
 }
 
 // Tarifas por cliente y zona tarifaria, con vigencia para mantener histórico
@@ -353,10 +377,11 @@ model ZonaTarifaria {
 
   eliminadoEn DateTime?
 
-  localidades LocalidadZonaTarifaria[]
-  partidos    PartidoZonaTarifaria[]
-  tarifas     TarifaCliente[]
-  pedidos     Pedido[]
+  localidades                LocalidadZonaTarifaria[]
+  partidos                   PartidoZonaTarifaria[]
+  tarifas                    TarifaCliente[]
+  pedidos                    Pedido[]
+  montosUnificadoMedicamento MontoUnificadoMedicamento[]
 
   @@map("zonas_tarifarias")
 }
@@ -483,6 +508,30 @@ model Pedido {
   ticket               String? // opcional — Farmapal (§4 funcional)
   simplirouteId        String?
   observaciones        String?
+  // --- Específicos de medicamentos (Guia Arbet, decisión 2026-09-13 — ver
+  // TEMAS_PENDIENTES.md §13.14/§13.15). Null para pañales.
+  // Valor tal cual vino en la columna "Receta"/"Recetas" del Excel (ej. "EV",
+  // "Fisica") — se guarda crudo además del resuelto porque el ABM de
+  // sinónimos (ver SinonimoReceta) puede cambiar con el tiempo, y no hay que
+  // perder de qué valor de origen salió `recetaResuelta` en su momento.
+  receta               String?
+  // Snapshot del valor canónico resuelto contra SinonimoReceta al momento de
+  // importar (ej. "DIGITAL", "RECETA FISICA") — no una referencia viva, para
+  // no reescribir pedidos ya importados si el ABM cambia después.
+  recetaResuelta       String?
+  // Se importa tal cual viene, sin transformar — decisión explícita de
+  // Leonardo (valores reales: "RETIRO DE RECETA", "DT ESP", "PREP_HELADERA").
+  tipoPedido           String?
+  // Columna propia en Bella Vista (SI/NO); en Farmaet este concepto viene
+  // como un valor de "tipoPedido" en vez de una columna aparte.
+  retiroDeReceta       Boolean?
+  // Dispara Urgente/Crítica (§13.15) — valores reales: "72 HS HABITUAL" vs
+  // "URGENCIA 24 HS"/"URGENCIA 48 HS".
+  tiempoDeEntrega      String?
+  // Franja horaria de entrega tal cual viene (ej. "10 a 20 hs") — no es la
+  // fecha real del pedido, esa siempre es la que informa el usuario al
+  // importar (ver CAMPOS_OPCIONALES en campo-canonico.ts).
+  horarioEntrega       String?
   // Cuándo se imprimió por última vez alguna etiqueta de este pedido — null =
   // nunca. §8.1 funcional v6: "estado de impresión de la etiqueta" en la
   // pantalla de Embalaje y Despacho. No impide reimprimir, solo informa.
@@ -567,19 +616,48 @@ model Producto {
 // ("se cobra un % de pañal y uno de medicamento") — por eso dos columnas en
 // vez de una. 100/100 reproduce el caso "tal cual viene del documento".
 model PorcentajeSegundoServicio {
-  id                    String  @id @default(uuid())
-  clienteId             String
-  porcentajePanal       Decimal @db.Decimal(5, 2)
-  porcentajeMedicamento Decimal @db.Decimal(5, 2)
+  id              String  @id @default(uuid())
+  clienteId       String
+  porcentajePanal Decimal @db.Decimal(5, 2)
   // Decisión 2026-09-11: sin historial por vigencia — ver comentario en
-  // TarifaCliente, mismo criterio.
-  activa                Boolean @default(true)
+  // TarifaCliente, mismo criterio. Decisión 2026-09-12: `porcentajeMedicamento`
+  // se sacó de acá — el lado medicamento de un unificado ahora es un monto
+  // fijo por zona, ver MontoUnificadoMedicamento.
+  activa          Boolean @default(true)
 
   creadoEn    DateTime  @default(now())
   creadoPorId String?
   eliminadoEn DateTime?
 
   @@map("porcentajes_segundo_servicio")
+}
+
+// Monto fijo que cobra el lado MEDICAMENTO de una entrega unificada — decisión
+// 2026-09-12 (reemplaza a PorcentajeSegundoServicio.porcentajeMedicamento,
+// que quedó solo para el lado pañal). Varía por zona tarifaria — Leonardo:
+// 2 valores (CABA/Provincia) para Farmaet/Farmapal/Biosíntesis/Bella Vista
+// pañal, 4 valores (uno por Cordón) específicamente para Bella Vista
+// Medicamentos. `tipoEnvase` nullable a propósito: hoy el monto es el mismo
+// para Bolsa y Bulto (una fila con null cubre los dos), pero deja la puerta
+// abierta a diferenciarlos en el futuro sin otra migración — alcanzaría con
+// cargar una fila por cada envase en esa misma zona.
+model MontoUnificadoMedicamento {
+  id              String      @id @default(uuid())
+  clienteId       String
+  zonaTarifariaId String
+  tipoEnvase      TipoEnvase?
+  monto           Decimal     @db.Decimal(10, 2)
+  activa          Boolean     @default(true)
+
+  creadoEn    DateTime  @default(now())
+  creadoPorId String?
+  eliminadoEn DateTime?
+
+  cliente       Cliente       @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  zonaTarifaria ZonaTarifaria @relation(fields: [zonaTarifariaId], references: [id])
+
+  @@unique([clienteId, zonaTarifariaId, tipoEnvase])
+  @@map("montos_unificado_medicamento")
 }
 
 // Combinaciones habilitadas de unificación ENTRE clientes distintos (Guia_
@@ -676,7 +754,12 @@ model GrupoFacturacion {
   // borra, por las filas históricas ya confirmadas). Null en 2x1/INDIVIDUAL,
   // igual que antes.
   porcentajePanalAplicado       Decimal? @db.Decimal(5, 2)
+  // Decisión 2026-09-12: el lado medicamento de un unificado dejó de ser un
+  // %, pasa a ser un monto fijo por zona — porcentajeMedicamentoAplicado
+  // queda sin usar para filas nuevas (mismo criterio que porcentajeAplicado
+  // arriba: no se borra, por si hay filas históricas confirmadas).
   porcentajeMedicamentoAplicado Decimal? @db.Decimal(5, 2)
+  montoFijoMedicamentoAplicado  Decimal? @db.Decimal(10, 2)
   // Para una unificación ENTRE clientes distintos (combinación habilitada):
   // referencia informativa al pedido "socio" (del otro cliente) y a qué
   // cliente pertenece — no forma parte de este GrupoFacturacion (cada

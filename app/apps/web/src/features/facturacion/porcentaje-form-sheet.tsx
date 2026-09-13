@@ -20,9 +20,11 @@ function mensajeError(error: unknown): string {
 // Solo hace falta cuando el cliente tiene (o va a tener) entregas unificadas
 // pañales+medicamentos — DOCUMENTO FUNCIONAL.md §25. Con solo pañales (única
 // etapa en alcance hoy) no se usa, así que no es obligatorio cargarlo.
-// Decisión 2026-09-08: dos porcentajes, uno por lado. Decisión 2026-09-11: un
-// solo registro por cliente, sin historial — si ya existe, este mismo
-// formulario lo edita en vez de crear otro.
+// Decisión 2026-09-12: acá solo vive el % del lado PAÑAL — el lado
+// medicamento pasó a ser un monto fijo por zona, ver
+// monto-unificado-medicamento-form-sheet.tsx. Un solo registro por cliente,
+// sin historial — si ya existe, este mismo formulario lo edita en vez de
+// crear otro.
 export function PorcentajeFormSheet({
   clienteId,
   porcentaje,
@@ -37,16 +39,13 @@ export function PorcentajeFormSheet({
   const editando = porcentaje !== null;
 
   const [porcentajePanal, setPorcentajePanal] = useState("100");
-  const [porcentajeMedicamento, setPorcentajeMedicamento] = useState("100");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (porcentaje) {
       setPorcentajePanal(String(porcentaje.porcentajePanal));
-      setPorcentajeMedicamento(String(porcentaje.porcentajeMedicamento));
     } else {
       setPorcentajePanal("100");
-      setPorcentajeMedicamento("100");
     }
     setError(null);
   }, [porcentaje]);
@@ -55,19 +54,12 @@ export function PorcentajeFormSheet({
   const mutacion = useMutation({
     mutationFn: () => {
       if (editando) {
-        return actualizarPorcentaje(porcentaje.id, {
-          porcentajePanal: Number(porcentajePanal),
-          porcentajeMedicamento: Number(porcentajeMedicamento),
-        });
+        return actualizarPorcentaje(porcentaje.id, { porcentajePanal: Number(porcentajePanal) });
       }
-      return crearPorcentaje({
-        clienteId,
-        porcentajePanal: Number(porcentajePanal),
-        porcentajeMedicamento: Number(porcentajeMedicamento),
-      });
+      return crearPorcentaje({ clienteId, porcentajePanal: Number(porcentajePanal) });
     },
     onSuccess: () => {
-      toast.success(editando ? "Porcentajes actualizados." : "Porcentajes cargados.");
+      toast.success(editando ? "Porcentaje actualizado." : "Porcentaje cargado.");
       queryClient.invalidateQueries({ queryKey: ["facturacion", "porcentajes", clienteId] });
       setError(null);
       onOpenChange(false);
@@ -85,10 +77,11 @@ export function PorcentajeFormSheet({
     <Sheet open={abierto} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-md">
         <SheetHeader>
-          <SheetTitle>{editando ? "Editar porcentajes" : "Nuevos porcentajes"} de entrega unificada</SheetTitle>
+          <SheetTitle>{editando ? "Editar porcentaje" : "Nuevo porcentaje"} de pañal en unificado</SheetTitle>
           <SheetDescription>
-            En una entrega unificada (pañales + medicamentos, mismo domicilio/fecha), cada servicio se cobra a
-            su propio porcentaje de su tarifa. 100% reproduce "se cobra completo".
+            En una entrega unificada (pañales + medicamentos, mismo domicilio/fecha), el pañal se cobra a este
+            porcentaje de su propia tarifa. 100% reproduce "se cobra completo". El lado medicamento se configura
+            aparte, como un monto fijo por zona.
           </SheetDescription>
         </SheetHeader>
 
@@ -112,20 +105,6 @@ export function PorcentajeFormSheet({
                 step="0.01"
                 value={porcentajePanal}
                 onChange={(e) => setPorcentajePanal(e.target.value)}
-                required
-                disabled={mutacion.isPending}
-              />
-            </FilaFormulario>
-
-            <FilaFormulario label="% Medicamento" htmlFor="porcentaje-medicamento" anchoEtiqueta="140px">
-              <Input
-                id="porcentaje-medicamento"
-                type="number"
-                min="0"
-                max="100"
-                step="0.01"
-                value={porcentajeMedicamento}
-                onChange={(e) => setPorcentajeMedicamento(e.target.value)}
                 required
                 disabled={mutacion.isPending}
               />
