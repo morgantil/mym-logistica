@@ -230,7 +230,14 @@ describe("motor-facturacion — peso por pedidos originales (decisión 2026-09-1
 });
 
 describe("motor-facturacion — Bolsa/Bulto (Guia Arbet paso 2 y 5)", () => {
-  it("cobra tarifa distinta a Bolsa y Bulto en la misma zona", () => {
+  // Decisión 2026-09-16 (Leonardo): el 2x1 se dispara con dos AFILIADOS
+  // DISTINTOS en la misma dirección — acá modelados como dos Pedidos
+  // distintos (mismo cliente/fecha/dirección, cada uno peso 1). Si entre
+  // ellos mezclan Bolsa y Bulto, se facturan juntos en un solo 2x1, con la
+  // MISMA regla "mezcla→Bulto" que ya se aplicaba dentro de un solo pedido
+  // (determinarClasificacionMedicamento) — antes cada uno quedaba INDIVIDUAL
+  // en su propia fila, por tener distinta clave de tarifa.
+  it("dos pedidos distintos, uno Bolsa y otro Bulto, en la misma dirección/fecha: se unen en un 2x1 facturado a tarifa de Bulto", () => {
     const viajes = calcularFacturacionCliente(
       [
         pedido({ id: "bolsa", tipoServicio: TipoServicio.MEDICAMENTO, tipoEnvase: TipoEnvase.BOLSA }),
@@ -240,13 +247,43 @@ describe("motor-facturacion — Bolsa/Bulto (Guia Arbet paso 2 y 5)", () => {
       CONFIG_UNIFICACION_ARBET,
     );
 
-    // Bolsa y Bulto en el mismo grupo fecha+dirección no pueden compartir
-    // fila de 2x1 (tarifa distinta) — cada uno queda en su propia fila INDIVIDUAL.
-    expect(viajes).toHaveLength(2);
-    const viajeBolsa = viajes.find((v) => v.pedidoIds.includes("bolsa"));
-    const viajeBulto = viajes.find((v) => v.pedidoIds.includes("bulto"));
-    expect(viajeBolsa?.importeCalculado).toBe(800);
-    expect(viajeBulto?.importeCalculado).toBe(1200);
+    expect(viajes).toHaveLength(1);
+    expect(viajes[0].pedidoIds).toEqual(expect.arrayContaining(["bolsa", "bulto"]));
+    expect(viajes[0].reglaAplicada).toBe("2x1");
+    expect(viajes[0].cantidadViajes).toBe(1);
+    expect(viajes[0].importeCalculado).toBe(1200);
+  });
+
+  it("si todos los pedidos del grupo son Bolsa (sin ningún Bulto), se sigue facturando a tarifa de Bolsa", () => {
+    const viajes = calcularFacturacionCliente(
+      [
+        pedido({ id: "bolsa-1", tipoServicio: TipoServicio.MEDICAMENTO, tipoEnvase: TipoEnvase.BOLSA }),
+        pedido({ id: "bolsa-2", tipoServicio: TipoServicio.MEDICAMENTO, tipoEnvase: TipoEnvase.BOLSA }),
+      ],
+      TARIFAS,
+      CONFIG_UNIFICACION_ARBET,
+    );
+
+    expect(viajes).toHaveLength(1);
+    expect(viajes[0].importeCalculado).toBe(800);
+  });
+
+  it("grupo de más de 2 pedidos mezclando Bolsa/Bulto: sigue la fórmula normal de viajes (cada 2 = 1), pero todo a tarifa de Bulto", () => {
+    const viajes = calcularFacturacionCliente(
+      [
+        pedido({ id: "bolsa-1", tipoServicio: TipoServicio.MEDICAMENTO, tipoEnvase: TipoEnvase.BOLSA }),
+        pedido({ id: "bolsa-2", tipoServicio: TipoServicio.MEDICAMENTO, tipoEnvase: TipoEnvase.BOLSA }),
+        pedido({ id: "bulto-1", tipoServicio: TipoServicio.MEDICAMENTO, tipoEnvase: TipoEnvase.BULTO }),
+        pedido({ id: "bulto-2", tipoServicio: TipoServicio.MEDICAMENTO, tipoEnvase: TipoEnvase.BULTO }),
+      ],
+      TARIFAS,
+      CONFIG_UNIFICACION_ARBET,
+    );
+
+    expect(viajes).toHaveLength(1);
+    expect(viajes[0].pedidoIds).toHaveLength(4);
+    expect(viajes[0].cantidadViajes).toBe(2);
+    expect(viajes[0].importeCalculado).toBe(2400);
   });
 
   it("Bolsa + Bulto en un mismo pedido de medicamentos se unifica igual con pañales, usando la tarifa de Bulto", () => {

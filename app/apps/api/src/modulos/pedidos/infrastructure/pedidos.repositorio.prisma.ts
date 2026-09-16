@@ -76,6 +76,29 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
             ],
           }
         : {}),
+      ...(filtro.tipoServicio
+        ? { tipoServicio: filtro.tipoServicio as unknown as Prisma.EnumTipoServicioFilter }
+        : {}),
+      ...(filtro.zonaId ? { zonaId: filtro.zonaId } : {}),
+      ...(filtro.estadoSimpliroute
+        ? { estadoSimpliroute: filtro.estadoSimpliroute as unknown as Prisma.EnumEstadoSimplirouteFilter }
+        : {}),
+      ...(filtro.localidad ? { localidad: filtro.localidad } : {}),
+      ...(filtro.sinEtiquetaImpresa ? { etiquetaImpresaEn: null } : {}),
+      // Bolsa/Bulto vive en Producto — matchea pedidos con al menos una línea
+      // de ese envase. El propio middleware de borrado lógico no intercepta
+      // relaciones anidadas (solo operaciones directas sobre el modelo
+      // Producto), así que `eliminadoEn: null` se agrega acá a mano.
+      ...(filtro.tipoEnvase
+        ? {
+            productos: {
+              some: {
+                eliminadoEn: null,
+                tipoEnvase: filtro.tipoEnvase as unknown as Prisma.EnumTipoEnvaseNullableFilter,
+              },
+            },
+          }
+        : {}),
     };
   }
 
@@ -175,12 +198,19 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
           datos.estadoSimpliroute as unknown as Prisma.PedidoCreateInput["estadoSimpliroute"],
         estadoValidacion:
           datos.estadoValidacion as unknown as Prisma.PedidoCreateInput["estadoValidacion"],
+        receta: datos.receta,
+        recetaResuelta: datos.recetaResuelta,
+        tipoPedido: datos.tipoPedido,
+        retiroDeReceta: datos.retiroDeReceta,
+        tiempoDeEntrega: datos.tiempoDeEntrega,
+        horarioEntrega: datos.horarioEntrega,
         productos: {
           create: datos.productos.map((producto) => ({
             codigo: producto.codigo,
             descripcion: producto.descripcion,
             cantidad: producto.cantidad,
             ticket: producto.ticket,
+            tipoEnvase: producto.tipoEnvase as unknown as Prisma.ProductoCreateWithoutPedidoInput["tipoEnvase"],
           })),
         },
       },
@@ -208,6 +238,16 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
       include: INCLUDE_LISTADO,
     });
     return pedidos.map(mapearListado);
+  }
+
+  async listarLocalidades(clienteIds?: string[]): Promise<string[]> {
+    const filas = await this.prisma.pedido.findMany({
+      where: clienteIds ? { clienteId: { in: clienteIds } } : undefined,
+      distinct: ["localidad"],
+      select: { localidad: true },
+      orderBy: { localidad: "asc" },
+    });
+    return filas.map((fila) => fila.localidad);
   }
 
   async listarFacturables(filtro: FiltroPedidosFacturables): Promise<PedidoFacturable[]> {

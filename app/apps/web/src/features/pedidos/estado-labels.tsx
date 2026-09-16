@@ -57,6 +57,12 @@ export const LABEL_ESTADO_PEDIDO: Record<EstadoPedido, string> = Object.fromEntr
   Object.entries(LABELS_ESTADO_PEDIDO).map(([clave, valor]) => [clave, valor.texto]),
 ) as Record<EstadoPedido, string>;
 
+// Exportado para el filtro de Pedidos (decisión 2026-09-16) — mismo texto
+// que ya muestra el Badge, sin duplicar strings en otro archivo.
+export const LABEL_ESTADO_SIMPLIROUTE: Record<EstadoSimpliroute, string> = Object.fromEntries(
+  Object.entries(LABELS_ESTADO_SIMPLIROUTE).map(([clave, valor]) => [clave, valor.texto]),
+) as Record<EstadoSimpliroute, string>;
+
 // Exportado para el Dashboard: mismo texto y tono de color que usa la grilla
 // de Pedidos para este estado, así los tiles de KPIs y la columna Estado se
 // leen como el mismo sistema en vez de dos paletas distintas.

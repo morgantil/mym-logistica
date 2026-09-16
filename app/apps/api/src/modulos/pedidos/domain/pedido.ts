@@ -65,7 +65,13 @@ export interface PedidoFacturable extends Pedido {
   productos: { tipoEnvase: TipoEnvase | null }[];
 }
 
-export interface LineaExcelPanales {
+// Decisión 2026-09-15: renombrada de "LineaExcelPanales" — ahora también la
+// arma el importador de medicamentos (transformarFilaMedicamento), no solo
+// el de pañales. La forma es la misma para los dos: una línea = un producto
+// (real, para pañales; sintético, para medicamentos — ver
+// TEMAS_PENDIENTES.md §13.19, no hay columna de descripción de producto en
+// los Excel de Farmaet/Bella Vista).
+export interface LineaExcelImportada {
   clienteId: string;
   numeroAfiliado: string;
   destinatario: string;
@@ -78,13 +84,27 @@ export interface LineaExcelPanales {
   // entrega ahí. No es basura: transformarFila lo separa de la fecha, y acá
   // viaja hasta el Pedido como observación (ver ImportarExcelService).
   notaFecha: string | null;
-  // Número de ticket (Farmapal, §4 funcional) — se guarda como observación,
-  // no en su propio campo (decisión 2026-09-01: así sale impreso en la
-  // etiqueta junto con el resto de las observaciones sin tocar el generador).
+  // Número de ticket (Farmapal) o de remito (Farmaet/Bella Vista, mismo rol
+  // — ver diccionario-sinonimos.ts) — se guarda como observación, no en su
+  // propio campo (decisión 2026-09-01: así sale impreso en la etiqueta junto
+  // con el resto de las observaciones sin tocar el generador).
   ticket: string | null;
   codigoProducto: string | null;
   descripcionProducto: string;
   cantidad: number;
+  // Solo medicamentos (null para pañales) — Guia Arbet paso 2, ver
+  // determinarClasificacionMedicamento.
+  tipoEnvase: TipoEnvase | null;
+  // --- Campos de PEDIDO (no de producto) específicos de medicamentos, null
+  // para pañales — decisión 2026-09-13/15, ver TEMAS_PENDIENTES.md §13.14.
+  // Viajan por línea porque LineaExcelImportada es "una línea del Excel",
+  // pero son iguales para todas las líneas de un mismo pedido agrupado
+  // (mismo criterio que destinatario/direccion más arriba).
+  receta: string | null;
+  tipoPedido: string | null;
+  retiroDeReceta: boolean | null;
+  tiempoDeEntrega: string | null;
+  horarioEntrega: string | null;
 }
 
 export interface PedidoAgrupado {
@@ -96,8 +116,19 @@ export interface PedidoAgrupado {
   telefono: string | null;
   fechaEntrega: string;
   notaFecha: string | null;
-  productos: { codigo: string | null; descripcion: string; cantidad: number; ticket: string | null }[];
+  productos: {
+    codigo: string | null;
+    descripcion: string;
+    cantidad: number;
+    ticket: string | null;
+    tipoEnvase: TipoEnvase | null;
+  }[];
   totalUnidades: number;
+  receta: string | null;
+  tipoPedido: string | null;
+  retiroDeReceta: boolean | null;
+  tiempoDeEntrega: string | null;
+  horarioEntrega: string | null;
 }
 
 // DOCUMENTO FUNCIONAL.md §7: una línea del Excel = un producto, no un pedido.
@@ -114,7 +145,7 @@ export interface PedidoAgrupado {
 // perdía el ticket de todas las líneas menos la primera. Guardarlo por
 // producto no pierde ningún dato de trazabilidad sin tocar cómo se arma
 // el pedido ni cómo se factura.
-export function agruparLineasEnPedidos(lineas: LineaExcelPanales[]): PedidoAgrupado[] {
+export function agruparLineasEnPedidos(lineas: LineaExcelImportada[]): PedidoAgrupado[] {
   const grupos = new Map<string, PedidoAgrupado>();
 
   const normalizarDireccion = (direccion: string) => direccion.trim().toUpperCase().replace(/\s+/g, " ");
@@ -133,6 +164,7 @@ export function agruparLineasEnPedidos(lineas: LineaExcelPanales[]): PedidoAgrup
       descripcion: linea.descripcionProducto,
       cantidad: linea.cantidad,
       ticket: linea.ticket,
+      tipoEnvase: linea.tipoEnvase,
     };
 
     if (grupoExistente) {
@@ -150,6 +182,11 @@ export function agruparLineasEnPedidos(lineas: LineaExcelPanales[]): PedidoAgrup
         notaFecha: linea.notaFecha,
         productos: [producto],
         totalUnidades: linea.cantidad,
+        receta: linea.receta,
+        tipoPedido: linea.tipoPedido,
+        retiroDeReceta: linea.retiroDeReceta,
+        tiempoDeEntrega: linea.tiempoDeEntrega,
+        horarioEntrega: linea.horarioEntrega,
       });
     }
   }

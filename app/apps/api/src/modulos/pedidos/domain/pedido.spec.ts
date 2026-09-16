@@ -1,6 +1,6 @@
-import { agruparLineasEnPedidos, LineaExcelPanales } from "./pedido";
+import { agruparLineasEnPedidos, LineaExcelImportada } from "./pedido";
 
-function linea(overrides: Partial<LineaExcelPanales> = {}): LineaExcelPanales {
+function linea(overrides: Partial<LineaExcelImportada> = {}): LineaExcelImportada {
   return {
     clienteId: "cliente-1",
     numeroAfiliado: "12345",
@@ -14,6 +14,12 @@ function linea(overrides: Partial<LineaExcelPanales> = {}): LineaExcelPanales {
     codigoProducto: "EAN001",
     descripcionProducto: "Pañal A",
     cantidad: 4,
+    tipoEnvase: null,
+    receta: null,
+    tipoPedido: null,
+    retiroDeReceta: null,
+    tiempoDeEntrega: null,
+    horarioEntrega: null,
     ...overrides,
   };
 }

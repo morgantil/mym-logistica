@@ -1,4 +1,5 @@
 import { TipoEnvase, TipoServicio } from "@mym/shared-types";
+import { determinarClasificacionMedicamento } from "./clasificacion-medicamento";
 
 // DOCUMENTO FUNCIONAL.md §21-§29 + Guia_Desarrollo_Logica_Facturacion_Arbet.docx:
 // reglas de facturación. Funciones puras, sin NestJS/Prisma — se testean
@@ -212,11 +213,10 @@ export function calcularViajesPorPeso(pedidos: PedidoParaFacturar[]): ViajePorPe
 }
 
 // Agrupa una lista de pedidos (ya del mismo tipo de servicio) por su clave de
-// tarifa (zona + tipo + Bolsa/Bulto) — necesario porque dos pedidos de
-// medicamentos en el mismo grupo cliente+fecha+dirección pueden tener
-// distinto Bolsa/Bulto, y por lo tanto distinta tarifa, así que no pueden
-// compartir el mismo viaje de 2x1 sin que el "tarifaUtilizada" del viaje
-// quede ambiguo.
+// tarifa (zona + tipo + Bolsa/Bulto). Usado solo para pañales — todos
+// comparten siempre la misma clave (tipoEnvase null), así que arma un único
+// grupo; se mantiene la función por si algún día pañales tuviera más de una
+// clave posible. Medicamentos NO usa esto — ver facturarMedicamentosDelGrupo.
 function agruparPorClaveTarifa(pedidos: PedidoParaFacturar[]): Map<string, PedidoParaFacturar[]> {
   const grupos = new Map<string, PedidoParaFacturar[]>();
   for (const pedido of pedidos) {
@@ -297,28 +297,69 @@ export function calcularFacturacionCliente(
       });
     }
 
-    // 2x1 sobre lo que quedó sin unificar — sub-agrupado por clave de tarifa
-    // (panalesRestantes siempre comparte una sola clave; medicamentosRestantes
-    // puede tener Bolsa y Bulto mezclados dentro del mismo grupo fecha+dirección).
-    // Una sola fila por clave, con la cantidad de viajes que pesa ese grupo
-    // (ver calcularViajesPorPeso) — no una fila por cada par de Pedidos.
-    for (const restantesDeUnTipo of [panalesRestantes, medicamentosRestantes]) {
-      for (const [, pedidosDeEstaClave] of agruparPorClaveTarifa(restantesDeUnTipo)) {
-        const tarifa = tarifaDe(pedidosDeEstaClave[0]);
-        const { pedidoIds, reglaAplicada, cantidadViajes } = calcularViajesPorPeso(pedidosDeEstaClave);
-        viajes.push({
-          clienteId: grupo.clienteId,
-          fecha: grupo.fecha,
-          direccion: grupo.direccion,
-          zonaTarifariaId: grupo.zonaTarifariaId,
-          pedidoIds,
-          reglaAplicada,
-          cantidadViajes,
-          tarifaUtilizada: tarifa,
-          porcentajeAplicado: null,
-          importeCalculado: tarifa * cantidadViajes,
-        });
+    // 2x1 de pañales sobre lo que quedó sin unificar — sub-agrupado por clave
+    // de tarifa (siempre una sola, tipoEnvase null). Una sola fila por clave,
+    // con la cantidad de viajes que pesa ese grupo (ver calcularViajesPorPeso)
+    // — no una fila por cada par de Pedidos.
+    for (const [, pedidosDeEstaClave] of agruparPorClaveTarifa(panalesRestantes)) {
+      const tarifa = tarifaDe(pedidosDeEstaClave[0]);
+      const { pedidoIds, reglaAplicada, cantidadViajes } = calcularViajesPorPeso(pedidosDeEstaClave);
+      viajes.push({
+        clienteId: grupo.clienteId,
+        fecha: grupo.fecha,
+        direccion: grupo.direccion,
+        zonaTarifariaId: grupo.zonaTarifariaId,
+        pedidoIds,
+        reglaAplicada,
+        cantidadViajes,
+        tarifaUtilizada: tarifa,
+        porcentajeAplicado: null,
+        importeCalculado: tarifa * cantidadViajes,
+      });
+    }
+
+    // 2x1 de medicamentos sobre lo que quedó sin unificar — decisión
+    // 2026-09-16 (Leonardo): a diferencia de pañales, acá NO se sub-agrupa
+    // por clave de tarifa (eso separaría Bolsa de Bulto en filas distintas
+    // aunque compartan cliente+fecha+dirección, o sea aunque sean el mismo
+    // 2x1 real). Todos los pedidos de medicamentos restantes de este grupo
+    // — sin importar de qué afiliado sean ni si mezclan Bolsa/Bulto —
+    // comparten un único 2x1, facturado con la misma regla "mezcla→Bulto"
+    // que ya existe para las líneas de un solo pedido
+    // (determinarClasificacionMedicamento), ahora aplicada a nivel del grupo
+    // entero: "si llevan n bolsas y n bultos, se cobra Bulto; si es todo
+    // bolsas, Bolsa; si es todo bultos, Bulto" — y la cantidad de viajes
+    // sigue la fórmula de siempre (cada 2 pedidos originales = 1 viaje). Esto
+    // NO afecta a `unificaciones` de arriba: qué medicamento se empareja con
+    // un pañal sigue usando el tipoEnvase propio de ESE pedido puntual.
+    if (medicamentosRestantes.length > 0) {
+      const clasificacionGrupo = determinarClasificacionMedicamento(
+        medicamentosRestantes.map((pedido) => pedido.tipoEnvase),
+      );
+      const clave = construirClaveTarifa({
+        zonaTarifariaId: grupo.zonaTarifariaId,
+        tipoServicio: TipoServicio.MEDICAMENTO,
+        tipoEnvase: clasificacionGrupo,
+      });
+      const tarifa = tarifas[clave];
+      if (tarifa === undefined) {
+        throw new Error(
+          `Falta tarifa vigente para zona=${grupo.zonaTarifariaId} tipoServicio=${TipoServicio.MEDICAMENTO} tipoEnvase=${clasificacionGrupo ?? "-"}.`,
+        );
       }
+      const { pedidoIds, reglaAplicada, cantidadViajes } = calcularViajesPorPeso(medicamentosRestantes);
+      viajes.push({
+        clienteId: grupo.clienteId,
+        fecha: grupo.fecha,
+        direccion: grupo.direccion,
+        zonaTarifariaId: grupo.zonaTarifariaId,
+        pedidoIds,
+        reglaAplicada,
+        cantidadViajes,
+        tarifaUtilizada: tarifa,
+        porcentajeAplicado: null,
+        importeCalculado: tarifa * cantidadViajes,
+      });
     }
   }
 

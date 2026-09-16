@@ -1,4 +1,4 @@
-import { EstadoPedido, EstadoSimpliroute, EstadoValidacion, TipoServicio } from "@mym/shared-types";
+import { EstadoPedido, EstadoSimpliroute, EstadoValidacion, TipoEnvase, TipoServicio } from "@mym/shared-types";
 import { Pedido, PedidoFacturable, PedidoListado } from "./pedido";
 
 export interface DatosCrearPedido {
@@ -15,13 +15,26 @@ export interface DatosCrearPedido {
   observaciones: string | null;
   // Ver Pedido.cantidadPedidoOriginal en schema.prisma.
   cantidadPedidoOriginal: number;
-  productos: { codigo: string | null; descripcion: string; cantidad: number; ticket: string | null }[];
+  productos: {
+    codigo: string | null;
+    descripcion: string;
+    cantidad: number;
+    ticket: string | null;
+    tipoEnvase: TipoEnvase | null;
+  }[];
   zonaId: string | null;
   zonaNombre: string | null;
   choferId: string | null;
   choferNombre: string | null;
   estadoSimpliroute: EstadoSimpliroute;
   estadoValidacion: EstadoValidacion;
+  // Específicos de medicamentos — null para pañales, ver comentario en Pedido (schema.prisma).
+  receta: string | null;
+  recetaResuelta: string | null;
+  tipoPedido: string | null;
+  retiroDeReceta: boolean | null;
+  tiempoDeEntrega: string | null;
+  horarioEntrega: string | null;
 }
 
 export interface FiltroPedidos {
@@ -36,6 +49,20 @@ export interface FiltroPedidos {
   // Búsqueda libre — matchea contra destinatario, dirección o Nº de afiliado
   // (case-insensitive, "contiene"). Decisión 2026-09-01.
   busqueda?: string;
+  // Filtros combinables agregados 2026-09-16 (pedido de Leonardo — "que sea
+  // combinatorio por la mayoría de variables que podamos tener"), todos AND
+  // entre sí y con el resto, mismo criterio que fecha/bultos de arriba.
+  tipoServicio?: TipoServicio;
+  zonaId?: string;
+  // Bolsa/Bulto vive en Producto, no en Pedido — filtra pedidos que tengan
+  // AL MENOS una línea de ese envase (ver armarWhere en el adapter Prisma).
+  tipoEnvase?: TipoEnvase;
+  estadoSimpliroute?: EstadoSimpliroute;
+  localidad?: string;
+  // true = solo pedidos con `etiquetaImpresaEn` null. No se ofrece el
+  // inverso ("con etiqueta impresa") porque no se pidió — se puede sumar
+  // después con el mismo campo (true/false) si hace falta.
+  sinEtiquetaImpresa?: boolean;
 }
 
 // Ordenamiento de la grilla — decisión 2026-09-01. Whitelist explícita (no un
@@ -99,6 +126,11 @@ export interface PedidosRepositorio {
   // §17 funcional: candidatos a "Revisión antes de enviar" — los que todavía
   // no se mandaron a SimpliRoute.
   listarPendientesDeEnvio(clienteIds?: string[]): Promise<PedidoListado[]>;
+
+  // Valores reales de Localidad ya cargados (para el dropdown del filtro de
+  // Pedidos, decisión 2026-09-16) — respeta los mismos permisos por cliente
+  // que el resto de los listados, no una lista fija en código.
+  listarLocalidades(clienteIds?: string[]): Promise<string[]>;
 
   // §30 funcional ("información necesaria para facturación"): candidatos a
   // facturar de un cliente en un período — entregados y todavía sin asignar

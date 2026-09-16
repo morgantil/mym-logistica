@@ -1,3 +1,5 @@
+import { TipoServicio } from "@mym/shared-types";
+
 // Campos que el sistema necesita extraer de CUALQUIER Excel de pañales O
 // medicamentos, sin importar cómo el cliente llame a sus columnas —
 // DOCUMENTO FUNCIONAL.md §6. Farmapal usa "ticket" (§4 funcional); Farmaet
@@ -37,6 +39,22 @@ export const CAMPOS_OBLIGATORIOS: CampoCanonico[] = [
   "descripcionProducto",
   "cantidad",
 ];
+
+// Medicamentos (Farmaet/Bella Vista, decisión 2026-09-15): ningún Excel real
+// trae columna de "descripción de producto" ni "cantidad" — el producto es
+// SINTÉTICO y la cantidad se deriva de Bolsa/Bulto (ver
+// transformar-fila-medicamento.ts), así que exigirlos como obligatorios
+// dejaría el mapeo manual sin poder completarse nunca para este tipo de cliente.
+export const CAMPOS_OBLIGATORIOS_MEDICAMENTO: CampoCanonico[] = [
+  "numeroAfiliado",
+  "destinatario",
+  "direccion",
+  "localidad",
+];
+
+export function camposObligatoriosPara(tipoServicio: TipoServicio): CampoCanonico[] {
+  return tipoServicio === TipoServicio.MEDICAMENTO ? CAMPOS_OBLIGATORIOS_MEDICAMENTO : CAMPOS_OBLIGATORIOS;
+}
 
 // `fechaEntrega` es opcional a propósito (decisión 2026-09-13, caso real
 // Farmaet): la fecha real del pedido SIEMPRE es la que el usuario informa al

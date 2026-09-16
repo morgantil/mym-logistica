@@ -88,6 +88,13 @@ export class PedidosService {
     return this.repositorio.contarPorEstado(clienteIds ?? undefined);
   }
 
+  // Dropdown del filtro de Localidad en la grilla de Pedidos (decisión
+  // 2026-09-16) — mismo criterio de permisos que el resto de los listados.
+  async listarLocalidadesParaUsuario(usuarioId: string) {
+    const clienteIds = await this.permisosCliente.clientesPermitidosPara(usuarioId);
+    return this.repositorio.listarLocalidades(clienteIds ?? undefined);
+  }
+
   // Usado por el módulo de importadores — un pedido nace siempre SIN_ASIGNAR
   // (estado por defecto en el schema) hasta que Etapa 2 (zona/chofer) lo procese.
   crear(datos: DatosCrearPedido) {

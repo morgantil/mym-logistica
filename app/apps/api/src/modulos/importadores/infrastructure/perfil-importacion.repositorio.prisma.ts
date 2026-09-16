@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
-import { Prisma } from "@prisma/client";
+import { $Enums, Prisma } from "@prisma/client";
+import { TipoServicio } from "@mym/shared-types";
 import { PrismaService } from "../../../common/prisma/prisma.service";
 import { MapeoColumnas } from "../domain/campo-canonico";
 import { PerfilImportacionRepositorio } from "../domain/perfil-importacion.repositorio";
@@ -8,16 +9,26 @@ import { PerfilImportacionRepositorio } from "../domain/perfil-importacion.repos
 export class PerfilImportacionRepositorioPrisma implements PerfilImportacionRepositorio {
   constructor(private prisma: PrismaService) {}
 
-  async buscarPorCliente(clienteId: string): Promise<MapeoColumnas | null> {
-    const perfil = await this.prisma.perfilImportacion.findUnique({ where: { clienteId } });
+  async buscarPorCliente(clienteId: string, tipoServicio: TipoServicio): Promise<MapeoColumnas | null> {
+    const tipoServicioPrisma = tipoServicio as unknown as $Enums.TipoServicio;
+    const perfil = await this.prisma.perfilImportacion.findUnique({
+      where: { clienteId_tipoServicio: { clienteId, tipoServicio: tipoServicioPrisma } },
+    });
     return (perfil?.mapeoColumnas as MapeoColumnas) ?? null;
   }
 
-  async guardar(clienteId: string, mapeo: MapeoColumnas, usuarioId: string | null): Promise<void> {
+  async guardar(
+    clienteId: string,
+    tipoServicio: TipoServicio,
+    mapeo: MapeoColumnas,
+    usuarioId: string | null,
+  ): Promise<void> {
+    const tipoServicioPrisma = tipoServicio as unknown as $Enums.TipoServicio;
     await this.prisma.perfilImportacion.upsert({
-      where: { clienteId },
+      where: { clienteId_tipoServicio: { clienteId, tipoServicio: tipoServicioPrisma } },
       create: {
         clienteId,
+        tipoServicio: tipoServicioPrisma,
         mapeoColumnas: mapeo as Prisma.InputJsonValue,
         creadoPorId: usuarioId,
       },

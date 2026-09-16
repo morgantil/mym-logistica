@@ -1,4 +1,4 @@
-import type { EstadoPedido } from "@mym/shared-types";
+import type { EstadoPedido, EstadoSimpliroute, TipoEnvase, TipoServicio } from "@mym/shared-types";
 import { apiClient } from "@/lib/api-client";
 import type {
   CampoOrdenPedido,
@@ -19,12 +19,25 @@ export interface ParametrosListarPedidos {
   bultosDesde?: number;
   bultosHasta?: number;
   busqueda?: string;
+  // Filtros combinables agregados 2026-09-16.
+  tipoServicio?: TipoServicio;
+  zonaId?: string;
+  tipoEnvase?: TipoEnvase;
+  estadoSimpliroute?: EstadoSimpliroute;
+  localidad?: string;
+  sinEtiquetaImpresa?: boolean;
   ordenarPor?: CampoOrdenPedido;
   direccionOrden?: "asc" | "desc";
 }
 
 export async function listarPedidos(parametros: ParametrosListarPedidos): Promise<PaginaPedidos> {
   const { data } = await apiClient.get<PaginaPedidos>("/pedidos", { params: parametros });
+  return data;
+}
+
+// Dropdown del filtro de Localidad — valores reales ya cargados.
+export async function listarLocalidadesPedidos(): Promise<string[]> {
+  const { data } = await apiClient.get<string[]>("/pedidos/localidades");
   return data;
 }
 

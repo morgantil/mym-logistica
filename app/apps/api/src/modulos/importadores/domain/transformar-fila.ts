@@ -1,14 +1,16 @@
-import { LineaExcelPanales } from "../../pedidos/domain/pedido";
+import { LineaExcelImportada } from "../../pedidos/domain/pedido";
 import { CAMPOS_OBLIGATORIOS, MapeoColumnas } from "./campo-canonico";
 import { FilaExcelCruda } from "./lector-excel.port";
 
 export interface ResultadoTransformarFila {
   valida: boolean;
-  linea: LineaExcelPanales | null;
+  linea: LineaExcelImportada | null;
   errores: string[];
 }
 
-function aTexto(valor: unknown): string | null {
+// Exportada — la reusa transformarFilaMedicamento (mismo criterio de
+// "celda vacía = null", nada específico de pañales acá).
+export function aTexto(valor: unknown): string | null {
   if (valor === null || valor === undefined) return null;
   const texto = String(valor).trim();
   return texto === "" ? null : texto;
@@ -25,7 +27,7 @@ const FECHA_ISO_AL_INICIO = /^(\d{4}-\d{2}-\d{2})/;
 // separa el texto de la celda para no perder la observación de entrega
 // real que pueda venir pegada a una fecha — se guarda como nota (ver
 // ImportarExcelService), el resto se descarta.
-function extraerNotaDeCeldaFecha(valor: unknown): string | null {
+export function extraerNotaDeCeldaFecha(valor: unknown): string | null {
   if (valor instanceof Date) return null;
 
   const texto = aTexto(valor);
@@ -111,6 +113,13 @@ export function transformarFila(
       codigoProducto,
       descripcionProducto: descripcionProducto!,
       cantidad: cantidad!,
+      // Campos de medicamentos — null para pañales, ver transformarFilaMedicamento.
+      tipoEnvase: null,
+      receta: null,
+      tipoPedido: null,
+      retiroDeReceta: null,
+      tiempoDeEntrega: null,
+      horarioEntrega: null,
     },
   };
 }

@@ -1,6 +1,6 @@
-import { Type } from "class-transformer";
-import { IsDate, IsEnum, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from "class-validator";
-import { EstadoPedido } from "@mym/shared-types";
+import { Transform, Type } from "class-transformer";
+import { IsBoolean, IsDate, IsEnum, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from "class-validator";
+import { EstadoPedido, EstadoSimpliroute, TipoEnvase, TipoServicio } from "@mym/shared-types";
 import { CampoOrdenPedido } from "../../domain/pedidos.repositorio";
 
 // Whitelist explícita para el DTO — mismos valores que CampoOrdenPedido, acá
@@ -64,6 +64,35 @@ export class ListarPedidosDto {
   @IsString()
   @MaxLength(200)
   busqueda?: string;
+
+  // Filtros combinables agregados 2026-09-16 — ver FiltroPedidos.
+  @IsOptional()
+  @IsEnum(TipoServicio)
+  tipoServicio?: TipoServicio;
+
+  @IsOptional()
+  @IsString()
+  zonaId?: string;
+
+  @IsOptional()
+  @IsEnum(TipoEnvase)
+  tipoEnvase?: TipoEnvase;
+
+  @IsOptional()
+  @IsEnum(EstadoSimpliroute)
+  estadoSimpliroute?: EstadoSimpliroute;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  localidad?: string;
+
+  // Query param llega como string ("true"/"false") — Boolean("false") daría
+  // true, por eso el Transform explícito en vez de @Type(() => Boolean).
+  @IsOptional()
+  @Transform(({ value }) => value === "true" || value === true)
+  @IsBoolean()
+  sinEtiquetaImpresa?: boolean;
 
   @IsOptional()
   @IsIn(CAMPOS_ORDEN)

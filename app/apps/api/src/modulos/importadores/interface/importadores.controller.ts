@@ -8,6 +8,7 @@ import {
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { Rol } from "@prisma/client";
+import { TipoServicio } from "@mym/shared-types";
 import { Roles } from "../../../common/decorators/roles.decorator";
 import { UsuarioActual, UsuarioAutenticado } from "../../../common/decorators/usuario-actual.decorator";
 import { ImportarExcelService } from "../application/importar-excel.service";
@@ -34,6 +35,7 @@ export class ImportadoresController {
     @UploadedFile() archivo: Express.Multer.File | undefined,
     @Body("clienteId") clienteId: string | undefined,
     @Body("fechaEntrega") fechaEntrega: string | undefined,
+    @Body("tipoServicio") tipoServicio: TipoServicio | undefined,
     @UsuarioActual() usuario: UsuarioAutenticado,
   ) {
     if (!archivo) {
@@ -48,6 +50,9 @@ export class ImportadoresController {
       usuarioId: usuario.id,
       fechaEntrega,
       clienteIdManual: clienteId || undefined,
+      // Opcional — default PANAL, ver ImportarExcelService (retrocompatible
+      // con clientes que todavía no distinguen tipo de importación en el front).
+      tipoServicio: tipoServicio || undefined,
     });
   }
 
@@ -62,6 +67,7 @@ export class ImportadoresController {
     @Body("clienteId") clienteId: string,
     @Body("mapeoManual") mapeoManualJson: string,
     @Body("fechaEntrega") fechaEntrega: string | undefined,
+    @Body("tipoServicio") tipoServicio: TipoServicio | undefined,
     @UsuarioActual() usuario: UsuarioAutenticado,
   ) {
     if (!archivo) {
@@ -90,6 +96,7 @@ export class ImportadoresController {
       clienteId,
       mapeoManual,
       fechaEntrega,
+      tipoServicio: tipoServicio || undefined,
     });
   }
 }

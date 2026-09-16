@@ -38,11 +38,24 @@ export class PedidosController {
         bultosDesde: query.bultosDesde,
         bultosHasta: query.bultosHasta,
         busqueda: query.busqueda,
+        tipoServicio: query.tipoServicio,
+        zonaId: query.zonaId,
+        tipoEnvase: query.tipoEnvase,
+        estadoSimpliroute: query.estadoSimpliroute,
+        localidad: query.localidad,
+        sinEtiquetaImpresa: query.sinEtiquetaImpresa,
       },
       query.pagina,
       query.porPagina,
       query.ordenarPor ? { campo: query.ordenarPor, direccion: query.direccionOrden ?? "asc" } : undefined,
     );
+  }
+
+  // Dropdown del filtro de Localidad (decisión 2026-09-16) — valores reales
+  // ya cargados, no una lista fija.
+  @Get("localidades")
+  listarLocalidades(@UsuarioActual() usuario: UsuarioAutenticado) {
+    return this.pedidosService.listarLocalidadesParaUsuario(usuario.id);
   }
 
   // §17 funcional: "Revisión antes de enviar" — cada pedido viene con sus

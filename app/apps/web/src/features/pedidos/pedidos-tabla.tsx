@@ -3,9 +3,9 @@ import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { flexRender } from "@tanstack/react-table";
 import { getCoreRowModel, useLegacyTable, type LegacyColumnDef } from "@tanstack/react-table/legacy";
-import { ArrowDown, ArrowUp, ArrowUpDown, SlidersHorizontal, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronUp, SlidersHorizontal, X } from "lucide-react";
 import { toast } from "sonner";
-import { EstadoPedido } from "@mym/shared-types";
+import { EstadoPedido, EstadoSimpliroute, TipoEnvase, TipoServicio } from "@mym/shared-types";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -27,12 +27,42 @@ import {
 } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth-context";
-import { actualizarColumnasPedidos, eliminarPedido, eliminarPedidos, listarPedidos, obtenerColumnasPedidos } from "./api";
+import { listarClientesActivos } from "@/features/clientes/api";
+import { listarZonas } from "@/features/zonas-choferes/api";
+import {
+  actualizarColumnasPedidos,
+  eliminarPedido,
+  eliminarPedidos,
+  listarLocalidadesPedidos,
+  listarPedidos,
+  obtenerColumnasPedidos,
+} from "./api";
 import { BultosCelda } from "./bultos-celda";
 import { DetallePedidoSheet } from "./detalle-pedido-sheet";
 import { ordenarColumnas } from "./orden-columnas";
-import { BadgeEstadoPedido, BadgeEstadoSimpliroute, BadgeEstadoValidacion, LABEL_ESTADO_PEDIDO } from "./estado-labels";
+import {
+  BadgeEstadoPedido,
+  BadgeEstadoSimpliroute,
+  BadgeEstadoValidacion,
+  LABEL_ESTADO_PEDIDO,
+  LABEL_ESTADO_SIMPLIROUTE,
+} from "./estado-labels";
 import type { CampoOrdenPedido, PedidoListado } from "./tipos";
+
+// Locales a este archivo — mismo criterio que ya usa Facturación (tarifa-form-
+// sheet.tsx) para estas mismas dos etiquetas, sin armar un archivo compartido
+// para dos strings.
+const LABEL_TIPO_SERVICIO: Record<TipoServicio, string> = {
+  [TipoServicio.PANAL]: "Pañales",
+  [TipoServicio.MEDICAMENTO]: "Medicamentos",
+};
+
+const LABEL_TIPO_ENVASE: Record<TipoEnvase, string> = {
+  [TipoEnvase.BOLSA]: "Bolsa",
+  [TipoEnvase.BULTO]: "Bulto",
+};
+
+const SENTINEL_TODOS = "TODOS";
 
 const POR_PAGINA = 20;
 const DEBOUNCE_BUSQUEDA_MS = 400;
@@ -164,6 +194,29 @@ export function PedidosTabla() {
   const [busquedaInput, setBusquedaInput] = useState("");
   const [busqueda, setBusqueda] = useState("");
 
+  // Filtros combinables agregados 2026-09-16 (pedido de Leonardo — "que sea
+  // combinatorio por la mayoría de variables que podamos tener"), agrupados
+  // en un panel "Filtros avanzados" desplegable para no saturar la barra
+  // principal. Mismo criterio que el resto: viven en estado local, no en la URL.
+  const [mostrarAvanzados, setMostrarAvanzados] = useState(false);
+  const [clienteId, setClienteId] = useState(SENTINEL_TODOS);
+  const [tipoServicio, setTipoServicio] = useState(SENTINEL_TODOS);
+  const [zonaId, setZonaId] = useState(SENTINEL_TODOS);
+  const [tipoEnvase, setTipoEnvase] = useState(SENTINEL_TODOS);
+  const [estadoSimpliroute, setEstadoSimpliroute] = useState(SENTINEL_TODOS);
+  const [localidad, setLocalidad] = useState(SENTINEL_TODOS);
+  const [sinEtiquetaImpresa, setSinEtiquetaImpresa] = useState(false);
+
+  const { data: clientesDisponibles = [] } = useQuery({
+    queryKey: ["clientes", "activos"],
+    queryFn: listarClientesActivos,
+  });
+  const { data: zonasDisponibles = [] } = useQuery({ queryKey: ["zonas"], queryFn: listarZonas });
+  const { data: localidadesDisponibles = [] } = useQuery({
+    queryKey: ["pedidos", "localidades"],
+    queryFn: listarLocalidadesPedidos,
+  });
+
   // Orden de la grilla — decisión 2026-09-01. Un solo campo a la vez (no
   // orden múltiple): alcanza para el caso de uso y evita una UI más compleja
   // de "prioridad de columnas".
@@ -187,13 +240,43 @@ export function PedidosTabla() {
 
   useEffect(() => {
     setPagina(1);
-  }, [fechaDesde, fechaHasta, bultosDesde, bultosHasta, busqueda]);
+  }, [
+    fechaDesde,
+    fechaHasta,
+    bultosDesde,
+    bultosHasta,
+    busqueda,
+    clienteId,
+    tipoServicio,
+    zonaId,
+    tipoEnvase,
+    estadoSimpliroute,
+    localidad,
+    sinEtiquetaImpresa,
+  ]);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: [
       "pedidos",
       "listado",
-      { pagina, porPagina: POR_PAGINA, estado, fechaDesde, fechaHasta, bultosDesde, bultosHasta, busqueda, orden },
+      {
+        pagina,
+        porPagina: POR_PAGINA,
+        estado,
+        fechaDesde,
+        fechaHasta,
+        bultosDesde,
+        bultosHasta,
+        busqueda,
+        orden,
+        clienteId,
+        tipoServicio,
+        zonaId,
+        tipoEnvase,
+        estadoSimpliroute,
+        localidad,
+        sinEtiquetaImpresa,
+      },
     ],
     queryFn: () =>
       listarPedidos({
@@ -205,6 +288,14 @@ export function PedidosTabla() {
         bultosDesde: bultosDesde ? Number(bultosDesde) : undefined,
         bultosHasta: bultosHasta ? Number(bultosHasta) : undefined,
         busqueda: busqueda || undefined,
+        clienteId: clienteId === SENTINEL_TODOS ? undefined : clienteId,
+        tipoServicio: tipoServicio === SENTINEL_TODOS ? undefined : (tipoServicio as TipoServicio),
+        zonaId: zonaId === SENTINEL_TODOS ? undefined : zonaId,
+        tipoEnvase: tipoEnvase === SENTINEL_TODOS ? undefined : (tipoEnvase as TipoEnvase),
+        estadoSimpliroute:
+          estadoSimpliroute === SENTINEL_TODOS ? undefined : (estadoSimpliroute as EstadoSimpliroute),
+        localidad: localidad === SENTINEL_TODOS ? undefined : localidad,
+        sinEtiquetaImpresa: sinEtiquetaImpresa || undefined,
         ordenarPor: orden?.campo,
         direccionOrden: orden?.direccion,
       }),
@@ -473,6 +564,18 @@ export function PedidosTabla() {
             />
           </div>
 
+          <Button
+            type="button"
+            variant="outline"
+            className="gap-2"
+            onClick={() => setMostrarAvanzados((actual) => !actual)}
+            aria-expanded={mostrarAvanzados}
+          >
+            <SlidersHorizontal className="size-4" />
+            Filtros avanzados
+            {mostrarAvanzados ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+          </Button>
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button type="button" variant="outline" className="gap-2">
@@ -496,6 +599,123 @@ export function PedidosTabla() {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+
+        {mostrarAvanzados && (
+          <div className="flex flex-wrap items-end gap-3 rounded-md border bg-muted/30 p-3">
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs text-muted-foreground">Cliente</Label>
+              <Select value={clienteId} onValueChange={setClienteId}>
+                <SelectTrigger className="w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={SENTINEL_TODOS}>Todos</SelectItem>
+                  {clientesDisponibles.map((cliente) => (
+                    <SelectItem key={cliente.id} value={cliente.id}>
+                      {cliente.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs text-muted-foreground">Tipo de servicio</Label>
+              <Select value={tipoServicio} onValueChange={setTipoServicio}>
+                <SelectTrigger className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={SENTINEL_TODOS}>Todos</SelectItem>
+                  {Object.values(TipoServicio).map((valor) => (
+                    <SelectItem key={valor} value={valor}>
+                      {LABEL_TIPO_SERVICIO[valor]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs text-muted-foreground">Zona</Label>
+              <Select value={zonaId} onValueChange={setZonaId}>
+                <SelectTrigger className="w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={SENTINEL_TODOS}>Todas</SelectItem>
+                  {zonasDisponibles.map((zona) => (
+                    <SelectItem key={zona.id} value={String(zona.id)}>
+                      {zona.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs text-muted-foreground">Bolsa/Bulto</Label>
+              <Select value={tipoEnvase} onValueChange={setTipoEnvase}>
+                <SelectTrigger className="w-36">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={SENTINEL_TODOS}>Todos</SelectItem>
+                  {Object.values(TipoEnvase).map((valor) => (
+                    <SelectItem key={valor} value={valor}>
+                      {LABEL_TIPO_ENVASE[valor]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs text-muted-foreground">Estado SimpliRoute</Label>
+              <Select value={estadoSimpliroute} onValueChange={setEstadoSimpliroute}>
+                <SelectTrigger className="w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={SENTINEL_TODOS}>Todos</SelectItem>
+                  {Object.values(EstadoSimpliroute).map((valor) => (
+                    <SelectItem key={valor} value={valor}>
+                      {LABEL_ESTADO_SIMPLIROUTE[valor]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs text-muted-foreground">Localidad</Label>
+              <Select value={localidad} onValueChange={setLocalidad}>
+                <SelectTrigger className="w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="max-h-64">
+                  <SelectItem value={SENTINEL_TODOS}>Todas</SelectItem>
+                  {localidadesDisponibles.map((valor) => (
+                    <SelectItem key={valor} value={valor}>
+                      {valor}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-2 pb-2">
+              <Checkbox
+                id="sin-etiqueta-impresa"
+                checked={sinEtiquetaImpresa}
+                onCheckedChange={(valor) => setSinEtiquetaImpresa(valor === true)}
+              />
+              <Label htmlFor="sin-etiqueta-impresa" className="text-sm">
+                Sin etiqueta impresa
+              </Label>
+            </div>
+          </div>
+        )}
 
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm text-muted-foreground">{total} pedido{total === 1 ? "" : "s"}</p>

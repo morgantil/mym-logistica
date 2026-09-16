@@ -1,4 +1,5 @@
-import { CAMPOS_OBLIGATORIOS, CampoCanonico, MapeoColumnas } from "./campo-canonico";
+import { TipoServicio } from "@mym/shared-types";
+import { camposObligatoriosPara, CampoCanonico, MapeoColumnas } from "./campo-canonico";
 import { DICCIONARIO_SINONIMOS } from "./diccionario-sinonimos";
 
 const MAPA_ACENTOS: Record<string, string> = {
@@ -32,7 +33,10 @@ export interface ResultadoMapeoAutomatico {
 // el cliente ni el formato: si el encabezado matchea algún sinónimo conocido,
 // se mapea solo. Lo que no matchea queda en camposObligatoriosFaltantes para
 // que se resuelva a mano UNA vez (ver ImportadoresService.confirmarMapeoManual).
-export function intentarMapeoAutomatico(encabezadosReales: string[]): ResultadoMapeoAutomatico {
+export function intentarMapeoAutomatico(
+  encabezadosReales: string[],
+  tipoServicio: TipoServicio = TipoServicio.PANAL,
+): ResultadoMapeoAutomatico {
   const normalizadoAOriginal = new Map(
     encabezadosReales.map((original) => [normalizarEncabezado(original), original]),
   );
@@ -49,7 +53,7 @@ export function intentarMapeoAutomatico(encabezadosReales: string[]): ResultadoM
     }
   }
 
-  const camposObligatoriosFaltantes = CAMPOS_OBLIGATORIOS.filter((campo) => !mapeo[campo]);
+  const camposObligatoriosFaltantes = camposObligatoriosPara(tipoServicio).filter((campo) => !mapeo[campo]);
 
   return { mapeo, camposObligatoriosFaltantes };
 }

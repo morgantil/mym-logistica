@@ -189,7 +189,7 @@ model Cliente {
   gruposFacturacion            GrupoFacturacion[]
   importaciones                ImportacionExcel[]
   usuariosPermitidos           UsuarioCliente[]
-  perfilImportacion            PerfilImportacion?
+  perfilesImportacion          PerfilImportacion[]
   combinacionesComoMedicamento CombinacionUnificacionClientes[] @relation("CombinacionMedicamento")
   combinacionesComoPanal       CombinacionUnificacionClientes[] @relation("CombinacionPanal")
   montosUnificadoMedicamento   MontoUnificadoMedicamento[]
@@ -204,8 +204,13 @@ model Cliente {
 // usuario una vez. A partir de ahí queda acá y las próximas importaciones de
 // ese mismo cliente no vuelven a preguntar nada.
 model PerfilImportacion {
-  id            String @id @default(uuid())
-  clienteId     String @unique
+  id        String @id @default(uuid())
+  clienteId String
+  // Decisión 2026-09-15: antes era 1 perfil por cliente (clienteId @unique).
+  // Un cliente TipoServicioCliente.AMBOS (ej. Bella Vista) sube dos Excel de
+  // formato totalmente distinto — uno de pañales, otro de medicamentos — y
+  // cada uno necesita su propio mapeo de columnas guardado por separado.
+  tipoServicio  TipoServicio @default(PANAL)
   mapeoColumnas Json // Record<CampoCanonico, string> — ver modulos/importadores/domain/campo-canonico.ts
 
   creadoEn         DateTime @default(now())
@@ -215,6 +220,7 @@ model PerfilImportacion {
 
   cliente Cliente @relation(fields: [clienteId], references: [id])
 
+  @@unique([clienteId, tipoServicio])
   @@map("perfiles_importacion")
 }
 

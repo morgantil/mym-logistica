@@ -6,7 +6,7 @@ import { PedidosService } from "../../pedidos/application/pedidos.service";
 import { ZonasChoferesService } from "../../zonas-choferes/application/zonas-choferes.service";
 import { ZonasTarifariasService } from "../../zonas-tarifarias/application/zonas-tarifarias.service";
 import { NORMALIZADOR_DIRECCIONES, NormalizadorDireccionesPort } from "../../geografia/domain/normalizador-direcciones.port";
-import { agruparLineasEnPedidos, LineaExcelPanales } from "../../pedidos/domain/pedido";
+import { agruparLineasEnPedidos, LineaExcelImportada } from "../../pedidos/domain/pedido";
 import { CampoCanonico, MapeoColumnas } from "../domain/campo-canonico";
 import {
   IMPORTACION_EXCEL_REPOSITORIO,
@@ -19,6 +19,8 @@ import {
   PerfilImportacionRepositorio,
 } from "../domain/perfil-importacion.repositorio";
 import { transformarFila } from "../domain/transformar-fila";
+import { transformarFilaMedicamento } from "../domain/transformar-fila-medicamento";
+import { SinonimoRecetaService } from "./sinonimo-receta.service";
 
 export interface ResultadoImportacionCompleta {
   estado: "completada";
@@ -61,6 +63,7 @@ export class ImportarExcelService {
     private pedidosService: PedidosService,
     private zonasChoferesService: ZonasChoferesService,
     private zonasTarifariasService: ZonasTarifariasService,
+    private sinonimoRecetaService: SinonimoRecetaService,
   ) {}
 
   // Punto de entrada — DOCUMENTO FUNCIONAL.md §5: el usuario no está obligado a
@@ -77,6 +80,7 @@ export class ImportarExcelService {
     usuarioId: string;
     fechaEntrega: string;
     clienteIdManual?: string;
+    tipoServicio?: TipoServicio;
   }): Promise<ResultadoImportacion> {
     const clienteId =
       params.clienteIdManual ??
@@ -94,6 +98,7 @@ export class ImportarExcelService {
       params.nombreArchivo,
       params.usuarioId,
       params.fechaEntrega,
+      params.tipoServicio ?? TipoServicio.PANAL,
     );
   }
 
@@ -107,12 +112,14 @@ export class ImportarExcelService {
     clienteId: string;
     mapeoManual: MapeoColumnas;
     fechaEntrega: string;
+    tipoServicio?: TipoServicio;
   }): Promise<ResultadoImportacion> {
+    const tipoServicio = params.tipoServicio ?? TipoServicio.PANAL;
     const { encabezados, filas } = await this.lectorExcel.leer(params.buffer);
-    const { mapeo: automatico } = intentarMapeoAutomatico(encabezados);
+    const { mapeo: automatico } = intentarMapeoAutomatico(encabezados, tipoServicio);
     const mapeoCompleto = { ...automatico, ...params.mapeoManual };
 
-    await this.perfilesRepositorio.guardar(params.clienteId, mapeoCompleto, params.usuarioId);
+    await this.perfilesRepositorio.guardar(params.clienteId, tipoServicio, mapeoCompleto, params.usuarioId);
 
     return this.ejecutarPipeline(
       params.clienteId,
@@ -121,6 +128,7 @@ export class ImportarExcelService {
       params.nombreArchivo,
       params.usuarioId,
       params.fechaEntrega,
+      tipoServicio,
     );
   }
 
@@ -131,13 +139,22 @@ export class ImportarExcelService {
     nombreArchivo: string,
     usuarioId: string,
     fechaEntrega: string,
+    tipoServicio: TipoServicio,
   ): Promise<ResultadoImportacion> {
-    const mapeoGuardado = await this.perfilesRepositorio.buscarPorCliente(clienteId);
+    const mapeoGuardado = await this.perfilesRepositorio.buscarPorCliente(clienteId, tipoServicio);
     if (mapeoGuardado) {
-      return this.ejecutarPipeline(clienteId, filas, mapeoGuardado, nombreArchivo, usuarioId, fechaEntrega);
+      return this.ejecutarPipeline(
+        clienteId,
+        filas,
+        mapeoGuardado,
+        nombreArchivo,
+        usuarioId,
+        fechaEntrega,
+        tipoServicio,
+      );
     }
 
-    const { mapeo, camposObligatoriosFaltantes } = intentarMapeoAutomatico(encabezados);
+    const { mapeo, camposObligatoriosFaltantes } = intentarMapeoAutomatico(encabezados, tipoServicio);
 
     if (camposObligatoriosFaltantes.length > 0) {
       return {
@@ -152,8 +169,8 @@ export class ImportarExcelService {
     // El diccionario de sinónimos alcanzó para mapear todo solo — se guarda
     // igual como perfil confirmado, así la próxima importación de este cliente
     // ni siquiera vuelve a pasar por acá.
-    await this.perfilesRepositorio.guardar(clienteId, mapeo, null);
-    return this.ejecutarPipeline(clienteId, filas, mapeo, nombreArchivo, usuarioId, fechaEntrega);
+    await this.perfilesRepositorio.guardar(clienteId, tipoServicio, mapeo, null);
+    return this.ejecutarPipeline(clienteId, filas, mapeo, nombreArchivo, usuarioId, fechaEntrega, tipoServicio);
   }
 
   private async ejecutarPipeline(
@@ -163,6 +180,7 @@ export class ImportarExcelService {
     nombreArchivo: string,
     usuarioId: string,
     fechaEntrega: string,
+    tipoServicio: TipoServicio,
   ): Promise<ResultadoImportacionCompleta> {
     if (filas.length === 0) {
       throw new BadRequestException("El Excel no tiene filas de datos.");
@@ -174,10 +192,23 @@ export class ImportarExcelService {
       usuarioId,
     });
 
-    const lineasValidas: LineaExcelPanales[] = [];
+    const lineasValidas: LineaExcelImportada[] = [];
     const filasConError: { fila: number; errores: string[] }[] = [];
 
+    // Farmaet/Bella Vista (transformarFilaMedicamento) devuelven 0-2 líneas
+    // por fila (Bella Vista puede traer Bulto Y Bolsa a la vez, ver
+    // TEMAS_PENDIENTES.md §13.19) — pañales (transformarFila) siempre 1.
     filas.forEach((filaCruda, indice) => {
+      if (tipoServicio === TipoServicio.MEDICAMENTO) {
+        const resultado = transformarFilaMedicamento(filaCruda, mapeo, clienteId, fechaEntrega);
+        if (resultado.valida) {
+          lineasValidas.push(...resultado.lineas);
+        } else {
+          filasConError.push({ fila: indice + 2, errores: resultado.errores });
+        }
+        return;
+      }
+
       const resultado = transformarFila(filaCruda, mapeo, clienteId, fechaEntrega);
       if (resultado.valida && resultado.linea) {
         lineasValidas.push(resultado.linea);
@@ -254,7 +285,7 @@ export class ImportarExcelService {
       // Tres fuentes posibles de observación, pueden darse juntas: la alerta de
       // dirección (arriba), la nota que venía pegada a la fecha en el Excel
       // (grupo.notaFecha) y el/los ticket(s) de las líneas agrupadas — ver
-      // LineaExcelPanales. Ninguna se pisa a la otra. El ticket se guarda acá
+      // LineaExcelImportada. Ninguna se pisa a la otra. El ticket se guarda acá
       // (no en el campo `Pedido.ticket`, sin usar) para que salga impreso en
       // la etiqueta sin tocar el generador de PDF (decisión 2026-09-01).
       // Cada producto guarda su propio ticket (decisión 2026-09-07: si dos
@@ -275,6 +306,18 @@ export class ImportarExcelService {
             : null,
       ].filter((parte): parte is string => Boolean(parte));
 
+      // Medicamentos (Bella Vista): una fila del Excel puede partirse en dos
+      // líneas (Bulto+Bolsa) que comparten el mismo remito — contar tickets
+      // distintos daría 1 en vez de la cantidad real entregada. Para
+      // facturación (motor-facturacion.ts) lo que importa es cuántas unidades
+      // originales se agruparon, no cuántos números de remito hay — ver
+      // TEMAS_PENDIENTES.md §13.19 "Falta todavía". Pañales (Farmapal/Farmaet)
+      // sigue con la fórmula de siempre: cada línea SÍ es un pedido de origen distinto.
+      const cantidadPedidoOriginal =
+        tipoServicio === TipoServicio.MEDICAMENTO ? grupo.totalUnidades : ticketsDistintos.length || 1;
+
+      const recetaResuelta = grupo.receta ? (await this.sinonimoRecetaService.resolver(grupo.receta))?.valorCanonico ?? null : null;
+
       await this.pedidosService.crear({
         clienteId,
         destinatarioId: destinatarioActual.id,
@@ -285,20 +328,24 @@ export class ImportarExcelService {
         localidad: grupo.localidad,
         zonaTarifariaId,
         fechaProgramada: new Date(grupo.fechaEntrega),
-        tipoServicio: TipoServicio.PANAL,
+        tipoServicio,
         observaciones: observacionesPartes.length > 0 ? observacionesPartes.join(" · ") : null,
-        // Decisión 2026-09-11 (caso real Farmapal): líneas con distinto Nº de
-        // ticket agrupadas en este Pedido son pedidos originales separados —
-        // sin tickets (o todos el mismo), sigue siendo 1 pedido real.
-        cantidadPedidoOriginal: ticketsDistintos.length || 1,
+        cantidadPedidoOriginal,
         zonaId,
         zonaNombre,
         choferId,
         choferNombre,
         estadoSimpliroute: encontrado ? EstadoSimpliroute.NO_ENVIADO : EstadoSimpliroute.NO_ENCONTRADO,
-        // Ya pasó transformarFila (campos obligatorios presentes) para llegar hasta acá.
+        // Ya pasó transformarFila/transformarFilaMedicamento (campos obligatorios
+        // presentes) para llegar hasta acá.
         estadoValidacion: EstadoValidacion.VALIDO,
         productos: grupo.productos,
+        receta: grupo.receta,
+        recetaResuelta,
+        tipoPedido: grupo.tipoPedido,
+        retiroDeReceta: grupo.retiroDeReceta,
+        tiempoDeEntrega: grupo.tiempoDeEntrega,
+        horarioEntrega: grupo.horarioEntrega,
       });
       pedidosCreados += 1;
     }
