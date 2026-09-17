@@ -514,6 +514,14 @@ model Pedido {
   ticket               String? // opcional — Farmapal (§4 funcional)
   simplirouteId        String?
   observaciones        String?
+  // Decisión 2026-09-16 (Leonardo, QA): antes, una dirección distinta a la
+  // registrada en el padrón solo quedaba anotada como texto libre en
+  // `observaciones` y el pedido se podía enviar igual — esta es la "Etapa 2"
+  // que el §11 funcional ya dejaba pendiente ("Sin UI de resolución
+  // todavía"). true = el pedido NO se puede enviar (ver validar-envio.ts)
+  // hasta que alguien elija una `ResolucionDireccion` (ver
+  // PedidosService.resolverAlertaDireccion, que la pone en false).
+  alertaDireccionPendiente Boolean @default(false)
   // --- Específicos de medicamentos (Guia Arbet, decisión 2026-09-13 — ver
   // TEMAS_PENDIENTES.md §13.14/§13.15). Null para pañales.
   // Valor tal cual vino en la columna "Receta"/"Recetas" del Excel (ej. "EV",

@@ -75,6 +75,10 @@ export class ListarPedidosDto {
   zonaId?: string;
 
   @IsOptional()
+  @IsString()
+  choferId?: string;
+
+  @IsOptional()
   @IsEnum(TipoEnvase)
   tipoEnvase?: TipoEnvase;
 

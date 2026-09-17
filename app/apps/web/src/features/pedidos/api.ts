@@ -1,4 +1,4 @@
-import type { EstadoPedido, EstadoSimpliroute, TipoEnvase, TipoServicio } from "@mym/shared-types";
+import type { EstadoPedido, EstadoSimpliroute, ResolucionDireccion, TipoEnvase, TipoServicio } from "@mym/shared-types";
 import { apiClient } from "@/lib/api-client";
 import type {
   CampoOrdenPedido,
@@ -22,6 +22,7 @@ export interface ParametrosListarPedidos {
   // Filtros combinables agregados 2026-09-16.
   tipoServicio?: TipoServicio;
   zonaId?: string;
+  choferId?: string;
   tipoEnvase?: TipoEnvase;
   estadoSimpliroute?: EstadoSimpliroute;
   localidad?: string;
@@ -53,6 +54,20 @@ export async function actualizarBultos(
 ): Promise<PedidoListado> {
   const { data } = await apiClient.patch<PedidoListado>(`/pedidos/${pedidoId}/bultos`, {
     bultos,
+    version,
+  });
+  return data;
+}
+
+// Decisión 2026-09-16: resuelve una "dirección distinta a la registrada en
+// el padrón" y desbloquea el envío del pedido (ver validar-envio.ts).
+export async function resolverAlertaDireccion(
+  pedidoId: string,
+  resolucion: ResolucionDireccion,
+  version: number,
+): Promise<PedidoListado> {
+  const { data } = await apiClient.patch<PedidoListado>(`/pedidos/${pedidoId}/resolver-direccion`, {
+    resolucion,
     version,
   });
   return data;

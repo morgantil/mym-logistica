@@ -80,6 +80,7 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
         ? { tipoServicio: filtro.tipoServicio as unknown as Prisma.EnumTipoServicioFilter }
         : {}),
       ...(filtro.zonaId ? { zonaId: filtro.zonaId } : {}),
+      ...(filtro.choferId ? { choferId: filtro.choferId } : {}),
       ...(filtro.estadoSimpliroute
         ? { estadoSimpliroute: filtro.estadoSimpliroute as unknown as Prisma.EnumEstadoSimplirouteFilter }
         : {}),
@@ -189,6 +190,7 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
         fechaProgramada: datos.fechaProgramada,
         tipoServicio: datos.tipoServicio as unknown as Prisma.PedidoCreateInput["tipoServicio"],
         observaciones: datos.observaciones,
+        alertaDireccionPendiente: datos.alertaDireccionPendiente,
         cantidadPedidoOriginal: datos.cantidadPedidoOriginal,
         zonaId: datos.zonaId,
         zonaNombre: datos.zonaNombre,
@@ -290,6 +292,17 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
     const resultado = await this.prisma.pedido.updateMany({
       where: { id, version },
       data: { bultos, version: { increment: 1 } },
+    });
+    if (resultado.count === 0) {
+      return this.fallarSiNoExiste(id);
+    }
+    return this.obtenerPorId(id) as Promise<Pedido>;
+  }
+
+  async resolverAlertaDireccion(id: string, direccionUsada: string, version: number): Promise<Pedido> {
+    const resultado = await this.prisma.pedido.updateMany({
+      where: { id, version },
+      data: { direccionUsada, alertaDireccionPendiente: false, version: { increment: 1 } },
     });
     if (resultado.count === 0) {
       return this.fallarSiNoExiste(id);

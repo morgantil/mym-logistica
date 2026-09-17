@@ -1,7 +1,8 @@
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AxiosError } from "axios";
 import { toast } from "sonner";
+import { TipoServicio, TipoServicioCliente } from "@mym/shared-types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SelectorArchivo } from "@/components/shell/selector-archivo";
@@ -13,6 +14,19 @@ import { confirmarMapeo, subirExcel } from "./api";
 import { MapeoManualForm } from "./mapeo-manual-form";
 import { ResumenImportacion } from "./resumen-importacion";
 import type { MapeoColumnas, ResultadoImportacion } from "./tipos";
+
+const LABEL_TIPO_IMPORTACION: Record<TipoServicio, string> = {
+  [TipoServicio.PANAL]: "Pañales",
+  [TipoServicio.MEDICAMENTO]: "Medicamentos",
+};
+
+// Un cliente PANAL no puede subir un Excel de medicamentos y viceversa —
+// filtra el dropdown de Cliente según el tipo de importación elegido, para
+// no dejar armar una combinación que nunca va a poder procesarse.
+function clienteAceptaTipoServicio(tipoServicioCliente: TipoServicioCliente, tipoImportacion: TipoServicio): boolean {
+  if (tipoServicioCliente === TipoServicioCliente.AMBOS) return true;
+  return tipoServicioCliente === (tipoImportacion as unknown as TipoServicioCliente);
+}
 
 function mensajeError(error: unknown): string {
   if (error instanceof AxiosError && error.response?.data?.message) {
@@ -28,16 +42,21 @@ export function ImportarPage() {
   const queryClient = useQueryClient();
   const [archivo, setArchivo] = useState<File | null>(null);
   const [clienteElegido, setClienteElegido] = useState<string>("");
+  const [tipoImportacion, setTipoImportacion] = useState<TipoServicio>(TipoServicio.PANAL);
   // Obligatoria — documento funcional v6 §4.1: se informa antes de subir el
   // archivo, se aplica a todo el lote, el Excel ya no la puede reemplazar.
   const [fechaEntrega, setFechaEntrega] = useState<string>(HOY);
   const [resultado, setResultado] = useState<ResultadoImportacion | null>(null);
 
   const { data: clientes } = useQuery({ queryKey: ["clientes"], queryFn: listarClientesActivos });
+  const clientesFiltrados = useMemo(
+    () => clientes?.filter((cliente) => clienteAceptaTipoServicio(cliente.tipoServicio, tipoImportacion)),
+    [clientes, tipoImportacion],
+  );
 
   const mutacionSubir = useMutation({
-    mutationFn: ({ archivo, clienteId }: { archivo: File; clienteId?: string }) =>
-      subirExcel(archivo, fechaEntrega, clienteId),
+    mutationFn: ({ archivo, clienteId }: { archivo: File; clienteId: string }) =>
+      subirExcel(archivo, fechaEntrega, tipoImportacion, clienteId),
     onSuccess: (data) => {
       setResultado(data);
       if (data.estado === "completada") {
@@ -52,7 +71,7 @@ export function ImportarPage() {
       if (!archivo || resultado?.estado !== "requiereMapeoManual") {
         throw new Error("Falta el archivo o el cliente para confirmar el mapeo.");
       }
-      return confirmarMapeo({ archivo, clienteId: resultado.clienteId, mapeoManual, fechaEntrega });
+      return confirmarMapeo({ archivo, clienteId: resultado.clienteId, mapeoManual, fechaEntrega, tipoServicio: tipoImportacion });
     },
     onSuccess: (data) => {
       setResultado(data);
@@ -66,14 +85,15 @@ export function ImportarPage() {
   function reiniciar() {
     setArchivo(null);
     setClienteElegido("");
+    setTipoImportacion(TipoServicio.PANAL);
     setFechaEntrega(HOY);
     setResultado(null);
   }
 
   function manejarSubmitInicial(evento: FormEvent) {
     evento.preventDefault();
-    if (!archivo || !fechaEntrega) return;
-    mutacionSubir.mutate({ archivo, clienteId: clienteElegido || undefined });
+    if (!archivo || !fechaEntrega || !clienteElegido) return;
+    mutacionSubir.mutate({ archivo, clienteId: clienteElegido });
   }
 
   const enviando = mutacionSubir.isPending || mutacionMapeo.isPending;
@@ -106,6 +126,32 @@ export function ImportarPage() {
                   />
                 </FilaFormulario>
 
+                <FilaFormulario
+                  label="Tipo de importación"
+                  htmlFor="tipo-importacion"
+                  descripcion="Pañales y medicamentos tienen formatos de Excel distintos — elegí el que corresponda antes de subir el archivo."
+                >
+                  <Select
+                    value={tipoImportacion}
+                    onValueChange={(valor) => {
+                      setTipoImportacion(valor as TipoServicio);
+                      setClienteElegido("");
+                    }}
+                    disabled={enviando}
+                  >
+                    <SelectTrigger id="tipo-importacion" className="w-full sm:w-48">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.values(TipoServicio).map((valor) => (
+                        <SelectItem key={valor} value={valor}>
+                          {LABEL_TIPO_IMPORTACION[valor]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FilaFormulario>
+
                 <FilaFormulario label="Archivo Excel" htmlFor="archivo">
                   <SelectorArchivo
                     id="archivo"
@@ -116,17 +162,13 @@ export function ImportarPage() {
                   />
                 </FilaFormulario>
 
-                <FilaFormulario
-                  label="Cliente"
-                  htmlFor="cliente"
-                  descripcion="Opcional — si no lo elegís, se intenta detectar solo a partir del nombre del archivo."
-                >
+                <FilaFormulario label="Cliente" htmlFor="cliente">
                   <Select value={clienteElegido} onValueChange={setClienteElegido} disabled={enviando}>
                     <SelectTrigger id="cliente" className="w-full sm:w-80">
-                      <SelectValue placeholder="Detectar automáticamente" />
+                      <SelectValue placeholder="Elegí un cliente" />
                     </SelectTrigger>
                     <SelectContent>
-                      {clientes?.map((cliente) => (
+                      {clientesFiltrados?.map((cliente) => (
                         <SelectItem key={cliente.id} value={cliente.id}>
                           {cliente.nombre}
                         </SelectItem>
@@ -136,48 +178,14 @@ export function ImportarPage() {
                 </FilaFormulario>
               </TablaFormulario>
 
-              <Button type="submit" disabled={!archivo || !fechaEntrega || enviando} className="self-start">
+              <Button
+                type="submit"
+                disabled={!archivo || !fechaEntrega || !clienteElegido || enviando}
+                className="self-start"
+              >
                 {enviando ? "Importando…" : "Importar"}
               </Button>
             </form>
-          </CardContent>
-        </Card>
-      )}
-
-      {resultado?.estado === "requiereSeleccionCliente" && (
-        <Card>
-          <CardHeader>
-            <CardTitle>¿A qué cliente pertenece este archivo?</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            <p className="text-sm text-muted-foreground">
-              No pudimos identificar el cliente a partir del nombre del archivo ({resultado.nombreArchivo}
-              ). Elegilo para continuar.
-            </p>
-            <TablaFormulario>
-              <FilaFormulario label="Cliente" htmlFor="cliente-manual">
-                <Select value={clienteElegido} onValueChange={setClienteElegido} disabled={enviando}>
-                  <SelectTrigger id="cliente-manual" className="w-full sm:w-80">
-                    <SelectValue placeholder="Elegí un cliente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clientes?.map((cliente) => (
-                      <SelectItem key={cliente.id} value={cliente.id}>
-                        {cliente.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </FilaFormulario>
-            </TablaFormulario>
-            <Button
-              type="button"
-              disabled={!clienteElegido || !archivo || enviando}
-              onClick={() => archivo && mutacionSubir.mutate({ archivo, clienteId: clienteElegido })}
-              className="self-start"
-            >
-              {enviando ? "Importando…" : "Continuar"}
-            </Button>
           </CardContent>
         </Card>
       )}

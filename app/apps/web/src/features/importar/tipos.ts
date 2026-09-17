@@ -1,6 +1,6 @@
 // Espejo de apps/api/src/modulos/importadores/domain/campo-canonico.ts — campos
-// que el sistema necesita de CUALQUIER Excel de pañales, sin importar cómo el
-// cliente llame a sus columnas (§6 funcional).
+// que el sistema necesita de CUALQUIER Excel de pañales o medicamentos, sin
+// importar cómo el cliente llame a sus columnas (§6 funcional).
 export type CampoCanonico =
   | "numeroAfiliado"
   | "destinatario"
@@ -11,7 +11,16 @@ export type CampoCanonico =
   | "descripcionProducto"
   | "cantidad"
   | "ticket"
-  | "telefono";
+  | "telefono"
+  // --- Específicos de medicamentos (ver campo-canonico.ts en el backend) ---
+  | "receta"
+  | "tipoPedido"
+  | "retiroDeReceta"
+  | "tiempoDeEntrega"
+  | "horarioEntrega"
+  | "envaseTexto"
+  | "cantidadBulto"
+  | "cantidadBolsa";
 
 export type MapeoColumnas = Partial<Record<CampoCanonico, string>>;
 
@@ -32,12 +41,4 @@ export interface ResultadoRequiereMapeoManual {
   mapeoAutomaticoParcial: MapeoColumnas;
 }
 
-export interface ResultadoRequiereSeleccionCliente {
-  estado: "requiereSeleccionCliente";
-  nombreArchivo: string;
-}
-
-export type ResultadoImportacion =
-  | ResultadoImportacionCompleta
-  | ResultadoRequiereMapeoManual
-  | ResultadoRequiereSeleccionCliente;
+export type ResultadoImportacion = ResultadoImportacionCompleta | ResultadoRequiereMapeoManual;

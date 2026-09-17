@@ -1,4 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { ResolucionDireccion } from "@mym/shared-types";
 import { PermisosClienteService } from "../../../common/permisos/permisos-cliente.service";
 import { DestinatariosService } from "../../destinatarios/application/destinatarios.service";
 import { LOGISTICA_PROVIDER, LogisticaProviderPort } from "../../simpliroute/domain/logistica-provider.port";
@@ -127,6 +128,29 @@ export class PedidosService {
   // ConflictoVersionError, que el controller traduce a HTTP 409.
   async actualizarBultos(pedidoId: string, bultos: number, version: number) {
     return this.repositorio.actualizarBultos(pedidoId, bultos, version);
+  }
+
+  // Decisión 2026-09-16 (Leonardo, QA): la "Etapa 2" del §11 funcional que
+  // había quedado pendiente — resolver una dirección distinta a la
+  // registrada en el padrón ya no es solo una nota en observaciones, ahora
+  // desbloquea el envío (ver validar-envio.ts). Reusa
+  // DestinatariosService.resolverDiferenciaDireccion (backend ya existente
+  // desde el importador, nunca antes expuesto por su cuenta).
+  async resolverAlertaDireccion(pedidoId: string, resolucion: ResolucionDireccion, version: number) {
+    const pedido = await this.repositorio.obtenerPorId(pedidoId);
+    if (!pedido) throw new NotFoundException(`Pedido ${pedidoId} no encontrado.`);
+
+    const destinatario = await this.destinatariosService.buscarPorId(pedido.destinatarioId);
+    if (!destinatario) throw new NotFoundException(`Destinatario ${pedido.destinatarioId} no encontrado.`);
+
+    const { direccionAUsar } = await this.destinatariosService.resolverDiferenciaDireccion(
+      destinatario.id,
+      resolucion,
+      pedido.direccionOriginal,
+      destinatario.direccion,
+    );
+
+    return this.repositorio.resolverAlertaDireccion(pedidoId, direccionAUsar, version);
   }
 
   // §8.2 funcional v6: etiquetas de bulto. `numeroBulto` ausente = todas las

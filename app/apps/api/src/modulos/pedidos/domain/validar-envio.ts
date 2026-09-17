@@ -19,6 +19,12 @@ export function validarPedidoParaEnvio(pedido: Pedido): string[] {
   if (!pedido.choferId) {
     errores.push("Chofer sin asignar.");
   }
+  // Decisión 2026-09-16 (Leonardo, QA): antes esto solo quedaba anotado en
+  // observaciones y el pedido se podía enviar igual — ver
+  // PedidosService.resolverAlertaDireccion para la forma de destrabarlo.
+  if (pedido.alertaDireccionPendiente) {
+    errores.push("Dirección distinta a la registrada en el padrón — resolver antes de enviar.");
+  }
   // Bultos NO bloquea el envío a SimpliRoute (decisión 2026-09-01) — se puede
   // cargar más cerca del despacho. Sigue siendo obligatorio para imprimir
   // etiquetas (PedidosService.generarEtiquetas), ahí sí hace falta saber el

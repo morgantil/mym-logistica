@@ -1,5 +1,4 @@
 import { Module } from "@nestjs/common";
-import { ClientesModule } from "../clientes/clientes.module";
 import { DestinatariosModule } from "../destinatarios/destinatarios.module";
 import { PedidosModule } from "../pedidos/pedidos.module";
 import { ZonasChoferesModule } from "../zonas-choferes/zonas-choferes.module";
@@ -20,7 +19,6 @@ import { SinonimosRecetaController } from "./interface/sinonimos-receta.controll
 
 @Module({
   imports: [
-    ClientesModule,
     DestinatariosModule,
     PedidosModule,
     ZonasChoferesModule,

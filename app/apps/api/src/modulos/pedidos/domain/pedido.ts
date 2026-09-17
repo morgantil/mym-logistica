@@ -6,6 +6,7 @@ export interface Pedido {
   clienteId: string;
   destinatarioId: string;
   numeroAfiliado: string;
+  direccionOriginal: string; // tal cual vino del Excel — ver resolverAlertaDireccion
   direccionUsada: string;
   localidad: string;
   zonaTarifariaId: string | null;
@@ -32,6 +33,9 @@ export interface Pedido {
   geocodeAlert: string | null;
   bultos: number | null;
   observaciones: string | null;
+  // Decisión 2026-09-16: bloquea el envío hasta que se resuelva — ver
+  // validar-envio.ts y PedidosService.resolverAlertaDireccion.
+  alertaDireccionPendiente: boolean;
   etiquetaImpresaEn: Date | null;
   // Cuántos pedidos del sistema de origen (Nº de ticket distintos) se
   // agruparon en este Pedido — ver comentario en schema.prisma. Default 1.

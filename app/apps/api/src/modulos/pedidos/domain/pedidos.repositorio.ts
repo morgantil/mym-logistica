@@ -13,6 +13,9 @@ export interface DatosCrearPedido {
   fechaProgramada: Date;
   tipoServicio: TipoServicio;
   observaciones: string | null;
+  // true si la dirección del Excel difiere de la registrada en el padrón —
+  // bloquea el envío hasta resolverse, ver validar-envio.ts (decisión 2026-09-16).
+  alertaDireccionPendiente: boolean;
   // Ver Pedido.cantidadPedidoOriginal en schema.prisma.
   cantidadPedidoOriginal: number;
   productos: {
@@ -54,6 +57,7 @@ export interface FiltroPedidos {
   // entre sí y con el resto, mismo criterio que fecha/bultos de arriba.
   tipoServicio?: TipoServicio;
   zonaId?: string;
+  choferId?: string;
   // Bolsa/Bulto vive en Producto, no en Pedido — filtra pedidos que tengan
   // AL MENOS una línea de ese envase (ver armarWhere en el adapter Prisma).
   tipoEnvase?: TipoEnvase;
@@ -157,6 +161,11 @@ export interface PedidosRepositorio {
   // Ambos con bloqueo optimista: lanzan ConflictoVersionError (ver ese archivo)
   // si `version` no coincide con la fila actual — alguien más lo modificó primero.
   actualizarBultos(id: string, bultos: number, version: number): Promise<Pedido>;
+  // Decisión 2026-09-16: aplica la resolución elegida por el usuario para una
+  // "dirección distinta al padrón" — actualiza `direccionUsada` (según lo que
+  // haya decidido resolverDiferenciaDireccion) y apaga `alertaDireccionPendiente`,
+  // destrabando el envío. Mismo bloqueo optimista que el resto.
+  resolverAlertaDireccion(id: string, direccionUsada: string, version: number): Promise<Pedido>;
   // `correccionZonaChofer` solo se completa cuando el recálculo con la
   // coordenada real de la entrega (post-envío) dio una zona/chofer distinta
   // a la asignada antes de enviar — ver PedidosService.enviarASimpliRoute.

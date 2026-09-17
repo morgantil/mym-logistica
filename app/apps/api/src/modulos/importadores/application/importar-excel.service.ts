@@ -1,6 +1,5 @@
 import { BadRequestException, Inject, Injectable } from "@nestjs/common";
 import { EstadoImportacion, EstadoSimpliroute, EstadoValidacion, ResolucionDireccion, TipoServicio } from "@mym/shared-types";
-import { ClientesService } from "../../clientes/application/clientes.service";
 import { DestinatariosService } from "../../destinatarios/application/destinatarios.service";
 import { PedidosService } from "../../pedidos/application/pedidos.service";
 import { ZonasChoferesService } from "../../zonas-choferes/application/zonas-choferes.service";
@@ -39,15 +38,7 @@ export interface ResultadoRequiereMapeoManual {
   mapeoAutomaticoParcial: MapeoColumnas;
 }
 
-export interface ResultadoRequiereSeleccionCliente {
-  estado: "requiereSeleccionCliente";
-  nombreArchivo: string;
-}
-
-export type ResultadoImportacion =
-  | ResultadoImportacionCompleta
-  | ResultadoRequiereMapeoManual
-  | ResultadoRequiereSeleccionCliente;
+export type ResultadoImportacion = ResultadoImportacionCompleta | ResultadoRequiereMapeoManual;
 
 @Injectable()
 export class ImportarExcelService {
@@ -58,7 +49,6 @@ export class ImportarExcelService {
     @Inject(IMPORTACION_EXCEL_REPOSITORIO)
     private readonly importacionesRepositorio: ImportacionExcelRepositorio,
     @Inject(NORMALIZADOR_DIRECCIONES) private readonly normalizadorDirecciones: NormalizadorDireccionesPort,
-    private clientesService: ClientesService,
     private destinatariosService: DestinatariosService,
     private pedidosService: PedidosService,
     private zonasChoferesService: ZonasChoferesService,
@@ -66,9 +56,12 @@ export class ImportarExcelService {
     private sinonimoRecetaService: SinonimoRecetaService,
   ) {}
 
-  // Punto de entrada — DOCUMENTO FUNCIONAL.md §5: el usuario no está obligado a
-  // elegir el cliente antes de importar. Si no se puede detectar ni vino
-  // `clienteIdManual`, se corta acá y se le pide al front que lo pida.
+  // Punto de entrada. Elegir el cliente es obligatorio siempre — decisión
+  // 2026-09-16 (Leonardo, QA): la detección automática por nombre de archivo
+  // (`detectarClientePorNombreArchivo`, eliminada) era un riesgo real, no solo
+  // cosmético — un patrón corto y genérico como "BIO" (Biosíntesis) podía
+  // matchear el nombre de cualquier archivo que contuviera esas letras y
+  // asignar el cliente equivocado en silencio, sin ningún aviso.
   //
   // `fechaEntrega` (ISO YYYY-MM-DD) es obligatoria — documento funcional v6
   // §4.1: "Antes de seleccionar el archivo, el usuario deberá informar
@@ -79,20 +72,12 @@ export class ImportarExcelService {
     nombreArchivo: string;
     usuarioId: string;
     fechaEntrega: string;
-    clienteIdManual?: string;
+    clienteId: string;
     tipoServicio?: TipoServicio;
   }): Promise<ResultadoImportacion> {
-    const clienteId =
-      params.clienteIdManual ??
-      (await this.clientesService.detectarDesdeNombreArchivo(params.nombreArchivo))?.id;
-
-    if (!clienteId) {
-      return { estado: "requiereSeleccionCliente", nombreArchivo: params.nombreArchivo };
-    }
-
     const { encabezados, filas } = await this.lectorExcel.leer(params.buffer);
     return this.resolverMapeoYProcesar(
-      clienteId,
+      params.clienteId,
       encabezados,
       filas,
       params.nombreArchivo,
@@ -330,6 +315,10 @@ export class ImportarExcelService {
         fechaProgramada: new Date(grupo.fechaEntrega),
         tipoServicio,
         observaciones: observacionesPartes.length > 0 ? observacionesPartes.join(" · ") : null,
+        // Decisión 2026-09-16 (Leonardo, QA): antes esto solo quedaba en
+        // `observaciones` (texto libre) y el pedido se podía enviar igual —
+        // ahora bloquea el envío hasta resolverse (ver validar-envio.ts).
+        alertaDireccionPendiente: Boolean(alertaDireccion),
         cantidadPedidoOriginal,
         zonaId,
         zonaNombre,

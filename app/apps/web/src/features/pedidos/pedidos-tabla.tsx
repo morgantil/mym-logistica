@@ -28,7 +28,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth-context";
 import { listarClientesActivos } from "@/features/clientes/api";
-import { listarZonas } from "@/features/zonas-choferes/api";
+import { listarChoferes, listarZonas } from "@/features/zonas-choferes/api";
 import {
   actualizarColumnasPedidos,
   eliminarPedido,
@@ -202,6 +202,7 @@ export function PedidosTabla() {
   const [clienteId, setClienteId] = useState(SENTINEL_TODOS);
   const [tipoServicio, setTipoServicio] = useState(SENTINEL_TODOS);
   const [zonaId, setZonaId] = useState(SENTINEL_TODOS);
+  const [choferId, setChoferId] = useState(SENTINEL_TODOS);
   const [tipoEnvase, setTipoEnvase] = useState(SENTINEL_TODOS);
   const [estadoSimpliroute, setEstadoSimpliroute] = useState(SENTINEL_TODOS);
   const [localidad, setLocalidad] = useState(SENTINEL_TODOS);
@@ -212,6 +213,7 @@ export function PedidosTabla() {
     queryFn: listarClientesActivos,
   });
   const { data: zonasDisponibles = [] } = useQuery({ queryKey: ["zonas"], queryFn: listarZonas });
+  const { data: choferesDisponibles = [] } = useQuery({ queryKey: ["choferes"], queryFn: listarChoferes });
   const { data: localidadesDisponibles = [] } = useQuery({
     queryKey: ["pedidos", "localidades"],
     queryFn: listarLocalidadesPedidos,
@@ -249,6 +251,7 @@ export function PedidosTabla() {
     clienteId,
     tipoServicio,
     zonaId,
+    choferId,
     tipoEnvase,
     estadoSimpliroute,
     localidad,
@@ -272,6 +275,7 @@ export function PedidosTabla() {
         clienteId,
         tipoServicio,
         zonaId,
+        choferId,
         tipoEnvase,
         estadoSimpliroute,
         localidad,
@@ -291,6 +295,7 @@ export function PedidosTabla() {
         clienteId: clienteId === SENTINEL_TODOS ? undefined : clienteId,
         tipoServicio: tipoServicio === SENTINEL_TODOS ? undefined : (tipoServicio as TipoServicio),
         zonaId: zonaId === SENTINEL_TODOS ? undefined : zonaId,
+        choferId: choferId === SENTINEL_TODOS ? undefined : choferId,
         tipoEnvase: tipoEnvase === SENTINEL_TODOS ? undefined : (tipoEnvase as TipoEnvase),
         estadoSimpliroute:
           estadoSimpliroute === SENTINEL_TODOS ? undefined : (estadoSimpliroute as EstadoSimpliroute),
@@ -647,6 +652,23 @@ export function PedidosTabla() {
                   {zonasDisponibles.map((zona) => (
                     <SelectItem key={zona.id} value={String(zona.id)}>
                       {zona.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs text-muted-foreground">Chofer</Label>
+              <Select value={choferId} onValueChange={setChoferId}>
+                <SelectTrigger className="w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={SENTINEL_TODOS}>Todos</SelectItem>
+                  {choferesDisponibles.map((chofer) => (
+                    <SelectItem key={chofer.id} value={String(chofer.id)}>
+                      {chofer.nombre}
                     </SelectItem>
                   ))}
                 </SelectContent>

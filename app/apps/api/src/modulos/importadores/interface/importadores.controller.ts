@@ -23,11 +23,12 @@ import { MapeoColumnas } from "../domain/campo-canonico";
 export class ImportadoresController {
   constructor(private importarExcelService: ImportarExcelService) {}
 
-  // §5 funcional: no hace falta elegir cliente antes de importar — `clienteId`
-  // es opcional, se manda solo cuando la detección automática falló y el
-  // usuario ya lo eligió a mano en el front. `fechaEntrega` SÍ es obligatoria
-  // — documento funcional v6 §4.1: se informa antes de subir el archivo y se
-  // aplica a todo el lote, sin importar qué traiga el Excel.
+  // `clienteId` es obligatorio — decisión 2026-09-16, ver comentario en
+  // ImportarExcelService (se sacó la detección automática por nombre de
+  // archivo, era un riesgo real de asignar el cliente equivocado en silencio).
+  // `fechaEntrega` también es obligatoria — documento funcional v6 §4.1: se
+  // informa antes de subir el archivo y se aplica a todo el lote, sin
+  // importar qué traiga el Excel.
   @Roles(Rol.OPERACIONES, Rol.ADMINISTRACION)
   @Post()
   @UseInterceptors(FileInterceptor("archivo"))
@@ -41,6 +42,9 @@ export class ImportadoresController {
     if (!archivo) {
       throw new BadRequestException("Falta el archivo Excel (campo 'archivo').");
     }
+    if (!clienteId) {
+      throw new BadRequestException("Falta 'clienteId'.");
+    }
     if (!fechaEntrega) {
       throw new BadRequestException("Falta 'fechaEntrega' (YYYY-MM-DD).");
     }
@@ -49,7 +53,7 @@ export class ImportadoresController {
       nombreArchivo: archivo.originalname,
       usuarioId: usuario.id,
       fechaEntrega,
-      clienteIdManual: clienteId || undefined,
+      clienteId,
       // Opcional — default PANAL, ver ImportarExcelService (retrocompatible
       // con clientes que todavía no distinguen tipo de importación en el front).
       tipoServicio: tipoServicio || undefined,

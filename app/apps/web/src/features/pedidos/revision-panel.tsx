@@ -1,13 +1,20 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth-context";
 import { eliminarPedido, eliminarPedidos, enviarASimpliRoute, revisarPendientesDeEnvio } from "./api";
+import { ResolverDireccionSheet } from "./resolver-direccion-sheet";
+import type { PedidoListado } from "./tipos";
+
+const SENTINEL_TODOS = "TODOS";
+const MOTIVO_DIRECCION = "Dirección distinta a la registrada en el padrón";
 
 // §17-18 funcional: candidatos a envío con sus motivos bloqueantes, selección
 // y envío masivo a SimpliRoute (un pedido inválido no frena a los demás).
@@ -26,11 +33,27 @@ export function RevisionPanel() {
 
   const queryClient = useQueryClient();
   const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
+  // Filtro por cliente (decisión 2026-09-16, pedido de Leonardo) — client-side
+  // sobre lo que ya devuelve el endpoint: la lista de "pendientes de enviar"
+  // no pagina ni es grande, no hace falta ida y vuelta al backend para esto.
+  const [clienteId, setClienteId] = useState(SENTINEL_TODOS);
+  const [pedidoAResolverDireccion, setPedidoAResolverDireccion] = useState<PedidoListado | null>(null);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["pedidos", "revision"],
     queryFn: revisarPendientesDeEnvio,
   });
+
+  const clientesEnRevision = useMemo(() => {
+    const mapa = new Map<string, string>();
+    for (const { pedido } of data ?? []) mapa.set(pedido.clienteId, pedido.clienteNombre);
+    return Array.from(mapa, ([id, nombre]) => ({ id, nombre })).sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }, [data]);
+
+  const dataFiltrada = useMemo(
+    () => (clienteId === SENTINEL_TODOS ? data : data?.filter(({ pedido }) => pedido.clienteId === clienteId)),
+    [data, clienteId],
+  );
 
   const mutacion = useMutation({
     mutationFn: enviarASimpliRoute,
@@ -82,7 +105,7 @@ export function RevisionPanel() {
     });
   }
 
-  const listos = data?.filter((item) => item.erroresBloqueantes.length === 0) ?? [];
+  const listos = dataFiltrada?.filter((item) => item.erroresBloqueantes.length === 0) ?? [];
 
   if (isError) {
     return (
@@ -102,6 +125,25 @@ export function RevisionPanel() {
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <Label className="text-xs text-muted-foreground">Cliente</Label>
+          <Select value={clienteId} onValueChange={setClienteId}>
+            <SelectTrigger className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={SENTINEL_TODOS}>Todos</SelectItem>
+              {clientesEnRevision.map((cliente) => (
+                <SelectItem key={cliente.id} value={cliente.id}>
+                  {cliente.nombre}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Button
@@ -160,7 +202,14 @@ export function RevisionPanel() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {data.map(({ pedido, erroresBloqueantes }) => {
+          {dataFiltrada?.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={7} className="text-muted-foreground">
+                No hay pedidos pendientes de enviar para este cliente.
+              </TableCell>
+            </TableRow>
+          ) : (
+            dataFiltrada?.map(({ pedido, erroresBloqueantes }) => {
             const bloqueado = erroresBloqueantes.length > 0;
             const puedeBorrarEste = puedeEliminar && pedido.estadoSimpliroute === "NO_ENVIADO";
             return (
@@ -181,12 +230,22 @@ export function RevisionPanel() {
                 </TableCell>
                 <TableCell>
                   {bloqueado ? (
-                    <div className="flex flex-wrap gap-1">
+                    <div className="flex flex-wrap items-center gap-1">
                       {erroresBloqueantes.map((error) => (
                         <Badge key={error} variant="destructive">
                           {error}
                         </Badge>
                       ))}
+                      {erroresBloqueantes.some((error) => error.includes(MOTIVO_DIRECCION)) && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPedidoAResolverDireccion(pedido)}
+                        >
+                          Resolver
+                        </Button>
+                      )}
                     </div>
                   ) : (
                     <Badge
@@ -217,10 +276,16 @@ export function RevisionPanel() {
                   )}
                 </TableCell>
               </TableRow>
-            );
-          })}
+              );
+            })
+          )}
         </TableBody>
       </Table>
+
+      <ResolverDireccionSheet
+        pedido={pedidoAResolverDireccion}
+        onOpenChange={(abierto) => !abierto && setPedidoAResolverDireccion(null)}
+      />
     </div>
   );
 }

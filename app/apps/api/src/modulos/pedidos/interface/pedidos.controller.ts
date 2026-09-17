@@ -19,6 +19,7 @@ import { ActualizarBultosDto } from "./dto/actualizar-bultos.dto";
 import { EliminarPedidosDto } from "./dto/eliminar-pedidos.dto";
 import { EnviarSimpliRouteDto } from "./dto/enviar-simpliroute.dto";
 import { ListarPedidosDto } from "./dto/listar-pedidos.dto";
+import { ResolverAlertaDireccionDto } from "./dto/resolver-alerta-direccion.dto";
 
 @Controller("pedidos")
 export class PedidosController {
@@ -40,6 +41,7 @@ export class PedidosController {
         busqueda: query.busqueda,
         tipoServicio: query.tipoServicio,
         zonaId: query.zonaId,
+        choferId: query.choferId,
         tipoEnvase: query.tipoEnvase,
         estadoSimpliroute: query.estadoSimpliroute,
         localidad: query.localidad,
@@ -70,6 +72,15 @@ export class PedidosController {
   @Patch(":id/bultos")
   actualizarBultos(@Param("id") id: string, @Body() dto: ActualizarBultosDto) {
     return this.pedidosService.actualizarBultos(id, dto.bultos, dto.version);
+  }
+
+  // Decisión 2026-09-16: resuelve una "dirección distinta a la registrada en
+  // el padrón" y desbloquea el envío — mismos roles que ya operan pedidos
+  // día a día (ver validar-envio.ts).
+  @Roles(Rol.OPERACIONES, Rol.LOGISTICA, Rol.ADMINISTRACION)
+  @Patch(":id/resolver-direccion")
+  resolverAlertaDireccion(@Param("id") id: string, @Body() dto: ResolverAlertaDireccionDto) {
+    return this.pedidosService.resolverAlertaDireccion(id, dto.resolucion, dto.version);
   }
 
   // §18 funcional: envío a SimpliRoute — rol Operaciones. Un pedido inválido

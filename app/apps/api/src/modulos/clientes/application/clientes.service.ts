@@ -1,6 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { TipoServicioCliente } from "@mym/shared-types";
-import { Cliente, detectarClientePorNombreArchivo } from "../domain/cliente";
+import { Cliente } from "../domain/cliente";
 import {
   CLIENTES_REPOSITORIO,
   ClientesRepositorio,
@@ -23,13 +23,6 @@ export class ClientesService {
 
   buscarPorId(id: string): Promise<Cliente | null> {
     return this.repositorio.buscarPorId(id);
-  }
-
-  // Usado por el módulo de importadores al recibir un Excel — §5 funcional.
-  // Devuelve null si no se pudo identificar ("Cliente sin identificar").
-  async detectarDesdeNombreArchivo(nombreArchivo: string): Promise<Cliente | null> {
-    const clientes = await this.repositorio.listarActivos();
-    return detectarClientePorNombreArchivo(nombreArchivo, clientes);
   }
 
   crear(datos: {

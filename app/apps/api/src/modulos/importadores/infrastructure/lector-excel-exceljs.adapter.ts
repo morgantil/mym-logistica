@@ -20,13 +20,21 @@ export class LectorExcelExceljsAdapter implements LectorExcelPort {
       throw new BadRequestException("El Excel no tiene ninguna hoja.");
     }
 
+    // `includeEmpty: true` es imprescindible acá — si la primera columna (A)
+    // viene vacía y los encabezados reales arrancan en B (caso real: Farmaet
+    // "LA QUE IMPORTO"), `includeEmpty: false` salta esa celda y el índice 0
+    // del array queda como un "hueco" (sparse) en vez de asignarse. Ese hueco
+    // sobrevive a `.map()` (que lo preserva) pero rompe `new Map(...)` más
+    // adelante en mapeo-columnas.ts, que al iterarlo recibe `undefined` en
+    // esa posición y explota con "Iterator value undefined is not an entry
+    // object" — encontrado con el archivo real de Farmaet, no hipotético.
     const filaEncabezados = hoja.getRow(1);
     const encabezados: string[] = [];
-    filaEncabezados.eachCell({ includeEmpty: false }, (celda, indice) => {
+    filaEncabezados.eachCell({ includeEmpty: true }, (celda, indice) => {
       encabezados[indice - 1] = String(celda.value ?? "").trim();
     });
 
-    if (encabezados.length === 0) {
+    if (encabezados.every((encabezado) => encabezado === "")) {
       throw new BadRequestException("No se encontraron encabezados en la primera fila.");
     }
 

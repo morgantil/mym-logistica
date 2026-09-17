@@ -9,6 +9,7 @@ function pedidoListoParaEnviar(overrides: Partial<Pedido> = {}): Pedido {
     clienteId: "c1",
     destinatarioId: "d1",
     numeroAfiliado: "123",
+    direccionOriginal: "Calle 1",
     direccionUsada: "Calle 1",
     localidad: "Once",
     zonaTarifariaId: null,
@@ -30,6 +31,7 @@ function pedidoListoParaEnviar(overrides: Partial<Pedido> = {}): Pedido {
     geocodeAlert: null,
     bultos: 2,
     observaciones: null,
+    alertaDireccionPendiente: false,
     etiquetaImpresaEn: null,
     cantidadPedidoOriginal: 1,
     version: 0,
@@ -63,6 +65,11 @@ describe("validarPedidoParaEnvio", () => {
     );
     expect(errores).toContain("Zona sin identificar.");
     expect(errores).toContain("Chofer sin asignar.");
+  });
+
+  it("marca dirección distinta al padrón como bloqueante hasta que se resuelva", () => {
+    const errores = validarPedidoParaEnvio(pedidoListoParaEnviar({ alertaDireccionPendiente: true }));
+    expect(errores).toContain("Dirección distinta a la registrada en el padrón — resolver antes de enviar.");
   });
 
   it("bultos sin cargar no bloquea el envío (se puede cargar después, más cerca del despacho)", () => {

@@ -20,6 +20,7 @@ export interface PedidoListado {
   clienteId: string;
   destinatarioId: string;
   numeroAfiliado: string;
+  direccionOriginal: string; // tal cual vino del Excel — ver resolverAlertaDireccion
   direccionUsada: string;
   localidad: string;
   zonaTarifariaId: string | null;
@@ -32,6 +33,9 @@ export interface PedidoListado {
   choferId: string | null;
   bultos: number | null;
   observaciones: string | null;
+  // Decisión 2026-09-16: true bloquea el envío hasta resolverse (ver
+  // ResolverDireccionDialog).
+  alertaDireccionPendiente: boolean;
   etiquetaImpresaEn: string | null;
   // Cuántos pedidos del sistema de origen (Nº de ticket distintos) se
   // agruparon en este Pedido — decisión 2026-09-11, caso real Farmapal.
