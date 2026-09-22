@@ -165,9 +165,6 @@ model UsuarioCliente {
 model Cliente {
   id                String              @id @default(uuid())
   nombre            String
-  // patrones de texto para detectar el cliente en el nombre del archivo Excel
-  // (§5 funcional, ej. "BIOSINTESIS", "BELLA VISTA", "FARMAPAL")
-  patronesDeteccion String[]
   activo            Boolean             @default(true)
   // Qué tipo de servicio maneja este cliente — determina reglas de
   // facturación (ej. Bolsa/Bulto solo aplica a medicamentos). Default

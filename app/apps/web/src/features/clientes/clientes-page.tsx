@@ -50,7 +50,6 @@ export function ClientesPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Nombre</TableHead>
-              <TableHead>Patrones de detección</TableHead>
               <TableHead>Tipo de servicio</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Acciones</TableHead>
@@ -59,13 +58,13 @@ export function ClientesPage() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-muted-foreground">
+                <TableCell colSpan={4} className="text-muted-foreground">
                   Cargando…
                 </TableCell>
               </TableRow>
             ) : clientes?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-muted-foreground">
+                <TableCell colSpan={4} className="text-muted-foreground">
                   Todavía no hay clientes cargados.
                 </TableCell>
               </TableRow>
@@ -73,9 +72,6 @@ export function ClientesPage() {
               clientes?.map((cliente) => (
                 <TableRow key={cliente.id}>
                   <TableCell>{cliente.nombre}</TableCell>
-                  <TableCell className="whitespace-normal">
-                    {cliente.patronesDeteccion.join(", ")}
-                  </TableCell>
                   <TableCell>{ETIQUETAS_TIPO_SERVICIO[cliente.tipoServicio]}</TableCell>
                   <TableCell>
                     {cliente.activo ? (

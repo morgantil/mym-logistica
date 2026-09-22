@@ -16,7 +16,6 @@ export async function listarTodosLosClientes(): Promise<Cliente[]> {
 
 export interface DatosCliente {
   nombre: string;
-  patronesDeteccion: string[];
   tipoServicio: TipoServicioCliente;
 }
 

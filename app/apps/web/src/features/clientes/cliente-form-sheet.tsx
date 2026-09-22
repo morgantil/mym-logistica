@@ -44,17 +44,14 @@ export function ClienteFormSheet({
   const editando = cliente !== null && cliente !== "nuevo";
 
   const [nombre, setNombre] = useState("");
-  const [patrones, setPatrones] = useState("");
   const [tipoServicio, setTipoServicio] = useState<TipoServicioCliente>(TipoServicioCliente.PANAL);
 
   useEffect(() => {
     if (editando) {
       setNombre(cliente.nombre);
-      setPatrones(cliente.patronesDeteccion.join(", "));
       setTipoServicio(cliente.tipoServicio);
     } else {
       setNombre("");
-      setPatrones("");
       setTipoServicio(TipoServicioCliente.PANAL);
     }
   }, [cliente, editando]);
@@ -62,14 +59,10 @@ export function ClienteFormSheet({
   const queryClient = useQueryClient();
   const mutacion = useMutation({
     mutationFn: async () => {
-      const patronesDeteccion = patrones
-        .split(",")
-        .map((p) => p.trim())
-        .filter(Boolean);
       if (editando) {
-        return actualizarCliente(cliente.id, { nombre, patronesDeteccion, tipoServicio });
+        return actualizarCliente(cliente.id, { nombre, tipoServicio });
       }
-      return crearCliente({ nombre, patronesDeteccion, tipoServicio });
+      return crearCliente({ nombre, tipoServicio });
     },
     onSuccess: () => {
       toast.success(editando ? "Cliente actualizado." : "Cliente creado.");
@@ -89,10 +82,6 @@ export function ClienteFormSheet({
       <SheetContent className="w-full sm:max-w-md">
         <SheetHeader>
           <SheetTitle>{editando ? "Editar cliente" : "Nuevo cliente"}</SheetTitle>
-          <SheetDescription>
-            Los patrones de detección se usan para identificar el cliente a partir del
-            nombre del archivo Excel al importar (§5).
-          </SheetDescription>
         </SheetHeader>
 
         <form onSubmit={manejarSubmit} className="flex flex-col gap-4 px-4">
@@ -102,22 +91,6 @@ export function ClienteFormSheet({
                 id="nombre-cliente"
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
-                required
-                disabled={mutacion.isPending}
-              />
-            </FilaFormulario>
-
-            <FilaFormulario
-              label="Patrones de detección"
-              htmlFor="patrones-cliente"
-              anchoEtiqueta="140px"
-              descripcion="Separados por coma. Si el nombre del Excel contiene alguno de estos textos, se asigna a este cliente automáticamente."
-            >
-              <Input
-                id="patrones-cliente"
-                value={patrones}
-                onChange={(e) => setPatrones(e.target.value)}
-                placeholder="BIOSINTESIS, BIO SINTESIS"
                 required
                 disabled={mutacion.isPending}
               />

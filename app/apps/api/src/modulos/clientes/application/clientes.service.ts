@@ -25,11 +25,7 @@ export class ClientesService {
     return this.repositorio.buscarPorId(id);
   }
 
-  crear(datos: {
-    nombre: string;
-    patronesDeteccion: string[];
-    tipoServicio: TipoServicioCliente;
-  }): Promise<Cliente> {
+  crear(datos: { nombre: string; tipoServicio: TipoServicioCliente }): Promise<Cliente> {
     return this.repositorio.crear(datos);
   }
 

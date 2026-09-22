@@ -3,7 +3,6 @@ import { Cliente } from "./cliente";
 
 export interface DatosActualizarCliente {
   nombre?: string;
-  patronesDeteccion?: string[];
   activo?: boolean;
   tipoServicio?: TipoServicioCliente;
 }
