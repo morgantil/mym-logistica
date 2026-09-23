@@ -72,6 +72,7 @@ export interface DatosCrearGrupoFacturacion {
 export interface DatosCrearCombinacion {
   clienteMedicamentoId: string;
   clientePanalId: string;
+  nombre?: string | null;
 }
 
 export interface DatosCrearParUnificacion {

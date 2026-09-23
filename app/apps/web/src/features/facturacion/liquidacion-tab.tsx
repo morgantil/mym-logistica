@@ -228,6 +228,7 @@ function FilasGrupo({ grupo, pedidos }: { grupo: GrupoFacturacion; pedidos: Pedi
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <BadgeRegla regla={grupo.reglaAplicada} />
+              {grupo.nombreUnificacion && <span className="text-sm font-medium">{grupo.nombreUnificacion}</span>}
               {grupo.tarifaUtilizada !== null && (
                 <span className="text-sm text-muted-foreground">Tarifa {formatearMonto(grupo.tarifaUtilizada)}</span>
               )}

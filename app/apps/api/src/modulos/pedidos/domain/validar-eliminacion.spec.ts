@@ -53,7 +53,7 @@ describe("validarPedidoParaEliminar", () => {
     expect(validarPedidoParaEliminar(pedido({ estadoSimpliroute: EstadoSimpliroute.ERROR }))).not.toBeNull();
   });
 
-  it("bloquea borrar un pedido no encontrado en SimpliRoute (también se intentó enviar)", () => {
-    expect(validarPedidoParaEliminar(pedido({ estadoSimpliroute: EstadoSimpliroute.NO_ENCONTRADO }))).not.toBeNull();
+  it("permite borrar un pedido no encontrado en SimpliRoute (nunca se creó ninguna visita)", () => {
+    expect(validarPedidoParaEliminar(pedido({ estadoSimpliroute: EstadoSimpliroute.NO_ENCONTRADO }))).toBeNull();
   });
 });

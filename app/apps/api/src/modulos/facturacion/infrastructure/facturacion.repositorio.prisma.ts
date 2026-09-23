@@ -61,6 +61,7 @@ function mapearCombinacion(fila: {
   clienteMedicamento?: { nombre: string };
   clientePanalId: string;
   clientePanal?: { nombre: string };
+  nombre: string | null;
   activa: boolean;
 }): CombinacionUnificacionClientes {
   return {
@@ -69,6 +70,7 @@ function mapearCombinacion(fila: {
     clienteMedicamentoNombre: fila.clienteMedicamento?.nombre,
     clientePanalId: fila.clientePanalId,
     clientePanalNombre: fila.clientePanal?.nombre,
+    nombre: fila.nombre,
     activa: fila.activa,
   };
 }
@@ -307,6 +309,7 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
       data: {
         clienteMedicamentoId: datos.clienteMedicamentoId,
         clientePanalId: datos.clientePanalId,
+        nombre: datos.nombre ?? null,
       },
       include: {
         clienteMedicamento: { select: { nombre: true } },

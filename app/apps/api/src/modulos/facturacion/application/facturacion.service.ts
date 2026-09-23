@@ -111,7 +111,7 @@ export class FacturacionService {
   // validaba nada al crear una combinación — un error de tipeo (clientes al
   // revés, o un cliente que en realidad no maneja ese tipo de servicio)
   // rompía en silencio todo el emparejamiento de unificación cruzada.
-  async crearCombinacion(clienteMedicamentoId: string, clientePanalId: string) {
+  async crearCombinacion(clienteMedicamentoId: string, clientePanalId: string, nombre?: string) {
     if (clienteMedicamentoId === clientePanalId) {
       throw new BadRequestException("No se puede combinar un cliente consigo mismo.");
     }
@@ -131,7 +131,11 @@ export class FacturacionService {
         `"${clientePanal.nombre}" está configurado como Medicamento — no puede ser el lado Pañal de una combinación.`,
       );
     }
-    return this.repositorio.crearCombinacion({ clienteMedicamentoId, clientePanalId });
+    return this.repositorio.crearCombinacion({
+      clienteMedicamentoId,
+      clientePanalId,
+      nombre: nombre?.trim() || null,
+    });
   }
 
   eliminarCombinacion(id: string) {
@@ -150,8 +154,34 @@ export class FacturacionService {
     return this.repositorio.actualizarTarifaTransportista(id, datos);
   }
 
-  listarGrupos(clienteId: string, mes: number, anio: number) {
-    return this.repositorio.listarGrupos(clienteId, mes, anio);
+  async listarGrupos(clienteId: string, mes: number, anio: number) {
+    return this.ordenarYNombrarGrupos(await this.repositorio.listarGrupos(clienteId, mes, anio));
+  }
+
+  // Decisión 2026-09-22 (reunión con el cliente): primero se factura lo
+  // unificado, después el 2x1 y al final lo individual. Sort estable: dentro
+  // de cada bloque queda el orden en que el motor generó los grupos (por
+  // fecha). De paso completa el nombre de la combinación en las unificaciones
+  // entre clientes, para mostrarlo en pantalla y en el Excel.
+  private async ordenarYNombrarGrupos(grupos: GrupoFacturacion[]): Promise<GrupoFacturacion[]> {
+    const RANGO: Record<string, number> = { UNIFICADA: 0, "2x1": 1 };
+    const nombrePorSocio = new Map<string, string | null>();
+    for (const grupo of grupos) {
+      if (grupo.reglaAplicada !== "UNIFICADA" || !grupo.clienteSocioId) continue;
+      const clave = `${grupo.clienteId}|${grupo.clienteSocioId}`;
+      if (nombrePorSocio.has(clave)) continue;
+      const combinacion = await this.repositorio.buscarCombinacionEntreClientes(grupo.clienteId, grupo.clienteSocioId);
+      nombrePorSocio.set(clave, combinacion?.nombre ?? null);
+    }
+    return grupos
+      .map((grupo) => ({
+        ...grupo,
+        nombreUnificacion:
+          grupo.reglaAplicada === "UNIFICADA" && grupo.clienteSocioId
+            ? (nombrePorSocio.get(`${grupo.clienteId}|${grupo.clienteSocioId}`) ?? null)
+            : null,
+      }))
+      .sort((a, b) => (RANGO[a.reglaAplicada] ?? 2) - (RANGO[b.reglaAplicada] ?? 2));
   }
 
   // Decisión 2026-09-11: mismo detalle por pedido que ya se arma para el
@@ -515,10 +545,11 @@ export class FacturacionService {
       throw new NotFoundException(`Cliente ${clienteId} no encontrado.`);
     }
 
-    const [pedidos, grupos] = await Promise.all([
+    const [pedidos, gruposSinOrdenar] = await Promise.all([
       this.repositorio.listarPedidosFacturados(clienteId, mes, anio),
       this.repositorio.listarGrupos(clienteId, mes, anio),
     ]);
+    const grupos = await this.ordenarYNombrarGrupos(gruposSinOrdenar);
 
     return generarReporteMensualExcel({ clienteNombre: cliente.nombre, mes, anio, pedidos, grupos });
   }

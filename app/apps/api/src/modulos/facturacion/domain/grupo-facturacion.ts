@@ -33,6 +33,10 @@ export interface GrupoFacturacion {
   confirmadoEn: Date | null;
   confirmadoPorId: string | null;
   pedidoIds: string[];
+  // Solo lectura, lo completa el servicio al listar (no se guarda en la base):
+  // nombre de la combinación entre clientes que originó una UNIFICADA
+  // (ej. "Unificado Bellavista"). null si no tiene nombre o no es cruzada.
+  nombreUnificacion?: string | null;
 }
 
 // Fila de detalle para el reporte mensual (§31 funcional) — un pedido

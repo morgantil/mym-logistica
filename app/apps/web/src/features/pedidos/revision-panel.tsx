@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth-context";
 import { eliminarPedido, eliminarPedidos, enviarASimpliRoute, revisarPendientesDeEnvio } from "./api";
+import { estadoBorrable } from "./estado-labels";
 import { ResolverDireccionSheet } from "./resolver-direccion-sheet";
 import type { PedidoListado } from "./tipos";
 
@@ -176,7 +177,7 @@ export function RevisionPanel() {
               onClick={() => {
                 if (
                   window.confirm(
-                    `¿Borrar ${seleccionados.size} pedido(s)? Solo se borran los que todavía no se mandaron a SimpliRoute.`,
+                    `¿Borrar ${seleccionados.size} pedido(s)? Solo se borran los que todavía no llegaron a SimpliRoute.`,
                   )
                 ) {
                   mutacionEliminarVarios.mutate(Array.from(seleccionados));
@@ -211,7 +212,7 @@ export function RevisionPanel() {
           ) : (
             dataFiltrada?.map(({ pedido, erroresBloqueantes }) => {
             const bloqueado = erroresBloqueantes.length > 0;
-            const puedeBorrarEste = puedeEliminar && pedido.estadoSimpliroute === "NO_ENVIADO";
+            const puedeBorrarEste = puedeEliminar && estadoBorrable(pedido.estadoSimpliroute);
             return (
               <TableRow key={pedido.id}>
                 <TableCell>

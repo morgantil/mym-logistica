@@ -1,4 +1,4 @@
-import { IsUUID } from "class-validator";
+import { IsOptional, IsString, IsUUID, MaxLength } from "class-validator";
 
 // Guia_Desarrollo_Logica_Facturacion_Arbet.docx paso 4/8: combinación
 // habilitada de unificación ENTRE dos clientes distintos (ej. Farmaet
@@ -10,4 +10,10 @@ export class CrearCombinacionDto {
 
   @IsUUID()
   clientePanalId!: string;
+
+  // Nombre para mostrar (ej. "Unificado Bellavista"), opcional.
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  nombre?: string;
 }

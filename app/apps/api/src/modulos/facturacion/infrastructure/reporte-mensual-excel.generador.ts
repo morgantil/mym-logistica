@@ -49,6 +49,7 @@ export async function generarReporteMensualExcel(datos: {
     { header: "Tipo de servicio", key: "tipoServicio", width: 16 },
     { header: "Chofer", key: "chofer", width: 20 },
     { header: "Regla aplicada", key: "regla", width: 14 },
+    { header: "Unificación", key: "unificacion", width: 22 },
     { header: "Cantidad de viajes", key: "cantidadViajes", width: 16 },
     { header: "Tarifa del viaje", key: "tarifa", width: 16 },
     { header: "Porcentaje aplicado", key: "porcentaje", width: 18 },
@@ -58,7 +59,15 @@ export async function generarReporteMensualExcel(datos: {
   ];
   hojaDetalle.getRow(1).font = { bold: true };
 
-  for (const pedido of datos.pedidos) {
+  // Mismo orden que los grupos (unificadas primero, después 2×1, después
+  // individuales): el detalle por pedido sigue el orden de la liquidación.
+  const posicionGrupo = new Map(datos.grupos.map((grupo, indice) => [grupo.id, indice]));
+  const nombreUnificacionPorGrupo = new Map(datos.grupos.map((grupo) => [grupo.id, grupo.nombreUnificacion ?? ""]));
+  const pedidosOrdenados = [...datos.pedidos].sort(
+    (a, b) => (posicionGrupo.get(a.grupoId) ?? 0) - (posicionGrupo.get(b.grupoId) ?? 0),
+  );
+
+  for (const pedido of pedidosOrdenados) {
     hojaDetalle.addRow({
       cliente: datos.clienteNombre,
       fecha: pedido.fechaProgramada.toISOString().slice(0, 10),
@@ -69,6 +78,7 @@ export async function generarReporteMensualExcel(datos: {
       tipoServicio: TEXTO_TIPO_SERVICIO[pedido.tipoServicio],
       chofer: pedido.choferNombre ?? "Sin asignar",
       regla: TEXTO_REGLA[pedido.reglaAplicada] ?? pedido.reglaAplicada,
+      unificacion: nombreUnificacionPorGrupo.get(pedido.grupoId) ?? "",
       cantidadViajes: pedido.cantidadViajes,
       tarifa: pedido.tarifaUtilizada,
       porcentaje: pedido.porcentajeAplicado,
@@ -90,6 +100,7 @@ export async function generarReporteMensualExcel(datos: {
     { header: "Fecha", key: "fecha", width: 12 },
     { header: "Dirección", key: "direccion", width: 32 },
     { header: "Regla aplicada", key: "regla", width: 14 },
+    { header: "Unificación", key: "unificacion", width: 22 },
     { header: "Cantidad de pedidos", key: "cantidadPedidos", width: 18 },
     { header: "Cantidad de viajes", key: "cantidadViajes", width: 16 },
     { header: "Tarifa", key: "tarifa", width: 14 },
@@ -105,6 +116,7 @@ export async function generarReporteMensualExcel(datos: {
       fecha: referencia?.fecha.toISOString().slice(0, 10) ?? "",
       direccion: referencia?.direccion ?? "",
       regla: TEXTO_REGLA[grupo.reglaAplicada] ?? grupo.reglaAplicada,
+      unificacion: grupo.nombreUnificacion ?? "",
       cantidadPedidos: grupo.pedidoIds.length,
       cantidadViajes: grupo.cantidadViajes,
       tarifa: grupo.tarifaUtilizada,

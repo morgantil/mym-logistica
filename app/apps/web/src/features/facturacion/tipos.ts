@@ -39,6 +39,7 @@ export interface CombinacionUnificacionClientes {
   clienteMedicamentoNombre?: string;
   clientePanalId: string;
   clientePanalNombre?: string;
+  nombre: string | null;
   activa: boolean;
 }
 
@@ -70,6 +71,8 @@ export interface GrupoFacturacion {
   confirmadoEn: string | null;
   confirmadoPorId: string | null;
   pedidoIds: string[];
+  // Nombre de la combinación que originó una UNIFICADA entre clientes.
+  nombreUnificacion?: string | null;
 }
 
 export interface PedidoExcluido {

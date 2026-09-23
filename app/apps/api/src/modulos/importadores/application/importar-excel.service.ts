@@ -267,10 +267,12 @@ export class ImportarExcelService {
         clasificacionLocalidad?.partido ?? null,
       );
 
-      // Tres fuentes posibles de observación, pueden darse juntas: la alerta de
-      // dirección (arriba), la nota que venía pegada a la fecha en el Excel
-      // (grupo.notaFecha) y el/los ticket(s) de las líneas agrupadas — ver
-      // LineaExcelImportada. Ninguna se pisa a la otra. El ticket se guarda acá
+      // Dos fuentes posibles de observación, pueden darse juntas: la nota que
+      // venía pegada a la fecha en el Excel (grupo.notaFecha) y el/los
+      // ticket(s) de las líneas agrupadas — ver LineaExcelImportada. La
+      // alerta de dirección distinta al padrón ya NO va acá (decisión
+      // 2026-09-22): tiene su propio campo bloqueante (alertaDireccionPendiente)
+      // y dejarla en texto libre ensuciaba Observaciones. El ticket se guarda acá
       // (no en el campo `Pedido.ticket`, sin usar) para que salga impreso en
       // la etiqueta sin tocar el generador de PDF (decisión 2026-09-01).
       // Cada producto guarda su propio ticket (decisión 2026-09-07: si dos
@@ -280,9 +282,6 @@ export class ImportarExcelService {
       // (el caso más común).
       const ticketsDistintos = [...new Set(grupo.productos.map((producto) => producto.ticket).filter(Boolean))];
       const observacionesPartes = [
-        alertaDireccion
-          ? `Dirección diferente a la registrada en el padrón (padrón: "${alertaDireccion.direccionPadron}"). Pendiente de revisión.`
-          : null,
         grupo.notaFecha,
         ticketsDistintos.length === 1
           ? `Ticket: ${ticketsDistintos[0]}`

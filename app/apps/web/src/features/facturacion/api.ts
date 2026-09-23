@@ -104,6 +104,7 @@ export async function listarCombinaciones(): Promise<CombinacionUnificacionClien
 export async function crearCombinacion(datos: {
   clienteMedicamentoId: string;
   clientePanalId: string;
+  nombre?: string;
 }): Promise<CombinacionUnificacionClientes> {
   const { data } = await apiClient.post<CombinacionUnificacionClientes>("/facturacion/combinaciones", datos);
   return data;

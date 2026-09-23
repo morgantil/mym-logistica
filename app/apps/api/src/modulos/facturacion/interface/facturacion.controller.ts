@@ -93,7 +93,7 @@ export class FacturacionController {
 
   @Post("combinaciones")
   crearCombinacion(@Body() dto: CrearCombinacionDto) {
-    return this.facturacionService.crearCombinacion(dto.clienteMedicamentoId, dto.clientePanalId);
+    return this.facturacionService.crearCombinacion(dto.clienteMedicamentoId, dto.clientePanalId, dto.nombre);
   }
 
   @Delete("combinaciones/:id")

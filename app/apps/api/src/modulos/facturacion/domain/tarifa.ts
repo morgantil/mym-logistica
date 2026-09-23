@@ -66,6 +66,7 @@ export interface CombinacionUnificacionClientes {
   clienteMedicamentoNombre?: string;
   clientePanalId: string;
   clientePanalNombre?: string;
+  nombre: string | null;
   activa: boolean;
 }
 

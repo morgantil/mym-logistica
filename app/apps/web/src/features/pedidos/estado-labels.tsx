@@ -67,3 +67,10 @@ export const LABEL_ESTADO_SIMPLIROUTE: Record<EstadoSimpliroute, string> = Objec
 // de Pedidos para este estado, así los tiles de KPIs y la columna Estado se
 // leen como el mismo sistema en vez de dos paletas distintas.
 export { LABELS_ESTADO_PEDIDO, CLASES_TONO };
+
+// Espejo de estadoSimplirouteBorrable (apps/api, validar-eliminacion.ts):
+// NO_ENVIADO y NO_ENCONTRADO nunca llegaron a crear una Visit en SimpliRoute,
+// así que se pueden borrar; ENVIADO y ERROR no (decisión 2026-09-22).
+export function estadoBorrable(estado: EstadoSimpliroute): boolean {
+  return estado === EstadoSimpliroute.NO_ENVIADO || estado === EstadoSimpliroute.NO_ENCONTRADO;
+}

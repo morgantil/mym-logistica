@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { TipoServicio, TipoServicioCliente } from "@mym/shared-types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { listarClientesActivos } from "@/features/clientes/api";
@@ -297,6 +298,7 @@ function CombinacionesUnificacion() {
 
   const [clienteMedicamentoId, setClienteMedicamentoId] = useState("");
   const [clientePanalId, setClientePanalId] = useState("");
+  const [nombre, setNombre] = useState("");
 
   const clientesMedicamento = (clientes ?? []).filter(
     (c) => c.tipoServicio === TipoServicioCliente.MEDICAMENTO || c.tipoServicio === TipoServicioCliente.AMBOS,
@@ -307,12 +309,13 @@ function CombinacionesUnificacion() {
   const nombreCliente = (id: string) => clientes?.find((c) => c.id === id)?.nombre ?? id;
 
   const mutacionCrear = useMutation({
-    mutationFn: () => crearCombinacion({ clienteMedicamentoId, clientePanalId }),
+    mutationFn: () => crearCombinacion({ clienteMedicamentoId, clientePanalId, nombre: nombre.trim() || undefined }),
     onSuccess: () => {
       toast.success("Combinación habilitada.");
       queryClient.invalidateQueries({ queryKey: ["facturacion", "combinaciones"] });
       setClienteMedicamentoId("");
       setClientePanalId("");
+      setNombre("");
     },
     onError: (error) => toast.error(mensajeError(error)),
   });
@@ -368,6 +371,16 @@ function CombinacionesUnificacion() {
             </SelectContent>
           </Select>
         </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-sm text-muted-foreground">Nombre (opcional)</span>
+          <Input
+            className="w-56"
+            placeholder="Ej. Unificado Bellavista"
+            maxLength={80}
+            value={nombre}
+            onChange={(evento) => setNombre(evento.target.value)}
+          />
+        </div>
         <Button
           type="button"
           variant="outline"
@@ -382,6 +395,7 @@ function CombinacionesUnificacion() {
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead>Nombre</TableHead>
             <TableHead>Medicamentos</TableHead>
             <TableHead>Pañales</TableHead>
             <TableHead className="w-24">Acción</TableHead>
@@ -390,19 +404,20 @@ function CombinacionesUnificacion() {
         <TableBody>
           {isLoading ? (
             <TableRow>
-              <TableCell colSpan={3} className="text-muted-foreground">
+              <TableCell colSpan={4} className="text-muted-foreground">
                 Cargando…
               </TableCell>
             </TableRow>
           ) : combinaciones?.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={3} className="text-muted-foreground">
+              <TableCell colSpan={4} className="text-muted-foreground">
                 Todavía no hay combinaciones habilitadas.
               </TableCell>
             </TableRow>
           ) : (
             combinaciones?.map((combinacion) => (
               <TableRow key={combinacion.id}>
+                <TableCell>{combinacion.nombre ?? "—"}</TableCell>
                 <TableCell>{combinacion.clienteMedicamentoNombre ?? nombreCliente(combinacion.clienteMedicamentoId)}</TableCell>
                 <TableCell>{combinacion.clientePanalNombre ?? nombreCliente(combinacion.clientePanalId)}</TableCell>
                 <TableCell>

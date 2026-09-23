@@ -684,6 +684,10 @@ model CombinacionUnificacionClientes {
   id                   String  @id @default(uuid())
   clienteMedicamentoId String
   clientePanalId       String
+  // Decisión 2026-09-22 (reunión con el cliente): nombre para mostrar de la
+  // combinación en Liquidación y en el Excel (ej. "Unificado Bellavista").
+  // Opcional — sin nombre, se muestra "Unificada" como hasta ahora.
+  nombre               String?
   activa               Boolean @default(true)
 
   creadoEn    DateTime  @default(now())
