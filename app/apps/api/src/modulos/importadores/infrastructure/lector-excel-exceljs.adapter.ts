@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import ExcelJS from "exceljs";
 import { ExcelLeido, FilaExcelCruda, LectorExcelPort } from "../domain/lector-excel.port";
+import { repararMojibake } from "../domain/texto-mojibake";
 
 // Toma la hoja indicada (o la PRIMERA si no se indica). La primera fila no vacía se toma como
 // encabezados. No asume nada más sobre la estructura — eso es justamente
@@ -40,7 +41,7 @@ export class LectorExcelExceljsAdapter implements LectorExcelPort {
     const filaEncabezados = hoja.getRow(1);
     const encabezados: string[] = [];
     filaEncabezados.eachCell({ includeEmpty: true }, (celda, indice) => {
-      encabezados[indice - 1] = String(celda.value ?? "").trim();
+      encabezados[indice - 1] = repararMojibake(String(celda.value ?? "").trim());
     });
 
     if (encabezados.every((encabezado) => encabezado === "")) {
@@ -56,7 +57,12 @@ export class LectorExcelExceljsAdapter implements LectorExcelPort {
       encabezados.forEach((encabezado, indice) => {
         const celda = fila.getCell(indice + 1);
         const valor = this.valorPlano(celda.value);
-        filaCruda[encabezado] = valor;
+        // Encabezado repetido (Farmaet trae DOMICILIO dos veces, y la segunda
+        // columna a veces viene vacía): gana el primer valor no vacío, uno
+        // vacío nunca pisa a uno lleno.
+        const existente = filaCruda[encabezado];
+        const yaTieneValor = existente !== undefined && existente !== null && existente !== "";
+        if (!yaTieneValor) filaCruda[encabezado] = valor;
         if (valor !== null && valor !== "") tieneAlgunValor = true;
       });
 
@@ -75,11 +81,12 @@ export class LectorExcelExceljsAdapter implements LectorExcelPort {
     if (typeof valor === "object") {
       if ("result" in valor) return this.valorPlano(valor.result as ExcelJS.CellValue);
       if ("richText" in valor) {
-        return valor.richText.map((parte) => parte.text).join("");
+        return repararMojibake(valor.richText.map((parte) => parte.text).join(""));
       }
       if ("text" in valor) return String((valor as { text: unknown }).text);
       return null;
     }
+    if (typeof valor === "string") return repararMojibake(valor);
     return typeof valor === "boolean" ? String(valor) : valor;
   }
 }

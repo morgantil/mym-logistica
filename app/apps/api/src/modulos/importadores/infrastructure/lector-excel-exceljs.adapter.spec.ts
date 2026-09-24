@@ -48,4 +48,27 @@ describe("LectorExcelExceljsAdapter", () => {
 
     await expect(adapter.leer(buffer)).rejects.toThrow("No se encontraron encabezados en la primera fila.");
   });
+
+  it("con un encabezado repetido, una columna vacía no pisa a la que tiene valor", async () => {
+    const buffer = await bufferDeWorkbook((hoja) => {
+      hoja.addRow(["PACIENTE", "DOMICILIO", "DOMICILIO"]);
+      hoja.addRow(["Juan Pérez", "Calle Falsa 123", null]);
+      hoja.addRow(["Ana Gómez", null, "Otra 45"]);
+    });
+
+    const { filas } = await adapter.leer(buffer);
+
+    expect(filas.map((fila) => fila.DOMICILIO)).toEqual(["Calle Falsa 123", "Otra 45"]);
+  });
+
+  it("repara texto con codificación rota (NÂ° → N°)", async () => {
+    const buffer = await bufferDeWorkbook((hoja) => {
+      hoja.addRow(["PACIENTE", "DOMICILIO"]);
+      hoja.addRow(["Juan Pérez", "Hughes NÂ° 225"]);
+    });
+
+    const { filas } = await adapter.leer(buffer);
+
+    expect(filas[0].DOMICILIO).toBe("Hughes N° 225");
+  });
 });
