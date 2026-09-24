@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { ResolucionDireccion } from "@mym/shared-types";
+import { PrioridadPedido, ResolucionDireccion } from "@mym/shared-types";
 import { PermisosClienteService } from "../../../common/permisos/permisos-cliente.service";
 import { DestinatariosService } from "../../destinatarios/application/destinatarios.service";
 import { LOGISTICA_PROVIDER, LogisticaProviderPort } from "../../simpliroute/domain/logistica-provider.port";
@@ -356,6 +356,14 @@ export class PedidosService {
       throw new BadRequestException(error);
     }
     await this.repositorio.eliminar(id);
+  }
+
+  // Decisión 2026-09-24: Normal/Urgente/Crítica a mano, uno o varios pedidos.
+  // Vale para cualquier estado (un pedido ya enviado también puede volverse
+  // urgente para el seguimiento interno — no toca SimpliRoute).
+  async actualizarPrioridad(pedidoIds: string[], prioridad: PrioridadPedido, usuarioId: string) {
+    const actualizados = await this.repositorio.actualizarPrioridad(pedidoIds, prioridad, usuarioId);
+    return { actualizados };
   }
 
   // Selección múltiple desde Grilla/Revisión — un pedido que no se puede

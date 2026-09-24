@@ -1,4 +1,11 @@
-import { EstadoPedido, EstadoSimpliroute, EstadoValidacion, TipoEnvase, TipoServicio } from "@mym/shared-types";
+import {
+  EstadoPedido,
+  EstadoSimpliroute,
+  EstadoValidacion,
+  PrioridadPedido,
+  TipoEnvase,
+  TipoServicio,
+} from "@mym/shared-types";
 
 export interface Pedido {
   id: string;
@@ -36,6 +43,19 @@ export interface Pedido {
   // Decisión 2026-09-16: bloquea el envío hasta que se resuelva — ver
   // validar-envio.ts y PedidosService.resolverAlertaDireccion.
   alertaDireccionPendiente: boolean;
+  // Decisión 2026-09-24: Normal/Urgente/Crítica para todos los clientes.
+  prioridad: PrioridadPedido;
+  // Remito(s) del sistema de origen, separados por coma — solo medicamentos
+  // (en pañales el equivalente es el ticket, que vive en `observaciones`).
+  remito: string | null;
+  // Específicos de medicamentos (null para pañales) — ver schema.prisma. Si un
+  // pedido agrupa varias líneas con valores distintos, viajan separados por " / ".
+  receta: string | null;
+  recetaResuelta: string | null;
+  tipoPedido: string | null;
+  retiroDeReceta: string | null;
+  tiempoDeEntrega: string | null;
+  horarioEntrega: string | null;
   etiquetaImpresaEn: Date | null;
   // Cuántos pedidos del sistema de origen (Nº de ticket distintos) se
   // agruparon en este Pedido — ver comentario en schema.prisma. Default 1.
@@ -57,7 +77,13 @@ export interface PedidoListado extends Pedido {
   clienteNombre: string;
   destinatarioNombre: string;
   destinatarioTelefono: string | null;
-  productos: { codigo: string | null; descripcion: string; cantidad: number; ticket: string | null }[];
+  productos: {
+    codigo: string | null;
+    descripcion: string;
+    cantidad: number;
+    ticket: string | null;
+    tipoEnvase: TipoEnvase | null;
+  }[];
 }
 
 // Proyección de Pedido para el motor de facturación (facturacion/domain/
@@ -106,9 +132,12 @@ export interface LineaExcelImportada {
   // (mismo criterio que destinatario/direccion más arriba).
   receta: string | null;
   tipoPedido: string | null;
-  retiroDeReceta: boolean | null;
+  // Texto tal cual ("NO", "RR", ...) — o el que asigne una ReglaImportacion.
+  retiroDeReceta: string | null;
   tiempoDeEntrega: string | null;
   horarioEntrega: string | null;
+  // Derivada de las reglas de importación del cliente (NORMAL si ninguna aplica).
+  prioridad: PrioridadPedido;
 }
 
 export interface PedidoAgrupado {
@@ -130,10 +159,26 @@ export interface PedidoAgrupado {
   totalUnidades: number;
   receta: string | null;
   tipoPedido: string | null;
-  retiroDeReceta: boolean | null;
+  retiroDeReceta: string | null;
   tiempoDeEntrega: string | null;
   horarioEntrega: string | null;
+  prioridad: PrioridadPedido;
 }
+
+// Une valores distintos con " / " sin repetir (Farmaet manda una línea por
+// receta: un pedido de 6 líneas puede traer "ENV" y "EV" — no se pierde
+// ninguno, pero tampoco se repite el mismo 6 veces).
+function unirDistintos(actual: string | null, nuevo: string | null): string | null {
+  if (!nuevo) return actual;
+  if (!actual) return nuevo;
+  return actual.split(" / ").includes(nuevo) ? actual : `${actual} / ${nuevo}`;
+}
+
+const SEVERIDAD_PRIORIDAD: Record<PrioridadPedido, number> = {
+  [PrioridadPedido.NORMAL]: 0,
+  [PrioridadPedido.URGENTE]: 1,
+  [PrioridadPedido.CRITICA]: 2,
+};
 
 // DOCUMENTO FUNCIONAL.md §7: una línea del Excel = un producto, no un pedido.
 // Se agrupan por MISMO cliente + MISMO afiliado + MISMA dirección + MISMA fecha.
@@ -174,6 +219,14 @@ export function agruparLineasEnPedidos(lineas: LineaExcelImportada[]): PedidoAgr
     if (grupoExistente) {
       grupoExistente.productos.push(producto);
       grupoExistente.totalUnidades += linea.cantidad;
+      grupoExistente.receta = unirDistintos(grupoExistente.receta, linea.receta);
+      grupoExistente.tipoPedido = unirDistintos(grupoExistente.tipoPedido, linea.tipoPedido);
+      grupoExistente.retiroDeReceta = unirDistintos(grupoExistente.retiroDeReceta, linea.retiroDeReceta);
+      grupoExistente.tiempoDeEntrega = unirDistintos(grupoExistente.tiempoDeEntrega, linea.tiempoDeEntrega);
+      // Si UNA línea del pedido es urgente/crítica, todo el pedido lo es.
+      if (SEVERIDAD_PRIORIDAD[linea.prioridad] > SEVERIDAD_PRIORIDAD[grupoExistente.prioridad]) {
+        grupoExistente.prioridad = linea.prioridad;
+      }
     } else {
       grupos.set(clave, {
         clienteId: linea.clienteId,
@@ -191,6 +244,7 @@ export function agruparLineasEnPedidos(lineas: LineaExcelImportada[]): PedidoAgr
         retiroDeReceta: linea.retiroDeReceta,
         tiempoDeEntrega: linea.tiempoDeEntrega,
         horarioEntrega: linea.horarioEntrega,
+        prioridad: linea.prioridad,
       });
     }
   }

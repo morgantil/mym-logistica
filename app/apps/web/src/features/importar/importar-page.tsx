@@ -9,9 +9,12 @@ import { SelectorArchivo } from "@/components/shell/selector-archivo";
 import { FilaFormulario, TablaFormulario } from "@/components/shell/fila-formulario";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { listarClientesActivos } from "@/features/clientes/api";
 import { confirmarMapeo, subirExcel } from "./api";
 import { MapeoManualForm } from "./mapeo-manual-form";
+import { RecetasTab } from "./recetas-tab";
+import { ReglasTab } from "./reglas-tab";
 import { ResumenImportacion } from "./resumen-importacion";
 import type { MapeoColumnas, ResultadoImportacion } from "./tipos";
 
@@ -38,7 +41,34 @@ function mensajeError(error: unknown): string {
 
 const HOY = new Date().toISOString().slice(0, 10);
 
+// Decisión 2026-09-24: además de subir el archivo, desde acá se definen las
+// reglas de importación por cliente y los sinónimos de receta — todo lo que
+// el usuario puede configurar de una importación vive en la misma pantalla.
 export function ImportarPage() {
+  return (
+    <div className="flex flex-col gap-4">
+      <h1 className="text-xl font-semibold">Importar Excel</h1>
+      <Tabs defaultValue="archivo" className="flex flex-col gap-4">
+        <TabsList className="self-start">
+          <TabsTrigger value="archivo">Subir archivo</TabsTrigger>
+          <TabsTrigger value="reglas">Reglas por cliente</TabsTrigger>
+          <TabsTrigger value="recetas">Recetas</TabsTrigger>
+        </TabsList>
+        <TabsContent value="archivo">
+          <SubirArchivo />
+        </TabsContent>
+        <TabsContent value="reglas">
+          <ReglasTab />
+        </TabsContent>
+        <TabsContent value="recetas">
+          <RecetasTab />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+function SubirArchivo() {
   const queryClient = useQueryClient();
   const [archivo, setArchivo] = useState<File | null>(null);
   const [clienteElegido, setClienteElegido] = useState<string>("");
@@ -46,6 +76,9 @@ export function ImportarPage() {
   // Obligatoria — documento funcional v6 §4.1: se informa antes de subir el
   // archivo, se aplica a todo el lote, el Excel ya no la puede reemplazar.
   const [fechaEntrega, setFechaEntrega] = useState<string>(HOY);
+  // Opcional — si el libro trae varias hojas, cuál importar (queda guardada
+  // en el perfil del cliente). Vacío = la guardada, o la primera.
+  const [nombreHoja, setNombreHoja] = useState("");
   const [resultado, setResultado] = useState<ResultadoImportacion | null>(null);
 
   const { data: clientes } = useQuery({ queryKey: ["clientes"], queryFn: listarClientesActivos });
@@ -56,7 +89,7 @@ export function ImportarPage() {
 
   const mutacionSubir = useMutation({
     mutationFn: ({ archivo, clienteId }: { archivo: File; clienteId: string }) =>
-      subirExcel(archivo, fechaEntrega, tipoImportacion, clienteId),
+      subirExcel(archivo, fechaEntrega, tipoImportacion, clienteId, nombreHoja.trim() || undefined),
     onSuccess: (data) => {
       setResultado(data);
       if (data.estado === "completada") {
@@ -71,7 +104,14 @@ export function ImportarPage() {
       if (!archivo || resultado?.estado !== "requiereMapeoManual") {
         throw new Error("Falta el archivo o el cliente para confirmar el mapeo.");
       }
-      return confirmarMapeo({ archivo, clienteId: resultado.clienteId, mapeoManual, fechaEntrega, tipoServicio: tipoImportacion });
+      return confirmarMapeo({
+        archivo,
+        clienteId: resultado.clienteId,
+        mapeoManual,
+        fechaEntrega,
+        tipoServicio: tipoImportacion,
+        nombreHoja: nombreHoja.trim() || undefined,
+      });
     },
     onSuccess: (data) => {
       setResultado(data);
@@ -87,6 +127,7 @@ export function ImportarPage() {
     setClienteElegido("");
     setTipoImportacion(TipoServicio.PANAL);
     setFechaEntrega(HOY);
+    setNombreHoja("");
     setResultado(null);
   }
 
@@ -100,8 +141,6 @@ export function ImportarPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold">Importar Excel</h1>
-
       {!resultado && (
         <Card>
           <CardHeader>
@@ -159,6 +198,21 @@ export function ImportarPage() {
                     disabled={enviando}
                     archivo={archivo}
                     onChange={setArchivo}
+                  />
+                </FilaFormulario>
+
+                <FilaFormulario
+                  label="Hoja del Excel"
+                  htmlFor="nombre-hoja"
+                  descripcion="Opcional. Si el archivo trae varias hojas, escribí el nombre de la que se importa (ej. Hoja1). Queda guardada para este cliente; vacío = la que ya tenga guardada, o la primera."
+                >
+                  <Input
+                    id="nombre-hoja"
+                    value={nombreHoja}
+                    onChange={(e) => setNombreHoja(e.target.value)}
+                    disabled={enviando}
+                    placeholder="Primera hoja"
+                    className="w-full sm:w-64"
                   />
                 </FilaFormulario>
 

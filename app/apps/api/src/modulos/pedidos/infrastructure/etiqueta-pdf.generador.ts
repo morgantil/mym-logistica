@@ -1,4 +1,6 @@
 import PDFDocument from "pdfkit";
+import { TipoEnvase } from "@mym/shared-types";
+import { textoEtiquetaEnvase, tiposEnvasePorEtiqueta } from "../domain/etiquetas-envase";
 import { PedidoListado } from "../domain/pedido";
 
 // §8.2 funcional v6: etiqueta de bulto, una por cada bulto del pedido,
@@ -19,7 +21,13 @@ function formatearFecha(fecha: Date): string {
   return fecha.toLocaleDateString("es-AR", { timeZone: "UTC" });
 }
 
-function dibujarEtiqueta(doc: PDFKit.PDFDocument, pedido: PedidoListado, numeroBulto: number, totalBultos: number) {
+function dibujarEtiqueta(
+  doc: PDFKit.PDFDocument,
+  pedido: PedidoListado,
+  numeroBulto: number,
+  totalBultos: number,
+  tipoEnvase: TipoEnvase | null,
+) {
   const anchoUtil = ANCHO_PT - MARGEN_PT * 2;
 
   doc.fontSize(10).font("Helvetica-Bold").text(`Pedido N.º ${pedido.numero}`, { width: anchoUtil });
@@ -27,7 +35,7 @@ function dibujarEtiqueta(doc: PDFKit.PDFDocument, pedido: PedidoListado, numeroB
   doc
     .fontSize(20)
     .font("Helvetica-Bold")
-    .text(`Bulto ${numeroBulto}/${totalBultos}`, { width: anchoUtil });
+    .text(`${textoEtiquetaEnvase(tipoEnvase)} ${numeroBulto}/${totalBultos}`, { width: anchoUtil });
   doc.moveDown(0.6);
 
   doc.fontSize(9).font("Helvetica").text(`Fecha de entrega: ${formatearFecha(pedido.fechaProgramada)}`, {
@@ -57,6 +65,8 @@ export async function generarEtiquetasPdf(
   numerosBulto: number[],
 ): Promise<Buffer> {
   const totalBultos = pedido.bultos ?? 0;
+  // Medicamentos: cada etiqueta dice si es Bolsa o Bulto (null = genérica).
+  const tipos = tiposEnvasePorEtiqueta(pedido.productos, totalBultos);
 
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: [ANCHO_PT, ALTO_PT], margin: MARGEN_PT });
@@ -67,7 +77,7 @@ export async function generarEtiquetasPdf(
 
     numerosBulto.forEach((numeroBulto, indice) => {
       if (indice > 0) doc.addPage({ size: [ANCHO_PT, ALTO_PT], margin: MARGEN_PT });
-      dibujarEtiqueta(doc, pedido, numeroBulto, totalBultos);
+      dibujarEtiqueta(doc, pedido, numeroBulto, totalBultos, tipos?.[numeroBulto - 1] ?? null);
     });
 
     doc.end();

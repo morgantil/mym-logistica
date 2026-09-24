@@ -13,7 +13,9 @@ export interface ExcelLeido {
 }
 
 export interface LectorExcelPort {
-  leer(buffer: Buffer): Promise<ExcelLeido>;
+  // `nombreHoja` opcional: sin él se lee la primera hoja (decisión 2026-09-24:
+  // Farmaet manda un libro con dos hojas y se importa la segunda).
+  leer(buffer: Buffer, nombreHoja?: string): Promise<ExcelLeido>;
 }
 
 export const LECTOR_EXCEL = Symbol("LECTOR_EXCEL");

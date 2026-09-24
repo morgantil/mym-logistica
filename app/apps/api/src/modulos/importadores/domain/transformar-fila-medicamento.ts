@@ -1,8 +1,9 @@
-import { TipoEnvase } from "@mym/shared-types";
+import { PrioridadPedido, TipoEnvase } from "@mym/shared-types";
 import { LineaExcelImportada } from "../../pedidos/domain/pedido";
-import { MapeoColumnas } from "./campo-canonico";
+import { CampoCanonico, MapeoColumnas } from "./campo-canonico";
 import { parseEnvaseDesdeTexto } from "./envase-medicamento-importado";
 import { FilaExcelCruda } from "./lector-excel.port";
+import { aplicarReglasImportacion, ReglaImportacion } from "./reglas-importacion";
 import { aTexto, extraerNotaDeCeldaFecha } from "./transformar-fila";
 
 export interface ResultadoTransformarFilaMedicamento {
@@ -21,15 +22,6 @@ function aNumeroOCero(valor: unknown): number {
   if (valor === null || valor === undefined) return 0;
   const numero = typeof valor === "number" ? valor : Number(String(valor).trim());
   return Number.isFinite(numero) && numero > 0 ? numero : 0;
-}
-
-function aBooleanoSiNo(valor: unknown): boolean | null {
-  const texto = aTexto(valor);
-  if (!texto) return null;
-  const normalizado = texto.trim().toUpperCase();
-  if (normalizado === "SI" || normalizado === "SÍ") return true;
-  if (normalizado === "NO") return false;
-  return null;
 }
 
 const DESCRIPCION_GENERICA: Record<TipoEnvase, string> = {
@@ -63,6 +55,9 @@ export function transformarFilaMedicamento(
   mapeo: MapeoColumnas,
   clienteId: string,
   fechaEntregaLote: string,
+  // Reglas de importación editables del cliente (ver reglas-importacion.ts) —
+  // vacío = ninguna, la fila se importa tal cual viene.
+  reglas: ReglaImportacion[] = [],
 ): ResultadoTransformarFilaMedicamento {
   const errores: string[] = [];
 
@@ -71,7 +66,11 @@ export function transformarFilaMedicamento(
     return encabezado ? filaCruda[encabezado] : undefined;
   };
 
-  const numeroAfiliado = aTexto(leer("numeroAfiliado"));
+  // Las reglas siempre se evalúan contra los valores crudos del Excel.
+  const leerTexto = (campo: CampoCanonico) => aTexto(leer(campo));
+  const porRegla = aplicarReglasImportacion(reglas, leerTexto);
+
+  const numeroAfiliado = porRegla.numeroAfiliado ?? aTexto(leer("numeroAfiliado"));
   const destinatario = aTexto(leer("destinatario"));
   const direccion = aTexto(leer("direccion"));
   const localidad = aTexto(leer("localidad"));
@@ -80,7 +79,8 @@ export function transformarFilaMedicamento(
   const ticket = aTexto(leer("ticket"));
   const receta = aTexto(leer("receta"));
   const tipoPedido = aTexto(leer("tipoPedido"));
-  const retiroDeReceta = aBooleanoSiNo(leer("retiroDeReceta"));
+  // Texto tal cual viene ("NO"), salvo que una regla del cliente lo pise (ej. R-0011 → "RR").
+  const retiroDeReceta = porRegla.retiroDeReceta ?? aTexto(leer("retiroDeReceta"));
   const tiempoDeEntrega = aTexto(leer("tiempoDeEntrega"));
   const horarioEntrega = aTexto(leer("horarioEntrega"));
 
@@ -126,6 +126,7 @@ export function transformarFilaMedicamento(
     retiroDeReceta,
     tiempoDeEntrega,
     horarioEntrega,
+    prioridad: porRegla.prioridad ?? PrioridadPedido.NORMAL,
   };
 
   return {

@@ -1,5 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { normalizarEncabezado } from "../domain/mapeo-columnas";
+import { TipoCoincidenciaRegla } from "../domain/reglas-importacion";
 import {
   SINONIMO_RECETA_REPOSITORIO,
   SinonimoReceta,
@@ -26,16 +27,35 @@ export class SinonimoRecetaService {
     return this.repositorio.resolver(normalizarEncabezado(valorCrudo));
   }
 
-  crear(valorOrigen: string, valorCanonico: string, usuarioId: string) {
+  crear(
+    valorOrigen: string,
+    valorCanonico: string,
+    tipoCoincidencia: TipoCoincidenciaRegla,
+    orden: number,
+    usuarioId: string,
+  ) {
     return this.repositorio.crear({
       valorOrigen: normalizarEncabezado(valorOrigen),
       valorCanonico: valorCanonico.trim(),
+      tipoCoincidencia,
+      orden,
       usuarioId,
     });
   }
 
-  actualizar(id: string, valorCanonico: string, usuarioId: string) {
-    return this.repositorio.actualizar(id, { valorCanonico: valorCanonico.trim(), usuarioId });
+  actualizar(
+    id: string,
+    valorCanonico: string,
+    tipoCoincidencia: TipoCoincidenciaRegla | undefined,
+    orden: number | undefined,
+    usuarioId: string,
+  ) {
+    return this.repositorio.actualizar(id, {
+      valorCanonico: valorCanonico.trim(),
+      tipoCoincidencia,
+      orden,
+      usuarioId,
+    });
   }
 
   eliminar(id: string) {

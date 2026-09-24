@@ -79,6 +79,16 @@ export const CAMPOS_OPCIONALES: CampoCanonico[] = [
   "cantidadBolsa",
 ];
 
+// Todos los campos canónicos (obligatorios + opcionales) — para validar el
+// `campoOrigen` de una ReglaImportacion contra una lista real.
+export const TODOS_LOS_CAMPOS_CANONICOS: CampoCanonico[] = [
+  ...new Set<CampoCanonico>([
+    ...CAMPOS_OBLIGATORIOS,
+    ...CAMPOS_OBLIGATORIOS_MEDICAMENTO,
+    ...CAMPOS_OPCIONALES,
+  ]),
+];
+
 // Mapeo resuelto: campo canónico -> nombre EXACTO del encabezado en el Excel
 // de ese cliente en particular. Esto es lo que se guarda en PerfilImportacion.
 export type MapeoColumnas = Partial<Record<CampoCanonico, string>>;

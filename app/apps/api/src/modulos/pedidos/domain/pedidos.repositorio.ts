@@ -1,4 +1,11 @@
-import { EstadoPedido, EstadoSimpliroute, EstadoValidacion, TipoEnvase, TipoServicio } from "@mym/shared-types";
+import {
+  EstadoPedido,
+  EstadoSimpliroute,
+  EstadoValidacion,
+  PrioridadPedido,
+  TipoEnvase,
+  TipoServicio,
+} from "@mym/shared-types";
 import { Pedido, PedidoFacturable, PedidoListado } from "./pedido";
 
 export interface DatosCrearPedido {
@@ -35,9 +42,14 @@ export interface DatosCrearPedido {
   receta: string | null;
   recetaResuelta: string | null;
   tipoPedido: string | null;
-  retiroDeReceta: boolean | null;
+  retiroDeReceta: string | null;
   tiempoDeEntrega: string | null;
   horarioEntrega: string | null;
+  prioridad: PrioridadPedido;
+  remito: string | null;
+  // Cantidad de bultos/etiquetas ya calculada al importar (medicamentos) —
+  // null = se carga a mano después, como siempre (pañales).
+  bultos: number | null;
 }
 
 export interface FiltroPedidos {
@@ -62,6 +74,7 @@ export interface FiltroPedidos {
   // AL MENOS una línea de ese envase (ver armarWhere en el adapter Prisma).
   tipoEnvase?: TipoEnvase;
   estadoSimpliroute?: EstadoSimpliroute;
+  prioridad?: PrioridadPedido;
   localidad?: string;
   // true = solo pedidos con `etiquetaImpresaEn` null. No se ofrece el
   // inverso ("con etiqueta impresa") porque no se pidió — se puede sumar
@@ -90,7 +103,12 @@ export type CampoOrdenPedido =
   | "chofer"
   | "validacion"
   | "simpliroute"
-  | "observaciones";
+  | "observaciones"
+  | "remito"
+  | "receta"
+  | "tipoPedido"
+  | "tiempoDeEntrega"
+  | "prioridad";
 
 export interface OrdenPedidos {
   campo: CampoOrdenPedido;
@@ -225,6 +243,9 @@ export interface PedidosRepositorio {
   // pedido" (ver validar-eliminacion.ts) la hace el service ANTES de llamar
   // acá — este método no vuelve a chequear nada, confía en el llamador.
   eliminar(id: string): Promise<void>;
+  // Decisión 2026-09-24: cambia la prioridad de varios pedidos de una vez
+  // (o de uno solo). Devuelve cuántos actualizó.
+  actualizarPrioridad(pedidoIds: string[], prioridad: PrioridadPedido, usuarioId: string): Promise<number>;
 }
 
 export const PEDIDOS_REPOSITORIO = Symbol("PEDIDOS_REPOSITORIO");

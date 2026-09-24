@@ -1,4 +1,4 @@
-import { EstadoPedido, EstadoSimpliroute, EstadoValidacion } from "@mym/shared-types";
+import { EstadoPedido, EstadoSimpliroute, EstadoValidacion, PrioridadPedido } from "@mym/shared-types";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -73,4 +73,32 @@ export { LABELS_ESTADO_PEDIDO, CLASES_TONO };
 // así que se pueden borrar; ENVIADO y ERROR no (decisión 2026-09-22).
 export function estadoBorrable(estado: EstadoSimpliroute): boolean {
   return estado === EstadoSimpliroute.NO_ENVIADO || estado === EstadoSimpliroute.NO_ENCONTRADO;
+}
+
+// Decisión 2026-09-24: Normal/Urgente/Crítica para todos los clientes. La fila
+// de la grilla se pinta según la prioridad (ver CLASE_FILA_PRIORIDAD).
+export const LABEL_PRIORIDAD: Record<PrioridadPedido, string> = {
+  [PrioridadPedido.NORMAL]: "Normal",
+  [PrioridadPedido.URGENTE]: "Urgente",
+  [PrioridadPedido.CRITICA]: "Crítica",
+};
+
+export const CLASE_FILA_PRIORIDAD: Record<PrioridadPedido, string | undefined> = {
+  [PrioridadPedido.NORMAL]: undefined,
+  [PrioridadPedido.URGENTE]: "bg-orange-50 hover:bg-orange-100/70 dark:bg-orange-500/10",
+  [PrioridadPedido.CRITICA]: "bg-red-100 hover:bg-red-200/70 dark:bg-red-500/15",
+};
+
+const CLASE_BADGE_PRIORIDAD: Record<PrioridadPedido, string> = {
+  [PrioridadPedido.NORMAL]: CLASES_TONO.gris,
+  [PrioridadPedido.URGENTE]: "bg-orange-100 text-orange-800 dark:bg-orange-500/15 dark:text-orange-400",
+  [PrioridadPedido.CRITICA]: "bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-400",
+};
+
+export function BadgePrioridad({ prioridad }: { prioridad: PrioridadPedido }) {
+  return (
+    <Badge variant="outline" className={cn("border-transparent", CLASE_BADGE_PRIORIDAD[prioridad])}>
+      {LABEL_PRIORIDAD[prioridad]}
+    </Badge>
+  );
 }

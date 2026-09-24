@@ -45,6 +45,21 @@ enum TipoServicioCliente {
   AMBOS
 }
 
+// Prioridad de un pedido (ver PrioridadPedido en @mym/shared-types).
+enum PrioridadPedido {
+  NORMAL
+  URGENTE
+  CRITICA
+}
+
+// Cómo se compara un valor contra el texto de una regla (ReglaImportacion,
+// SinonimoReceta) — siempre sin distinguir mayúsculas/acentos.
+enum TipoCoincidencia {
+  IGUAL
+  EMPIEZA_CON
+  CONTIENE
+}
+
 // Clasificación de un pedido de medicamentos para facturación — ver
 // @mym/shared-types para la regla completa (Bolsa+Bulto en el mismo pedido
 // se factura como Bulto).
@@ -187,6 +202,7 @@ model Cliente {
   importaciones                ImportacionExcel[]
   usuariosPermitidos           UsuarioCliente[]
   perfilesImportacion          PerfilImportacion[]
+  reglasImportacion            ReglaImportacion[]
   combinacionesComoMedicamento CombinacionUnificacionClientes[] @relation("CombinacionMedicamento")
   combinacionesComoPanal       CombinacionUnificacionClientes[] @relation("CombinacionPanal")
   montosUnificadoMedicamento   MontoUnificadoMedicamento[]
@@ -208,6 +224,9 @@ model PerfilImportacion {
   // formato totalmente distinto — uno de pañales, otro de medicamentos — y
   // cada uno necesita su propio mapeo de columnas guardado por separado.
   tipoServicio  TipoServicio @default(PANAL)
+  // Decisión 2026-09-24: hoja del Excel a leer (Farmaet manda un libro con
+  // dos hojas y la que se importa es la segunda). Null = la primera.
+  nombreHoja    String?
   mapeoColumnas Json // Record<CampoCanonico, string> — ver modulos/importadores/domain/campo-canonico.ts
 
   creadoEn         DateTime @default(now())
@@ -232,8 +251,14 @@ model PerfilImportacion {
 // mande, salvo que aparezca un caso real que diga lo contrario.
 model SinonimoReceta {
   id            String @id @default(uuid())
-  valorOrigen   String @unique
+  valorOrigen   String
   valorCanonico String
+  // Decisión 2026-09-24: además de "es igual a", se puede definir "empieza
+  // con" / "contiene" (Farmaet manda "RR EV", "ENV PREP ...", etc. — todo lo
+  // que empieza con EV o ENV es digital). Si varias reglas aplican a un mismo
+  // valor gana la de menor `orden` (a igual orden, la más larga).
+  tipoCoincidencia TipoCoincidencia @default(IGUAL)
+  orden            Int              @default(0)
 
   creadoEn         DateTime  @default(now())
   actualizadoEn    DateTime  @updatedAt
@@ -241,7 +266,46 @@ model SinonimoReceta {
   actualizadoPorId String?
   eliminadoEn      DateTime?
 
+  @@unique([valorOrigen, tipoCoincidencia])
   @@map("sinonimos_receta")
+}
+
+// Reglas de importación editables por el usuario, por cliente y tipo de
+// servicio (misma clave que PerfilImportacion) — decisión 2026-09-24 (Leonardo:
+// "que el usuario pueda definirlo", nada de reglas de un cliente fijas en
+// código). Ejemplos reales: Bella Vista → si Remito contiene "R-0011" entonces
+// Retiro de receta = "RR"; Farmaet → si Tiempo de entrega empieza con
+// "URGENCIA" entonces Prioridad = URGENTE; Bella Vista → Nº de afiliado que
+// empieza con "OSDE" se le quita ese prefijo.
+model ReglaImportacion {
+  id           String       @id @default(uuid())
+  clienteId    String
+  tipoServicio TipoServicio @default(PANAL)
+  // Campo canónico contra el que se compara (ver CampoCanonico en
+  // modulos/importadores/domain/campo-canonico.ts) — ej. "ticket" (remito),
+  // "tiempoDeEntrega", "numeroAfiliado".
+  campoOrigen      String
+  tipoCoincidencia TipoCoincidencia @default(CONTIENE)
+  valor            String
+  // ASIGNAR_VALOR: pone `valorDestino` en `campoDestino` ("retiroDeReceta" o
+  // "prioridad"). QUITAR_PREFIJO: saca `valor` del comienzo de `campoDestino`
+  // (hoy solo "numeroAfiliado"), `valorDestino` no se usa.
+  accion       String @default("ASIGNAR_VALOR")
+  campoDestino String
+  valorDestino String @default("")
+  orden        Int    @default(0)
+  activa       Boolean @default(true)
+
+  creadoEn         DateTime  @default(now())
+  actualizadoEn    DateTime  @updatedAt
+  creadoPorId      String?
+  actualizadoPorId String?
+  eliminadoEn      DateTime?
+
+  cliente Cliente @relation(fields: [clienteId], references: [id])
+
+  @@index([clienteId, tipoServicio])
+  @@map("reglas_importacion")
 }
 
 // Tarifas por cliente y zona tarifaria, con vigencia para mantener histórico
@@ -533,9 +597,10 @@ model Pedido {
   // Se importa tal cual viene, sin transformar — decisión explícita de
   // Leonardo (valores reales: "RETIRO DE RECETA", "DT ESP", "PREP_HELADERA").
   tipoPedido           String?
-  // Columna propia en Bella Vista (SI/NO); en Farmaet este concepto viene
-  // como un valor de "tipoPedido" en vez de una columna aparte.
-  retiroDeReceta       Boolean?
+  // Columna propia en Bella Vista ("NO", o "RR" por una ReglaImportacion —
+  // decisión 2026-09-24, antes era SI/NO booleano); en Farmaet este concepto
+  // viene como un valor de "tipoPedido" en vez de una columna aparte.
+  retiroDeReceta       String?
   // Dispara Urgente/Crítica (§13.15) — valores reales: "72 HS HABITUAL" vs
   // "URGENCIA 24 HS"/"URGENCIA 48 HS".
   tiempoDeEntrega      String?
@@ -543,6 +608,8 @@ model Pedido {
   // fecha real del pedido, esa siempre es la que informa el usuario al
   // importar (ver CAMPOS_OPCIONALES en campo-canonico.ts).
   horarioEntrega       String?
+  // Decisión 2026-09-24: Normal/Urgente/Crítica, para todos los clientes.
+  prioridad            PrioridadPedido @default(NORMAL)
   // Cuándo se imprimió por última vez alguna etiqueta de este pedido — null =
   // nunca. §8.1 funcional v6: "estado de impresión de la etiqueta" en la
   // pantalla de Embalaje y Despacho. No impide reimprimir, solo informa.

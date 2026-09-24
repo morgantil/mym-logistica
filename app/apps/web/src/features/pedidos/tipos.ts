@@ -1,4 +1,11 @@
-import type { EstadoPedido, EstadoSimpliroute, EstadoValidacion, TipoServicio } from "@mym/shared-types";
+import type {
+  EstadoPedido,
+  EstadoSimpliroute,
+  EstadoValidacion,
+  PrioridadPedido,
+  TipoEnvase,
+  TipoServicio,
+} from "@mym/shared-types";
 
 export interface ProductoPedido {
   codigo: string | null;
@@ -8,6 +15,8 @@ export interface ProductoPedido {
   // puntual — puede diferir entre productos de un mismo pedido si vinieron
   // de órdenes de origen distintas agrupadas en la misma entrega.
   ticket: string | null;
+  // Solo medicamentos: Bolsa o Bulto de esta línea.
+  tipoEnvase: TipoEnvase | null;
 }
 
 // Espejo de PedidoListado (apps/api/src/modulos/pedidos/domain/pedido.ts) — lo
@@ -37,6 +46,17 @@ export interface PedidoListado {
   // ResolverDireccionDialog).
   alertaDireccionPendiente: boolean;
   etiquetaImpresaEn: string | null;
+  // Decisión 2026-09-24: Normal/Urgente/Crítica — pinta la fila de la grilla.
+  prioridad: PrioridadPedido;
+  // Solo medicamentos (null para pañales). Si un pedido agrupa varias
+  // líneas con valores distintos, vienen separados por " / ".
+  remito: string | null;
+  receta: string | null;
+  recetaResuelta: string | null;
+  tipoPedido: string | null;
+  retiroDeReceta: string | null;
+  tiempoDeEntrega: string | null;
+  horarioEntrega: string | null;
   // Cuántos pedidos del sistema de origen (Nº de ticket distintos) se
   // agruparon en este Pedido — decisión 2026-09-11, caso real Farmapal.
   cantidadPedidoOriginal: number;
@@ -72,7 +92,12 @@ export type CampoOrdenPedido =
   | "chofer"
   | "validacion"
   | "simpliroute"
-  | "observaciones";
+  | "observaciones"
+  | "remito"
+  | "receta"
+  | "tipoPedido"
+  | "tiempoDeEntrega"
+  | "prioridad";
 
 export interface PaginaPedidos {
   datos: PedidoListado[];

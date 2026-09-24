@@ -12,13 +12,15 @@ import {
   ImportacionExcelRepositorio,
 } from "../domain/importacion-excel.repositorio";
 import { LECTOR_EXCEL, LectorExcelPort } from "../domain/lector-excel.port";
-import { intentarMapeoAutomatico } from "../domain/mapeo-columnas";
+import { completarMapeoGuardado, intentarMapeoAutomatico } from "../domain/mapeo-columnas";
 import {
   PERFIL_IMPORTACION_REPOSITORIO,
   PerfilImportacionRepositorio,
 } from "../domain/perfil-importacion.repositorio";
 import { transformarFila } from "../domain/transformar-fila";
 import { transformarFilaMedicamento } from "../domain/transformar-fila-medicamento";
+import { PerfilGuardado } from "../domain/perfil-importacion.repositorio";
+import { ReglaImportacionService } from "./regla-importacion.service";
 import { SinonimoRecetaService } from "./sinonimo-receta.service";
 
 export interface ResultadoImportacionCompleta {
@@ -54,6 +56,7 @@ export class ImportarExcelService {
     private zonasChoferesService: ZonasChoferesService,
     private zonasTarifariasService: ZonasTarifariasService,
     private sinonimoRecetaService: SinonimoRecetaService,
+    private reglaImportacionService: ReglaImportacionService,
   ) {}
 
   // Punto de entrada. Elegir el cliente es obligatorio siempre — decisión
@@ -74,8 +77,17 @@ export class ImportarExcelService {
     fechaEntrega: string;
     clienteId: string;
     tipoServicio?: TipoServicio;
+    // Hoja del Excel a leer (decisión 2026-09-24). Si se informa, queda
+    // guardada en el perfil del cliente; si no, se usa la del perfil o la primera.
+    nombreHoja?: string;
   }): Promise<ResultadoImportacion> {
-    const { encabezados, filas } = await this.lectorExcel.leer(params.buffer);
+    const tipoServicio = params.tipoServicio ?? TipoServicio.PANAL;
+    const perfil = await this.perfilesRepositorio.buscarPorCliente(params.clienteId, tipoServicio);
+    const hojaInformada = params.nombreHoja?.trim() || undefined;
+    const { encabezados, filas } = await this.lectorExcel.leer(
+      params.buffer,
+      hojaInformada ?? perfil?.nombreHoja ?? undefined,
+    );
     return this.resolverMapeoYProcesar(
       params.clienteId,
       encabezados,
@@ -83,7 +95,9 @@ export class ImportarExcelService {
       params.nombreArchivo,
       params.usuarioId,
       params.fechaEntrega,
-      params.tipoServicio ?? TipoServicio.PANAL,
+      tipoServicio,
+      perfil,
+      hojaInformada,
     );
   }
 
@@ -98,13 +112,25 @@ export class ImportarExcelService {
     mapeoManual: MapeoColumnas;
     fechaEntrega: string;
     tipoServicio?: TipoServicio;
+    nombreHoja?: string;
   }): Promise<ResultadoImportacion> {
     const tipoServicio = params.tipoServicio ?? TipoServicio.PANAL;
-    const { encabezados, filas } = await this.lectorExcel.leer(params.buffer);
+    const perfil = await this.perfilesRepositorio.buscarPorCliente(params.clienteId, tipoServicio);
+    const hojaInformada = params.nombreHoja?.trim() || undefined;
+    const { encabezados, filas } = await this.lectorExcel.leer(
+      params.buffer,
+      hojaInformada ?? perfil?.nombreHoja ?? undefined,
+    );
     const { mapeo: automatico } = intentarMapeoAutomatico(encabezados, tipoServicio);
     const mapeoCompleto = { ...automatico, ...params.mapeoManual };
 
-    await this.perfilesRepositorio.guardar(params.clienteId, tipoServicio, mapeoCompleto, params.usuarioId);
+    await this.perfilesRepositorio.guardar(
+      params.clienteId,
+      tipoServicio,
+      mapeoCompleto,
+      params.usuarioId,
+      hojaInformada,
+    );
 
     return this.ejecutarPipeline(
       params.clienteId,
@@ -125,13 +151,23 @@ export class ImportarExcelService {
     usuarioId: string,
     fechaEntrega: string,
     tipoServicio: TipoServicio,
+    perfil: PerfilGuardado | null,
+    hojaInformada: string | undefined,
   ): Promise<ResultadoImportacion> {
-    const mapeoGuardado = await this.perfilesRepositorio.buscarPorCliente(clienteId, tipoServicio);
-    if (mapeoGuardado) {
+    if (perfil) {
+      if (hojaInformada && hojaInformada !== perfil.nombreHoja) {
+        await this.perfilesRepositorio.actualizarNombreHoja(clienteId, tipoServicio, hojaInformada, usuarioId);
+      }
+      // Suma columnas nuevas que este archivo trae y el perfil no tenía (ver
+      // completarMapeoGuardado) y las deja guardadas.
+      const mapeoCompleto = completarMapeoGuardado(perfil.mapeo, intentarMapeoAutomatico(encabezados, tipoServicio).mapeo);
+      if (Object.keys(mapeoCompleto).length > Object.keys(perfil.mapeo).length) {
+        await this.perfilesRepositorio.guardar(clienteId, tipoServicio, mapeoCompleto, usuarioId);
+      }
       return this.ejecutarPipeline(
         clienteId,
         filas,
-        mapeoGuardado,
+        mapeoCompleto,
         nombreArchivo,
         usuarioId,
         fechaEntrega,
@@ -154,7 +190,7 @@ export class ImportarExcelService {
     // El diccionario de sinónimos alcanzó para mapear todo solo — se guarda
     // igual como perfil confirmado, así la próxima importación de este cliente
     // ni siquiera vuelve a pasar por acá.
-    await this.perfilesRepositorio.guardar(clienteId, tipoServicio, mapeo, null);
+    await this.perfilesRepositorio.guardar(clienteId, tipoServicio, mapeo, null, hojaInformada);
     return this.ejecutarPipeline(clienteId, filas, mapeo, nombreArchivo, usuarioId, fechaEntrega, tipoServicio);
   }
 
@@ -177,6 +213,13 @@ export class ImportarExcelService {
       usuarioId,
     });
 
+    // Reglas editables del cliente (R-0011 → RR, URGENCIA → Urgente, quitar
+    // "OSDE" del afiliado…) — por ahora solo las usa el importador de medicamentos.
+    const reglas =
+      tipoServicio === TipoServicio.MEDICAMENTO
+        ? await this.reglaImportacionService.listarActivas(clienteId, tipoServicio)
+        : [];
+
     const lineasValidas: LineaExcelImportada[] = [];
     const filasConError: { fila: number; errores: string[] }[] = [];
 
@@ -185,7 +228,7 @@ export class ImportarExcelService {
     // TEMAS_PENDIENTES.md §13.19) — pañales (transformarFila) siempre 1.
     filas.forEach((filaCruda, indice) => {
       if (tipoServicio === TipoServicio.MEDICAMENTO) {
-        const resultado = transformarFilaMedicamento(filaCruda, mapeo, clienteId, fechaEntrega);
+        const resultado = transformarFilaMedicamento(filaCruda, mapeo, clienteId, fechaEntrega, reglas);
         if (resultado.valida) {
           lineasValidas.push(...resultado.lineas);
         } else {
@@ -300,7 +343,16 @@ export class ImportarExcelService {
       const cantidadPedidoOriginal =
         tipoServicio === TipoServicio.MEDICAMENTO ? grupo.totalUnidades : ticketsDistintos.length || 1;
 
-      const recetaResuelta = grupo.receta ? (await this.sinonimoRecetaService.resolver(grupo.receta))?.valorCanonico ?? null : null;
+      // Un pedido de Farmaet agrupa una línea por receta: cada valor distinto
+      // ("ENV", "EV"…) se resuelve por separado contra el ABM y se unen los
+      // resultados sin repetir.
+      const canonicas: string[] = [];
+      for (const valorReceta of grupo.receta ? grupo.receta.split(" / ") : []) {
+        const resuelta = (await this.sinonimoRecetaService.resolver(valorReceta))?.valorCanonico;
+        if (resuelta && !canonicas.includes(resuelta)) canonicas.push(resuelta);
+      }
+      const recetaResuelta = canonicas.length > 0 ? canonicas.join(" / ") : null;
+      const esMedicamento = tipoServicio === TipoServicio.MEDICAMENTO;
 
       await this.pedidosService.crear({
         clienteId,
@@ -334,6 +386,13 @@ export class ImportarExcelService {
         retiroDeReceta: grupo.retiroDeReceta,
         tiempoDeEntrega: grupo.tiempoDeEntrega,
         horarioEntrega: grupo.horarioEntrega,
+        prioridad: grupo.prioridad,
+        // Medicamentos: el remito sale de las líneas y la cantidad de
+        // bultos/etiquetas se calcula sola (una por Bolsa/Bulto, decisión
+        // 2026-09-24) — sigue siendo editable a mano después. Pañales sigue
+        // como siempre: sin bultos hasta que Logística los carga.
+        remito: esMedicamento && ticketsDistintos.length > 0 ? ticketsDistintos.join(", ") : null,
+        bultos: esMedicamento ? grupo.totalUnidades : null,
       });
       pedidosCreados += 1;
     }

@@ -37,6 +37,7 @@ export class ImportadoresController {
     @Body("clienteId") clienteId: string | undefined,
     @Body("fechaEntrega") fechaEntrega: string | undefined,
     @Body("tipoServicio") tipoServicio: TipoServicio | undefined,
+    @Body("nombreHoja") nombreHoja: string | undefined,
     @UsuarioActual() usuario: UsuarioAutenticado,
   ) {
     if (!archivo) {
@@ -57,6 +58,8 @@ export class ImportadoresController {
       // Opcional — default PANAL, ver ImportarExcelService (retrocompatible
       // con clientes que todavía no distinguen tipo de importación en el front).
       tipoServicio: tipoServicio || undefined,
+      // Opcional — hoja del libro a leer; se guarda en el perfil del cliente.
+      nombreHoja: nombreHoja || undefined,
     });
   }
 
@@ -72,6 +75,7 @@ export class ImportadoresController {
     @Body("mapeoManual") mapeoManualJson: string,
     @Body("fechaEntrega") fechaEntrega: string | undefined,
     @Body("tipoServicio") tipoServicio: TipoServicio | undefined,
+    @Body("nombreHoja") nombreHoja: string | undefined,
     @UsuarioActual() usuario: UsuarioAutenticado,
   ) {
     if (!archivo) {
@@ -101,6 +105,7 @@ export class ImportadoresController {
       mapeoManual,
       fechaEntrega,
       tipoServicio: tipoServicio || undefined,
+      nombreHoja: nombreHoja || undefined,
     });
   }
 }

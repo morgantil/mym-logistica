@@ -1,17 +1,28 @@
+import { TipoCoincidenciaRegla } from "./reglas-importacion";
+
 export interface SinonimoReceta {
   id: string;
   valorOrigen: string;
   valorCanonico: string;
+  // Decisión 2026-09-24: "es igual a" (lo de siempre), "empieza con" o "contiene".
+  tipoCoincidencia: TipoCoincidenciaRegla;
+  // Si varios sinónimos aplican al mismo valor gana el de menor `orden`; a
+  // igual orden, el de valorOrigen más largo (el más específico).
+  orden: number;
 }
 
 export interface DatosCrearSinonimoReceta {
   valorOrigen: string;
   valorCanonico: string;
+  tipoCoincidencia: TipoCoincidenciaRegla;
+  orden: number;
   usuarioId: string | null;
 }
 
 export interface DatosActualizarSinonimoReceta {
   valorCanonico: string;
+  tipoCoincidencia?: TipoCoincidenciaRegla;
+  orden?: number;
   usuarioId: string | null;
 }
 
@@ -20,9 +31,10 @@ export interface DatosActualizarSinonimoReceta {
 // realmente necesita en caliente; el resto es la pantalla de administración.
 export interface SinonimoRecetaRepositorio {
   listar(): Promise<SinonimoReceta[]>;
-  // Busca por `valorOrigen` ya normalizado (ver normalizarValorOrigen) — null
-  // si no hay ningún sinónimo cargado para ese valor todavía.
-  resolver(valorOrigenNormalizado: string): Promise<SinonimoReceta | null>;
+  // Recibe el valor crudo ya normalizado (ver normalizarEncabezado) y lo
+  // compara contra TODOS los sinónimos según su tipo de coincidencia — null si
+  // ninguno aplica todavía.
+  resolver(valorNormalizado: string): Promise<SinonimoReceta | null>;
   crear(datos: DatosCrearSinonimoReceta): Promise<SinonimoReceta>;
   actualizar(id: string, datos: DatosActualizarSinonimoReceta): Promise<SinonimoReceta>;
   eliminar(id: string): Promise<void>;

@@ -1,3 +1,4 @@
+import { PrioridadPedido } from "@mym/shared-types";
 import { LineaExcelImportada } from "../../pedidos/domain/pedido";
 import { CAMPOS_OBLIGATORIOS, MapeoColumnas } from "./campo-canonico";
 import { FilaExcelCruda } from "./lector-excel.port";
@@ -120,6 +121,7 @@ export function transformarFila(
       retiroDeReceta: null,
       tiempoDeEntrega: null,
       horarioEntrega: null,
+      prioridad: PrioridadPedido.NORMAL,
     },
   };
 }

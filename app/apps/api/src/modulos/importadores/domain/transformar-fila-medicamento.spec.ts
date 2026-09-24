@@ -1,5 +1,6 @@
-import { TipoEnvase } from "@mym/shared-types";
+import { PrioridadPedido, TipoEnvase } from "@mym/shared-types";
 import { MapeoColumnas } from "./campo-canonico";
+import { ReglaImportacion } from "./reglas-importacion";
 import { transformarFilaMedicamento } from "./transformar-fila-medicamento";
 
 const FECHA_LOTE = "2026-08-05";
@@ -139,8 +140,8 @@ describe("transformarFilaMedicamento — Bella Vista (Bulto y Bolsa en la misma 
     expect(bolsa?.ticket).toBe("R-0004-00046770");
   });
 
-  it("retiroDeReceta interpreta SI/NO como booleano", () => {
-    const filaNo = {
+  it("retiroDeReceta se guarda como texto tal cual viene", () => {
+    const fila = {
       NOMBRE: "Alguien",
       REMITO: "R1",
       "N° AFILIADO": "1",
@@ -150,14 +151,74 @@ describe("transformarFilaMedicamento — Bella Vista (Bulto y Bolsa en la misma 
       BULTO: 1,
       BOLSA: 0,
     };
-    const filaSi = { ...filaNo, REMITO: "R2", "RETIRO DE RECETA": "SI" };
 
-    expect(transformarFilaMedicamento(filaNo, MAPEO_BELLA_VISTA, "bella-vista", FECHA_LOTE).lineas[0].retiroDeReceta).toBe(
-      false,
+    expect(transformarFilaMedicamento(fila, MAPEO_BELLA_VISTA, "bella-vista", FECHA_LOTE).lineas[0].retiroDeReceta).toBe(
+      "NO",
     );
-    expect(transformarFilaMedicamento(filaSi, MAPEO_BELLA_VISTA, "bella-vista", FECHA_LOTE).lineas[0].retiroDeReceta).toBe(
-      true,
-    );
+  });
+
+  describe("reglas de importación del cliente", () => {
+    const filaBase = {
+      NOMBRE: "Alguien",
+      REMITO: "R-0011-00004550",
+      "N° AFILIADO": "OSDE61084055903",
+      DIRECCION: "Calle 1",
+      LOCALIDAD: "CABA",
+      "RETIRO DE RECETA": "NO",
+      BULTO: 1,
+      BOLSA: 0,
+    };
+    const reglaBase = {
+      id: "r",
+      clienteId: "bella-vista",
+      orden: 0,
+      activa: true,
+    };
+    const reglas: ReglaImportacion[] = [
+      {
+        ...reglaBase,
+        campoOrigen: "ticket",
+        tipoCoincidencia: "CONTIENE",
+        valor: "R-0011",
+        accion: "ASIGNAR_VALOR",
+        campoDestino: "retiroDeReceta",
+        valorDestino: "RR",
+      },
+      {
+        ...reglaBase,
+        id: "r2",
+        campoOrigen: "numeroAfiliado",
+        tipoCoincidencia: "EMPIEZA_CON",
+        valor: "OSDE",
+        accion: "QUITAR_PREFIJO",
+        campoDestino: "numeroAfiliado",
+        valorDestino: "",
+      },
+    ];
+
+    it("R-0011 pasa Retiro de receta a RR y se le saca OSDE al afiliado", () => {
+      const linea = transformarFilaMedicamento(filaBase, MAPEO_BELLA_VISTA, "bella-vista", FECHA_LOTE, reglas).lineas[0];
+      expect(linea.retiroDeReceta).toBe("RR");
+      expect(linea.numeroAfiliado).toBe("61084055903");
+    });
+
+    it("un remito R-0004 no cambia nada", () => {
+      const linea = transformarFilaMedicamento(
+        { ...filaBase, REMITO: "R-0004-00046770" },
+        MAPEO_BELLA_VISTA,
+        "bella-vista",
+        FECHA_LOTE,
+        reglas,
+      ).lineas[0];
+      expect(linea.retiroDeReceta).toBe("NO");
+    });
+
+    it("sin reglas la fila se importa tal cual", () => {
+      const linea = transformarFilaMedicamento(filaBase, MAPEO_BELLA_VISTA, "bella-vista", FECHA_LOTE).lineas[0];
+      expect(linea.retiroDeReceta).toBe("NO");
+      expect(linea.numeroAfiliado).toBe("OSDE61084055903");
+      expect(linea.prioridad).toBe(PrioridadPedido.NORMAL);
+    });
   });
 
   it("solo Bulto (Bolsa en 0) da una sola línea", () => {

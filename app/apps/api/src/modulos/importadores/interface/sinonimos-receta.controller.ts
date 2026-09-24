@@ -20,7 +20,13 @@ export class SinonimosRecetaController {
 
   @Post()
   crear(@Body() dto: CrearSinonimoRecetaDto, @UsuarioActual() usuario: UsuarioAutenticado) {
-    return this.sinonimoRecetaService.crear(dto.valorOrigen, dto.valorCanonico, usuario.id);
+    return this.sinonimoRecetaService.crear(
+      dto.valorOrigen,
+      dto.valorCanonico,
+      dto.tipoCoincidencia ?? "IGUAL",
+      dto.orden ?? 0,
+      usuario.id,
+    );
   }
 
   @Patch(":id")
@@ -29,7 +35,7 @@ export class SinonimosRecetaController {
     @Body() dto: ActualizarSinonimoRecetaDto,
     @UsuarioActual() usuario: UsuarioAutenticado,
   ) {
-    return this.sinonimoRecetaService.actualizar(id, dto.valorCanonico, usuario.id);
+    return this.sinonimoRecetaService.actualizar(id, dto.valorCanonico, dto.tipoCoincidencia, dto.orden, usuario.id);
   }
 
   @Delete(":id")

@@ -42,3 +42,33 @@ export interface ResultadoRequiereMapeoManual {
 }
 
 export type ResultadoImportacion = ResultadoImportacionCompleta | ResultadoRequiereMapeoManual;
+
+// --- Reglas de importación y sinónimos de receta (decisión 2026-09-24) ---
+// Espejo de apps/api/src/modulos/importadores/domain/reglas-importacion.ts.
+export type TipoCoincidencia = "IGUAL" | "EMPIEZA_CON" | "CONTIENE";
+export type AccionRegla = "ASIGNAR_VALOR" | "QUITAR_PREFIJO";
+export type CampoDestinoRegla = "retiroDeReceta" | "prioridad" | "numeroAfiliado";
+
+export interface ReglaImportacion {
+  id: string;
+  clienteId: string;
+  tipoServicio: "PANAL" | "MEDICAMENTO";
+  campoOrigen: CampoCanonico;
+  tipoCoincidencia: TipoCoincidencia;
+  valor: string;
+  accion: AccionRegla;
+  campoDestino: CampoDestinoRegla;
+  valorDestino: string;
+  orden: number;
+  activa: boolean;
+}
+
+export type DatosReglaImportacion = Omit<ReglaImportacion, "id">;
+
+export interface SinonimoReceta {
+  id: string;
+  valorOrigen: string;
+  valorCanonico: string;
+  tipoCoincidencia: TipoCoincidencia;
+  orden: number;
+}

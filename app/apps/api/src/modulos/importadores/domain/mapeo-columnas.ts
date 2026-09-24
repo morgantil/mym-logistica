@@ -63,3 +63,13 @@ export function intentarMapeoAutomatico(
 export function combinarMapeo(automatico: MapeoColumnas, manual: MapeoColumnas): MapeoColumnas {
   return { ...automatico, ...manual };
 }
+
+// Un perfil guardado quedó armado con las columnas del PRIMER archivo que se
+// importó de ese cliente. Si un archivo posterior trae columnas nuevas que el
+// diccionario reconoce (caso real Farmaet 2026-09-24: la primera hoja no traía
+// "Tiempo de entrega" ni "Teléfono", la segunda sí), sin esto se ignorarían en
+// silencio para siempre — y con ellas la regla de urgencia. Lo ya guardado
+// SIEMPRE gana; solo se suman campos que el perfil todavía no tenía.
+export function completarMapeoGuardado(guardado: MapeoColumnas, automatico: MapeoColumnas): MapeoColumnas {
+  return { ...automatico, ...guardado };
+}

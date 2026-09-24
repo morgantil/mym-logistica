@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
-import { EstadoPedido } from "@mym/shared-types";
+import { EstadoPedido, PrioridadPedido } from "@mym/shared-types";
 import { PrismaService } from "../../../common/prisma/prisma.service";
 import { ConflictoVersionError } from "../domain/conflicto-version.error";
 import { Pedido, PedidoFacturable, PedidoListado } from "../domain/pedido";
@@ -24,7 +24,7 @@ import {
 const INCLUDE_LISTADO = {
   cliente: { select: { nombre: true } },
   destinatario: { select: { nombre: true, telefono: true } },
-  productos: { select: { codigo: true, descripcion: true, cantidad: true, ticket: true } },
+  productos: { select: { codigo: true, descripcion: true, cantidad: true, ticket: true, tipoEnvase: true } },
 } satisfies Prisma.PedidoInclude;
 
 type FilaPedidoListado = Prisma.PedidoGetPayload<{ include: typeof INCLUDE_LISTADO }>;
@@ -36,7 +36,7 @@ function mapearListado(fila: FilaPedidoListado): PedidoListado {
     clienteNombre: cliente.nombre,
     destinatarioNombre: destinatario.nombre,
     destinatarioTelefono: destinatario.telefono,
-    productos: fila.productos,
+    productos: fila.productos as unknown as PedidoListado["productos"],
   };
 }
 
@@ -83,6 +83,9 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
       ...(filtro.choferId ? { choferId: filtro.choferId } : {}),
       ...(filtro.estadoSimpliroute
         ? { estadoSimpliroute: filtro.estadoSimpliroute as unknown as Prisma.EnumEstadoSimplirouteFilter }
+        : {}),
+      ...(filtro.prioridad
+        ? { prioridad: filtro.prioridad as unknown as Prisma.EnumPrioridadPedidoFilter }
         : {}),
       ...(filtro.localidad ? { localidad: filtro.localidad } : {}),
       ...(filtro.sinEtiquetaImpresa ? { etiquetaImpresaEn: null } : {}),
@@ -142,6 +145,16 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
         return { estadoSimpliroute: direccion };
       case "observaciones":
         return { observaciones: direccion };
+      case "remito":
+        return { remito: direccion };
+      case "receta":
+        return { receta: direccion };
+      case "tipoPedido":
+        return { tipoPedido: direccion };
+      case "tiempoDeEntrega":
+        return { tiempoDeEntrega: direccion };
+      case "prioridad":
+        return { prioridad: direccion };
     }
   }
 
@@ -206,6 +219,9 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
         retiroDeReceta: datos.retiroDeReceta,
         tiempoDeEntrega: datos.tiempoDeEntrega,
         horarioEntrega: datos.horarioEntrega,
+        prioridad: datos.prioridad as unknown as Prisma.PedidoCreateInput["prioridad"],
+        remito: datos.remito,
+        bultos: datos.bultos,
         productos: {
           create: datos.productos.map((producto) => ({
             codigo: producto.codigo,
@@ -384,6 +400,18 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
     // El middleware de borrado lógico reescribe esto como un update seteando
     // eliminadoEn — nunca borra la fila físicamente (ver soft-delete.middleware.ts).
     await this.prisma.pedido.delete({ where: { id } });
+  }
+
+  async actualizarPrioridad(pedidoIds: string[], prioridad: PrioridadPedido, usuarioId: string): Promise<number> {
+    const { count } = await this.prisma.pedido.updateMany({
+      where: { id: { in: pedidoIds }, eliminadoEn: null },
+      data: {
+        prioridad: prioridad as unknown as Prisma.PedidoUpdateManyMutationInput["prioridad"],
+        actualizadoPorId: usuarioId,
+        version: { increment: 1 },
+      },
+    });
+    return count;
   }
 
   async listarPendientesDeSincronizar(): Promise<PedidoParaSincronizar[]> {

@@ -1,4 +1,4 @@
-import { EstadoPedido, EstadoSimpliroute, EstadoValidacion, TipoServicio } from "@mym/shared-types";
+import { EstadoPedido, EstadoSimpliroute, EstadoValidacion, TipoServicio, PrioridadPedido } from "@mym/shared-types";
 import { Pedido } from "./pedido";
 import { validarPedidoParaEliminar } from "./validar-eliminacion";
 
@@ -34,6 +34,14 @@ function pedido(overrides: Partial<Pedido> = {}): Pedido {
     alertaDireccionPendiente: false,
     etiquetaImpresaEn: null,
     cantidadPedidoOriginal: 1,
+    prioridad: PrioridadPedido.NORMAL,
+    remito: null,
+    receta: null,
+    recetaResuelta: null,
+    tipoPedido: null,
+    retiroDeReceta: null,
+    tiempoDeEntrega: null,
+    horarioEntrega: null,
     version: 0,
     creadoEn: new Date(),
     ...overrides,

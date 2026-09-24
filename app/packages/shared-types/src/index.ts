@@ -32,6 +32,16 @@ export enum TipoEnvase {
   BULTO = "BULTO",
 }
 
+// Prioridad de un pedido — decisión 2026-09-24 (Leonardo, cliente): regla
+// general para todos los clientes, se puede marcar a mano o derivar de una
+// ReglaImportacion (ej. "URGENCIA 24 HS" → URGENTE). La grilla pinta la fila
+// según este valor.
+export enum PrioridadPedido {
+  NORMAL = "NORMAL",
+  URGENTE = "URGENTE",
+  CRITICA = "CRITICA",
+}
+
 // Clasificación geográfica simple (CABA vs. interior/provincia) que devuelve
 // GeorefArAdapter al resolver una dirección — NO refleja un enum de Prisma
 // (a partir de 2026-08-17 la unidad de facturación es ZonaTarifaria, una

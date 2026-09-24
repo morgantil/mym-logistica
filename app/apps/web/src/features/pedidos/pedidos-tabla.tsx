@@ -5,7 +5,7 @@ import { flexRender } from "@tanstack/react-table";
 import { getCoreRowModel, useLegacyTable, type LegacyColumnDef } from "@tanstack/react-table/legacy";
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronUp, SlidersHorizontal, X } from "lucide-react";
 import { toast } from "sonner";
-import { EstadoPedido, EstadoSimpliroute, TipoEnvase, TipoServicio } from "@mym/shared-types";
+import { EstadoPedido, EstadoSimpliroute, PrioridadPedido, TipoEnvase, TipoServicio } from "@mym/shared-types";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -31,6 +31,7 @@ import { listarClientesActivos } from "@/features/clientes/api";
 import { listarChoferes, listarZonas } from "@/features/zonas-choferes/api";
 import {
   actualizarColumnasPedidos,
+  actualizarPrioridad,
   eliminarPedido,
   eliminarPedidos,
   listarLocalidadesPedidos,
@@ -44,9 +45,12 @@ import {
   BadgeEstadoPedido,
   BadgeEstadoSimpliroute,
   BadgeEstadoValidacion,
+  BadgePrioridad,
+  CLASE_FILA_PRIORIDAD,
   estadoBorrable,
   LABEL_ESTADO_PEDIDO,
   LABEL_ESTADO_SIMPLIROUTE,
+  LABEL_PRIORIDAD,
 } from "./estado-labels";
 import type { CampoOrdenPedido, PedidoListado } from "./tipos";
 
@@ -94,7 +98,12 @@ const formateadorFechaHora = new Intl.DateTimeFormat("es-AR", {
 const IDS_COLUMNAS_DEFAULT = [
   "cliente",
   "estado",
+  "prioridad",
   "numero",
+  "remito",
+  "receta",
+  "tipoPedido",
+  "tiempoDeEntrega",
   "afiliado",
   "destinatario",
   "telefono",
@@ -114,7 +123,12 @@ const IDS_COLUMNAS_DEFAULT = [
 const LABEL_COLUMNA: Record<(typeof IDS_COLUMNAS_DEFAULT)[number], string> = {
   cliente: "Cliente",
   estado: "Estado",
+  prioridad: "Prioridad",
   numero: "Nº Pedido",
+  remito: "Remito",
+  receta: "Receta",
+  tipoPedido: "Tipo de pedido",
+  tiempoDeEntrega: "Tiempo de entrega",
   afiliado: "Nº afiliado",
   destinatario: "Destinatario",
   telefono: "Teléfono",
@@ -204,6 +218,7 @@ export function PedidosTabla() {
   const [choferId, setChoferId] = useState(SENTINEL_TODOS);
   const [tipoEnvase, setTipoEnvase] = useState(SENTINEL_TODOS);
   const [estadoSimpliroute, setEstadoSimpliroute] = useState(SENTINEL_TODOS);
+  const [prioridad, setPrioridad] = useState(SENTINEL_TODOS);
   const [localidad, setLocalidad] = useState(SENTINEL_TODOS);
   const [sinEtiquetaImpresa, setSinEtiquetaImpresa] = useState(false);
 
@@ -253,6 +268,7 @@ export function PedidosTabla() {
     choferId,
     tipoEnvase,
     estadoSimpliroute,
+    prioridad,
     localidad,
     sinEtiquetaImpresa,
   ]);
@@ -277,6 +293,7 @@ export function PedidosTabla() {
         choferId,
         tipoEnvase,
         estadoSimpliroute,
+        prioridad,
         localidad,
         sinEtiquetaImpresa,
       },
@@ -298,6 +315,7 @@ export function PedidosTabla() {
         tipoEnvase: tipoEnvase === SENTINEL_TODOS ? undefined : (tipoEnvase as TipoEnvase),
         estadoSimpliroute:
           estadoSimpliroute === SENTINEL_TODOS ? undefined : (estadoSimpliroute as EstadoSimpliroute),
+        prioridad: prioridad === SENTINEL_TODOS ? undefined : (prioridad as PrioridadPedido),
         localidad: localidad === SENTINEL_TODOS ? undefined : localidad,
         sinEtiquetaImpresa: sinEtiquetaImpresa || undefined,
         ordenarPor: orden?.campo,
@@ -352,6 +370,17 @@ export function PedidosTabla() {
     onError: () => toast.error("No se pudo borrar. Probá de nuevo en unos segundos."),
   });
 
+  const mutacionPrioridad = useMutation({
+    mutationFn: ({ ids, prioridad }: { ids: string[]; prioridad: PrioridadPedido }) =>
+      actualizarPrioridad(ids, prioridad),
+    onSuccess: ({ actualizados }, { prioridad }) => {
+      toast.success(`${actualizados} pedido(s) marcado(s) como ${LABEL_PRIORIDAD[prioridad].toLowerCase()}.`);
+      setSeleccionados(new Set());
+      queryClient.invalidateQueries({ queryKey: ["pedidos"] });
+    },
+    onError: () => toast.error("No se pudo cambiar la prioridad. Probá de nuevo en unos segundos."),
+  });
+
   const definicionesColumna: Record<(typeof IDS_COLUMNAS_DEFAULT)[number], LegacyColumnDef<PedidoListado>> = useMemo(
     () => ({
       cliente: { id: "cliente", header: "Cliente", cell: ({ row }) => row.original.clienteNombre },
@@ -360,7 +389,50 @@ export function PedidosTabla() {
         header: "Estado",
         cell: ({ row }) => <BadgeEstadoPedido estado={row.original.estado} />,
       },
+      prioridad: {
+        id: "prioridad",
+        header: "Prioridad",
+        cell: ({ row }) =>
+          puedeEliminar ? (
+            <Select
+              value={row.original.prioridad}
+              onValueChange={(valor) =>
+                mutacionPrioridad.mutate({ ids: [row.original.id], prioridad: valor as PrioridadPedido })
+              }
+              disabled={mutacionPrioridad.isPending}
+            >
+              <SelectTrigger
+                size="sm"
+                className="h-7 w-28 border-none bg-transparent px-1 shadow-none"
+                aria-label={`Prioridad del pedido de ${row.original.destinatarioNombre}`}
+              >
+                <BadgePrioridad prioridad={row.original.prioridad} />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.values(PrioridadPedido).map((valor) => (
+                  <SelectItem key={valor} value={valor}>
+                    {LABEL_PRIORIDAD[valor]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <BadgePrioridad prioridad={row.original.prioridad} />
+          ),
+      },
       numero: { id: "numero", header: "Nº Pedido", cell: ({ row }) => row.original.numero },
+      remito: { id: "remito", header: "Remito", cell: ({ row }) => row.original.remito ?? "—" },
+      receta: {
+        id: "receta",
+        header: "Receta",
+        cell: ({ row }) => row.original.recetaResuelta ?? row.original.receta ?? "—",
+      },
+      tipoPedido: { id: "tipoPedido", header: "Tipo de pedido", cell: ({ row }) => row.original.tipoPedido ?? "—" },
+      tiempoDeEntrega: {
+        id: "tiempoDeEntrega",
+        header: "Tiempo de entrega",
+        cell: ({ row }) => row.original.tiempoDeEntrega ?? "—",
+      },
       afiliado: { id: "afiliado", header: "Nº afiliado", cell: ({ row }) => row.original.numeroAfiliado },
       destinatario: {
         id: "destinatario",
@@ -415,7 +487,7 @@ export function PedidosTabla() {
         cell: ({ row }) => row.original.observaciones ?? "—",
       },
     }),
-    [puedeEditarBultos],
+    [puedeEditarBultos, puedeEliminar, mutacionPrioridad],
   );
 
   const columnas = useMemo<LegacyColumnDef<PedidoListado>[]>(() => {
@@ -424,12 +496,11 @@ export function PedidosTabla() {
       id: "seleccion",
       header: "",
       cell: ({ row }) => {
-        const elegible = estadoBorrable(row.original.estadoSimpliroute);
         return (
           <Checkbox
             checked={seleccionados.has(row.original.id)}
             onCheckedChange={() => alternarSeleccion(row.original.id)}
-            disabled={!puedeEliminar || !elegible}
+            disabled={!puedeEliminar}
             aria-label={`Seleccionar pedido de ${row.original.destinatarioNombre}`}
           />
         );
@@ -474,6 +545,12 @@ export function PedidosTabla() {
     columns: columnas,
     getCoreRowModel: getCoreRowModel(),
   });
+
+  // Los seleccionados que todavía se pueden borrar (no enviados a SimpliRoute) —
+  // seleccionar sirve tanto para marcar prioridad (cualquier pedido) como para borrar.
+  const idsBorrablesSeleccionados = (data?.datos ?? [])
+    .filter((pedido) => seleccionados.has(pedido.id) && estadoBorrable(pedido.estadoSimpliroute))
+    .map((pedido) => pedido.id);
 
   const total = data?.total ?? 0;
   const totalPaginas = Math.max(1, Math.ceil(total / POR_PAGINA));
@@ -687,6 +764,23 @@ export function PedidosTabla() {
             </div>
 
             <div className="flex flex-col gap-1">
+              <Label className="text-xs text-muted-foreground">Prioridad</Label>
+              <Select value={prioridad} onValueChange={setPrioridad}>
+                <SelectTrigger className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={SENTINEL_TODOS}>Todas</SelectItem>
+                  {Object.values(PrioridadPedido).map((valor) => (
+                    <SelectItem key={valor} value={valor}>
+                      {LABEL_PRIORIDAD[valor]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-1">
               <Label className="text-xs text-muted-foreground">Estado SimpliRoute</Label>
               <Select value={estadoSimpliroute} onValueChange={setEstadoSimpliroute}>
                 <SelectTrigger className="w-44">
@@ -736,23 +830,47 @@ export function PedidosTabla() {
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm text-muted-foreground">{total} pedido{total === 1 ? "" : "s"}</p>
           {puedeEliminar && seleccionados.size > 0 && (
-            <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              disabled={mutacionEliminarVarios.isPending}
-              onClick={() => {
-                if (
-                  window.confirm(
-                    `¿Borrar ${seleccionados.size} pedido(s)? Solo se borran los que todavía no llegaron a SimpliRoute.`,
-                  )
-                ) {
-                  mutacionEliminarVarios.mutate(Array.from(seleccionados));
+            <div className="flex flex-wrap items-center gap-2">
+              <Select
+                value=""
+                onValueChange={(valor) =>
+                  mutacionPrioridad.mutate({ ids: Array.from(seleccionados), prioridad: valor as PrioridadPedido })
                 }
-              }}
-            >
-              {mutacionEliminarVarios.isPending ? "Borrando…" : `Borrar seleccionados (${seleccionados.size})`}
-            </Button>
+                disabled={mutacionPrioridad.isPending}
+              >
+                <SelectTrigger size="sm" className="w-48" aria-label="Marcar seleccionados como">
+                  <SelectValue placeholder={`Marcar (${seleccionados.size}) como…`} />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.values(PrioridadPedido).map((valor) => (
+                    <SelectItem key={valor} value={valor}>
+                      {LABEL_PRIORIDAD[valor]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {idsBorrablesSeleccionados.length > 0 && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  disabled={mutacionEliminarVarios.isPending}
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        `¿Borrar ${idsBorrablesSeleccionados.length} pedido(s)? Solo se borran los que todavía no llegaron a SimpliRoute.`,
+                      )
+                    ) {
+                      mutacionEliminarVarios.mutate(idsBorrablesSeleccionados);
+                    }
+                  }}
+                >
+                  {mutacionEliminarVarios.isPending
+                    ? "Borrando…"
+                    : `Borrar seleccionados (${idsBorrablesSeleccionados.length})`}
+                </Button>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -822,9 +940,10 @@ export function PedidosTabla() {
                       // SimpliRoute no tuvo confianza geolocalizando la
                       // dirección del Excel al enviar este pedido — riesgo
                       // real de mandar al chofer a un lugar equivocado.
-                      row.original.geocodeAlert && row.original.geocodeAlert !== "no alert"
+                      CLASE_FILA_PRIORIDAD[row.original.prioridad] ??
+                      (row.original.geocodeAlert && row.original.geocodeAlert !== "no alert"
                         ? "bg-amber-50 dark:bg-amber-500/10"
-                        : undefined
+                        : undefined)
                     }
                   >
                     {row.getVisibleCells().map((cell) => (

@@ -15,6 +15,7 @@ import { Rol } from "@prisma/client";
 import { Roles } from "../../../common/decorators/roles.decorator";
 import { UsuarioActual, UsuarioAutenticado } from "../../../common/decorators/usuario-actual.decorator";
 import { PedidosService } from "../application/pedidos.service";
+import { ActualizarPrioridadDto } from "./dto/actualizar-prioridad.dto";
 import { ActualizarBultosDto } from "./dto/actualizar-bultos.dto";
 import { EliminarPedidosDto } from "./dto/eliminar-pedidos.dto";
 import { EnviarSimpliRouteDto } from "./dto/enviar-simpliroute.dto";
@@ -44,6 +45,7 @@ export class PedidosController {
         choferId: query.choferId,
         tipoEnvase: query.tipoEnvase,
         estadoSimpliroute: query.estadoSimpliroute,
+        prioridad: query.prioridad,
         localidad: query.localidad,
         sinEtiquetaImpresa: query.sinEtiquetaImpresa,
       },
@@ -65,6 +67,14 @@ export class PedidosController {
   @Get("revision")
   revisarPendientesDeEnvio(@UsuarioActual() usuario: UsuarioAutenticado) {
     return this.pedidosService.revisarPendientesDeEnvio(usuario.id);
+  }
+
+  // Decisión 2026-09-24: marcar pedidos como Normal/Urgente/Crítica, uno o
+  // varios a la vez — mismos roles que operan pedidos día a día.
+  @Roles(Rol.OPERACIONES, Rol.LOGISTICA, Rol.ADMINISTRACION)
+  @Patch("prioridad")
+  actualizarPrioridad(@Body() dto: ActualizarPrioridadDto, @UsuarioActual() usuario: UsuarioAutenticado) {
+    return this.pedidosService.actualizarPrioridad(dto.pedidoIds, dto.prioridad, usuario.id);
   }
 
   // §16 funcional: carga de bultos desde la grilla — rol Logística.

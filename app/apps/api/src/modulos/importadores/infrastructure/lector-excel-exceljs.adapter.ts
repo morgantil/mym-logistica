@@ -2,12 +2,12 @@ import { BadRequestException, Injectable } from "@nestjs/common";
 import ExcelJS from "exceljs";
 import { ExcelLeido, FilaExcelCruda, LectorExcelPort } from "../domain/lector-excel.port";
 
-// Toma la PRIMERA hoja del archivo. La primera fila no vacía se toma como
+// Toma la hoja indicada (o la PRIMERA si no se indica). La primera fila no vacía se toma como
 // encabezados. No asume nada más sobre la estructura — eso es justamente
 // lo que resuelve mapeo-columnas.ts después.
 @Injectable()
 export class LectorExcelExceljsAdapter implements LectorExcelPort {
-  async leer(buffer: Buffer): Promise<ExcelLeido> {
+  async leer(buffer: Buffer, nombreHoja?: string): Promise<ExcelLeido> {
     const workbook = new ExcelJS.Workbook();
     try {
       await workbook.xlsx.load(buffer as unknown as ExcelJS.Buffer);
@@ -15,9 +15,18 @@ export class LectorExcelExceljsAdapter implements LectorExcelPort {
       throw new BadRequestException("El archivo no es un Excel válido (.xlsx).");
     }
 
-    const hoja = workbook.worksheets[0];
+    const nombreBuscado = nombreHoja?.trim();
+    const hoja = nombreBuscado
+      ? workbook.worksheets.find((candidata) => candidata.name.trim().toLowerCase() === nombreBuscado.toLowerCase())
+      : workbook.worksheets[0];
     if (!hoja) {
-      throw new BadRequestException("El Excel no tiene ninguna hoja.");
+      throw new BadRequestException(
+        nombreBuscado
+          ? `El Excel no tiene una hoja llamada "${nombreBuscado}". Hojas disponibles: ${workbook.worksheets
+              .map((candidata) => `"${candidata.name}"`)
+              .join(", ")}.`
+          : "El Excel no tiene ninguna hoja.",
+      );
     }
 
     // `includeEmpty: true` es imprescindible acá — si la primera columna (A)

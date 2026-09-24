@@ -1,4 +1,11 @@
-import type { EstadoPedido, EstadoSimpliroute, ResolucionDireccion, TipoEnvase, TipoServicio } from "@mym/shared-types";
+import type {
+  EstadoPedido,
+  EstadoSimpliroute,
+  PrioridadPedido,
+  ResolucionDireccion,
+  TipoEnvase,
+  TipoServicio,
+} from "@mym/shared-types";
 import { apiClient } from "@/lib/api-client";
 import type {
   CampoOrdenPedido,
@@ -25,6 +32,7 @@ export interface ParametrosListarPedidos {
   choferId?: string;
   tipoEnvase?: TipoEnvase;
   estadoSimpliroute?: EstadoSimpliroute;
+  prioridad?: PrioridadPedido;
   localidad?: string;
   sinEtiquetaImpresa?: boolean;
   ordenarPor?: CampoOrdenPedido;
@@ -83,6 +91,15 @@ export async function enviarASimpliRoute(pedidoIds: string[]): Promise<Resultado
 // Borrado lógico — solo pedidos que todavía no se mandaron a SimpliRoute.
 export async function eliminarPedido(pedidoId: string): Promise<void> {
   await apiClient.delete(`/pedidos/${pedidoId}`);
+}
+
+// Decisión 2026-09-24: marca uno o varios pedidos como Normal/Urgente/Crítica.
+export async function actualizarPrioridad(
+  pedidoIds: string[],
+  prioridad: PrioridadPedido,
+): Promise<{ actualizados: number }> {
+  const { data } = await apiClient.patch<{ actualizados: number }>("/pedidos/prioridad", { pedidoIds, prioridad });
+  return data;
 }
 
 export async function eliminarPedidos(pedidoIds: string[]): Promise<ResultadoEliminacionMasiva> {

@@ -1,3 +1,4 @@
+import { PrioridadPedido } from "@mym/shared-types";
 import { agruparLineasEnPedidos, LineaExcelImportada } from "./pedido";
 
 function linea(overrides: Partial<LineaExcelImportada> = {}): LineaExcelImportada {
@@ -20,6 +21,7 @@ function linea(overrides: Partial<LineaExcelImportada> = {}): LineaExcelImportad
     retiroDeReceta: null,
     tiempoDeEntrega: null,
     horarioEntrega: null,
+    prioridad: PrioridadPedido.NORMAL,
     ...overrides,
   };
 }
@@ -82,5 +84,18 @@ describe("agruparLineasEnPedidos", () => {
 
     expect(pedidos).toHaveLength(1);
     expect(pedidos[0].productos.map((p) => p.ticket)).toEqual(["ORDEN-123", "ORDEN-456"]);
+  });
+
+  it("une valores distintos de receta/tipo de pedido sin repetirlos y se queda con la prioridad más alta", () => {
+    const pedidos = agruparLineasEnPedidos([
+      linea({ receta: "ENV", tipoPedido: "DT ESP", prioridad: PrioridadPedido.NORMAL }),
+      linea({ receta: "EV", tipoPedido: "DT ESP", prioridad: PrioridadPedido.URGENTE }),
+      linea({ receta: "ENV", tipoPedido: null, prioridad: PrioridadPedido.NORMAL }),
+    ]);
+
+    expect(pedidos).toHaveLength(1);
+    expect(pedidos[0].receta).toBe("ENV / EV");
+    expect(pedidos[0].tipoPedido).toBe("DT ESP");
+    expect(pedidos[0].prioridad).toBe(PrioridadPedido.URGENTE);
   });
 });

@@ -1,4 +1,14 @@
-import { intentarMapeoAutomatico, normalizarEncabezado } from "./mapeo-columnas";
+import { completarMapeoGuardado, intentarMapeoAutomatico, normalizarEncabezado } from "./mapeo-columnas";
+
+describe("completarMapeoGuardado", () => {
+  it("suma campos que el perfil no tenía y respeta los ya guardados", () => {
+    const completo = completarMapeoGuardado(
+      { direccion: "DOMICILIO" },
+      { direccion: "OTRA COLUMNA", tiempoDeEntrega: "Tiempo de entrega" },
+    );
+    expect(completo).toEqual({ direccion: "DOMICILIO", tiempoDeEntrega: "Tiempo de entrega" });
+  });
+});
 
 describe("normalizarEncabezado", () => {
   it("saca acentos, mayúsculas y espacios de más", () => {

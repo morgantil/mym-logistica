@@ -1,6 +1,6 @@
 import { Transform, Type } from "class-transformer";
 import { IsBoolean, IsDate, IsEnum, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from "class-validator";
-import { EstadoPedido, EstadoSimpliroute, TipoEnvase, TipoServicio } from "@mym/shared-types";
+import { EstadoPedido, EstadoSimpliroute, PrioridadPedido, TipoEnvase, TipoServicio } from "@mym/shared-types";
 import { CampoOrdenPedido } from "../../domain/pedidos.repositorio";
 
 // Whitelist explícita para el DTO — mismos valores que CampoOrdenPedido, acá
@@ -23,6 +23,11 @@ const CAMPOS_ORDEN: CampoOrdenPedido[] = [
   "validacion",
   "simpliroute",
   "observaciones",
+  "remito",
+  "receta",
+  "tipoPedido",
+  "tiempoDeEntrega",
+  "prioridad",
 ];
 
 // `clienteId`/`fechaDesde`/`fechaHasta` los usa la pantalla de Embalaje y
@@ -85,6 +90,10 @@ export class ListarPedidosDto {
   @IsOptional()
   @IsEnum(EstadoSimpliroute)
   estadoSimpliroute?: EstadoSimpliroute;
+
+  @IsOptional()
+  @IsEnum(PrioridadPedido)
+  prioridad?: PrioridadPedido;
 
   @IsOptional()
   @IsString()
