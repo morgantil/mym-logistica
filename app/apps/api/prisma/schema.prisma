@@ -227,6 +227,10 @@ model PerfilImportacion {
   // Decisión 2026-09-24: hoja del Excel a leer (Farmaet manda un libro con
   // dos hojas y la que se importa es la segunda). Null = la primera.
   nombreHoja    String?
+  // Decisión 2026-09-24: Farmaet manda el archivo SIN fila de encabezados (la
+  // fila 1 ya es un paciente). true = las columnas se identifican por su letra
+  // ("A", "B"…) y todas las filas son datos.
+  sinEncabezado Boolean @default(false)
   mapeoColumnas Json // Record<CampoCanonico, string> — ver modulos/importadores/domain/campo-canonico.ts
 
   creadoEn         DateTime @default(now())

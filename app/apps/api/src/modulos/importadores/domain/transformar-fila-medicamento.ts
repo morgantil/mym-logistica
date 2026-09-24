@@ -3,6 +3,7 @@ import { LineaExcelImportada } from "../../pedidos/domain/pedido";
 import { CampoCanonico, MapeoColumnas } from "./campo-canonico";
 import { parseEnvaseDesdeTexto } from "./envase-medicamento-importado";
 import { FilaExcelCruda } from "./lector-excel.port";
+import { esAfiliadoIlegible } from "./afiliado-ilegible";
 import { aplicarReglasImportacion, ReglaImportacion } from "./reglas-importacion";
 import { aTexto, extraerNotaDeCeldaFecha } from "./transformar-fila";
 
@@ -83,6 +84,7 @@ export function transformarFilaMedicamento(
   const retiroDeReceta = porRegla.retiroDeReceta ?? aTexto(leer("retiroDeReceta"));
   const tiempoDeEntrega = aTexto(leer("tiempoDeEntrega"));
   const horarioEntrega = aTexto(leer("horarioEntrega"));
+  const entreCalles = aTexto(leer("entreCalles"));
 
   if (!numeroAfiliado) errores.push("Falta número de afiliado.");
   if (!destinatario) errores.push("Falta destinatario.");
@@ -126,6 +128,10 @@ export function transformarFilaMedicamento(
     retiroDeReceta,
     tiempoDeEntrega,
     horarioEntrega,
+    entreCalles,
+    // El reemplazo del afiliado ilegible lo resuelve el importador mirando el
+    // archivo completo (resolverAfiliadosIlegibles), acá solo se detecta.
+    afiliadoIlegible: esAfiliadoIlegible(numeroAfiliado!),
     prioridad: porRegla.prioridad ?? PrioridadPedido.NORMAL,
   };
 

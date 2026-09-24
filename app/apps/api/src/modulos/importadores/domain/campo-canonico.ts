@@ -23,6 +23,7 @@ export type CampoCanonico =
   | "tipoPedido" // se importa tal cual, sin transformar (Farmaet: "RETIRO DE RECETA", "DT ESP", "PREP_HELADERA", etc.)
   | "retiroDeReceta" // columna propia en Bella Vista (SI/NO); en Farmaet este concepto viene como un valor de "tipoPedido"
   | "tiempoDeEntrega" // dispara Urgente/Crítica (ver TEMAS_PENDIENTES.md §13.15) — ej. "72 HS HABITUAL" vs "URGENCIA 24 HS"
+  | "entreCalles" // "Entre calles / info adicional": referencia de entrega, va a las observaciones del pedido
   | "horarioEntrega" // franja horaria de entrega, ej. "10 a 20 hs"
   | "envaseTexto" // Farmaet: Bolsa/Bulto como texto en la columna "Empresa" (ej. "M&M BOLSA")
   | "cantidadBulto" // Bella Vista: cantidad de bultos (columna "BULTO")
@@ -74,6 +75,7 @@ export const CAMPOS_OPCIONALES: CampoCanonico[] = [
   "retiroDeReceta",
   "tiempoDeEntrega",
   "horarioEntrega",
+  "entreCalles",
   "envaseTexto",
   "cantidadBulto",
   "cantidadBolsa",

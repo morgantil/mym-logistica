@@ -79,6 +79,10 @@ function SubirArchivo() {
   // Opcional — si el libro trae varias hojas, cuál importar (queda guardada
   // en el perfil del cliente). Vacío = la guardada, o la primera.
   const [nombreHoja, setNombreHoja] = useState("");
+  // "guardado" = lo que ya tenga el perfil del cliente (Farmaet manda el archivo
+  // sin fila de encabezados; el resto sí los trae).
+  const [encabezados, setEncabezados] = useState<"guardado" | "trae" | "no-trae">("guardado");
+  const sinEncabezado = encabezados === "guardado" ? undefined : encabezados === "no-trae";
   const [resultado, setResultado] = useState<ResultadoImportacion | null>(null);
 
   const { data: clientes } = useQuery({ queryKey: ["clientes"], queryFn: listarClientesActivos });
@@ -89,7 +93,7 @@ function SubirArchivo() {
 
   const mutacionSubir = useMutation({
     mutationFn: ({ archivo, clienteId }: { archivo: File; clienteId: string }) =>
-      subirExcel(archivo, fechaEntrega, tipoImportacion, clienteId, nombreHoja.trim() || undefined),
+      subirExcel(archivo, fechaEntrega, tipoImportacion, clienteId, nombreHoja.trim() || undefined, sinEncabezado),
     onSuccess: (data) => {
       setResultado(data);
       if (data.estado === "completada") {
@@ -111,6 +115,7 @@ function SubirArchivo() {
         fechaEntrega,
         tipoServicio: tipoImportacion,
         nombreHoja: nombreHoja.trim() || undefined,
+        sinEncabezado,
       });
     },
     onSuccess: (data) => {
@@ -128,6 +133,7 @@ function SubirArchivo() {
     setTipoImportacion(TipoServicio.PANAL);
     setFechaEntrega(HOY);
     setNombreHoja("");
+    setEncabezados("guardado");
     setResultado(null);
   }
 
@@ -214,6 +220,27 @@ function SubirArchivo() {
                     placeholder="Primera hoja"
                     className="w-full sm:w-64"
                   />
+                </FilaFormulario>
+
+                <FilaFormulario
+                  label="Encabezados"
+                  htmlFor="encabezados"
+                  descripcion="Algunos clientes (Farmaet) mandan el Excel sin fila de títulos: la primera fila ya es un paciente. Dejalo en «Usar lo guardado» salvo que el cliente cambie cómo manda el archivo."
+                >
+                  <Select
+                    value={encabezados}
+                    onValueChange={(valor) => setEncabezados(valor as typeof encabezados)}
+                    disabled={enviando}
+                  >
+                    <SelectTrigger id="encabezados" className="w-full sm:w-64">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="guardado">Usar lo guardado</SelectItem>
+                      <SelectItem value="trae">El archivo trae encabezados</SelectItem>
+                      <SelectItem value="no-trae">El archivo NO trae encabezados</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </FilaFormulario>
 
                 <FilaFormulario label="Cliente" htmlFor="cliente">

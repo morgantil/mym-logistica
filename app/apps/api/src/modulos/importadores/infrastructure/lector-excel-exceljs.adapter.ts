@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import ExcelJS from "exceljs";
-import { ExcelLeido, FilaExcelCruda, LectorExcelPort } from "../domain/lector-excel.port";
+import { ExcelLeido, FilaExcelCruda, LectorExcelPort, OpcionesLectura } from "../domain/lector-excel.port";
 import { repararMojibake } from "../domain/texto-mojibake";
 
 // Toma la hoja indicada (o la PRIMERA si no se indica). La primera fila no vacía se toma como
@@ -8,7 +8,8 @@ import { repararMojibake } from "../domain/texto-mojibake";
 // lo que resuelve mapeo-columnas.ts después.
 @Injectable()
 export class LectorExcelExceljsAdapter implements LectorExcelPort {
-  async leer(buffer: Buffer, nombreHoja?: string): Promise<ExcelLeido> {
+  async leer(buffer: Buffer, opciones: OpcionesLectura = {}): Promise<ExcelLeido> {
+    const { nombreHoja, sinEncabezado } = opciones;
     const workbook = new ExcelJS.Workbook();
     try {
       await workbook.xlsx.load(buffer as unknown as ExcelJS.Buffer);
@@ -38,19 +39,29 @@ export class LectorExcelExceljsAdapter implements LectorExcelPort {
     // adelante en mapeo-columnas.ts, que al iterarlo recibe `undefined` en
     // esa posición y explota con "Iterator value undefined is not an entry
     // object" — encontrado con el archivo real de Farmaet, no hipotético.
-    const filaEncabezados = hoja.getRow(1);
     const encabezados: string[] = [];
-    filaEncabezados.eachCell({ includeEmpty: true }, (celda, indice) => {
-      encabezados[indice - 1] = repararMojibake(String(celda.value ?? "").trim());
-    });
+    if (sinEncabezado) {
+      // Sin fila de títulos: una columna por letra hasta la última con datos.
+      for (let indice = 1; indice <= hoja.columnCount; indice++) {
+        encabezados.push(hoja.getColumn(indice).letter);
+      }
+      if (encabezados.length === 0) {
+        throw new BadRequestException("La hoja está vacía.");
+      }
+    } else {
+      const filaEncabezados = hoja.getRow(1);
+      filaEncabezados.eachCell({ includeEmpty: true }, (celda, indice) => {
+        encabezados[indice - 1] = repararMojibake(String(celda.value ?? "").trim());
+      });
 
-    if (encabezados.every((encabezado) => encabezado === "")) {
-      throw new BadRequestException("No se encontraron encabezados en la primera fila.");
+      if (encabezados.every((encabezado) => encabezado === "")) {
+        throw new BadRequestException("No se encontraron encabezados en la primera fila.");
+      }
     }
 
     const filas: FilaExcelCruda[] = [];
     hoja.eachRow({ includeEmpty: false }, (fila, numeroFila) => {
-      if (numeroFila === 1) return; // ya usada como encabezados
+      if (numeroFila === 1 && !sinEncabezado) return; // ya usada como encabezados
 
       const filaCruda: FilaExcelCruda = {};
       let tieneAlgunValor = false;

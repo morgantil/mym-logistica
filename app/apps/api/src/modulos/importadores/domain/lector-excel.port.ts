@@ -12,10 +12,17 @@ export interface ExcelLeido {
   filas: FilaExcelCruda[];
 }
 
+export interface OpcionesLectura {
+  nombreHoja?: string;
+  sinEncabezado?: boolean;
+}
+
 export interface LectorExcelPort {
   // `nombreHoja` opcional: sin él se lee la primera hoja (decisión 2026-09-24:
   // Farmaet manda un libro con dos hojas y se importa la segunda).
-  leer(buffer: Buffer, nombreHoja?: string): Promise<ExcelLeido>;
+  // `sinEncabezado`: el archivo no trae fila de títulos (Farmaet) — las
+  // columnas se llaman "A", "B", "C"… y TODAS las filas son datos.
+  leer(buffer: Buffer, opciones?: OpcionesLectura): Promise<ExcelLeido>;
 }
 
 export const LECTOR_EXCEL = Symbol("LECTOR_EXCEL");

@@ -59,6 +59,14 @@ export const DICCIONARIO_SINONIMOS: Record<CampoCanonico, string[]> = {
   retiroDeReceta: ["RETIRO DE RECETA"],
   tiempoDeEntrega: ["TIEMPO DE ENTREGA"],
   horarioEntrega: ["HORARIO DE ENTREGA", "HORA"],
+  // Farmaet: "ENTRE CALLE + observacones" (sic); Bella Vista: "ENTRE CALLES E INFO ADICIONAL".
+  entreCalles: [
+    "ENTRE CALLE",
+    "ENTRE CALLES",
+    "ENTRE CALLE + OBSERVACONES",
+    "ENTRE CALLE + OBSERVACIONES",
+    "ENTRE CALLES E INFO ADICIONAL",
+  ],
   // OJO: "EMPRESA" es ambiguo entre clientes — en Farmaet trae Bolsa/Bulto
   // (útil), en Bella Vista es una columna sin uso (siempre "PREVIVAX",
   // constante). Es inofensivo que el mapeo automático lo detecte en los dos

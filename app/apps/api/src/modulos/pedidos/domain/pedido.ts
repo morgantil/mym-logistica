@@ -136,6 +136,12 @@ export interface LineaExcelImportada {
   retiroDeReceta: string | null;
   tiempoDeEntrega: string | null;
   horarioEntrega: string | null;
+  // Columna "Entre calles / info adicional" tal cual viene — viaja a las
+  // observaciones del pedido (la lee el chofer y sale en la etiqueta).
+  entreCalles: string | null;
+  // true = el Nº de afiliado del archivo venía truncado (notación científica)
+  // y se reemplazó por un identificador por nombre — ver afiliado-ilegible.ts.
+  afiliadoIlegible: boolean;
   // Derivada de las reglas de importación del cliente (NORMAL si ninguna aplica).
   prioridad: PrioridadPedido;
 }
@@ -162,6 +168,8 @@ export interface PedidoAgrupado {
   retiroDeReceta: string | null;
   tiempoDeEntrega: string | null;
   horarioEntrega: string | null;
+  entreCalles: string | null;
+  afiliadoIlegible: boolean;
   prioridad: PrioridadPedido;
 }
 
@@ -223,6 +231,8 @@ export function agruparLineasEnPedidos(lineas: LineaExcelImportada[]): PedidoAgr
       grupoExistente.tipoPedido = unirDistintos(grupoExistente.tipoPedido, linea.tipoPedido);
       grupoExistente.retiroDeReceta = unirDistintos(grupoExistente.retiroDeReceta, linea.retiroDeReceta);
       grupoExistente.tiempoDeEntrega = unirDistintos(grupoExistente.tiempoDeEntrega, linea.tiempoDeEntrega);
+      grupoExistente.entreCalles = unirDistintos(grupoExistente.entreCalles, linea.entreCalles);
+      grupoExistente.afiliadoIlegible = grupoExistente.afiliadoIlegible || linea.afiliadoIlegible;
       // Si UNA línea del pedido es urgente/crítica, todo el pedido lo es.
       if (SEVERIDAD_PRIORIDAD[linea.prioridad] > SEVERIDAD_PRIORIDAD[grupoExistente.prioridad]) {
         grupoExistente.prioridad = linea.prioridad;
@@ -244,6 +254,8 @@ export function agruparLineasEnPedidos(lineas: LineaExcelImportada[]): PedidoAgr
         retiroDeReceta: linea.retiroDeReceta,
         tiempoDeEntrega: linea.tiempoDeEntrega,
         horarioEntrega: linea.horarioEntrega,
+        entreCalles: linea.entreCalles,
+        afiliadoIlegible: linea.afiliadoIlegible,
         prioridad: linea.prioridad,
       });
     }

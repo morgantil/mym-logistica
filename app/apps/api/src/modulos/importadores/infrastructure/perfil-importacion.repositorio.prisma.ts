@@ -14,7 +14,9 @@ export class PerfilImportacionRepositorioPrisma implements PerfilImportacionRepo
     const perfil = await this.prisma.perfilImportacion.findUnique({
       where: { clienteId_tipoServicio: { clienteId, tipoServicio: tipoServicioPrisma } },
     });
-    return perfil ? { mapeo: perfil.mapeoColumnas as MapeoColumnas, nombreHoja: perfil.nombreHoja } : null;
+    return perfil
+      ? { mapeo: perfil.mapeoColumnas as MapeoColumnas, nombreHoja: perfil.nombreHoja, sinEncabezado: perfil.sinEncabezado }
+      : null;
   }
 
   async guardar(
@@ -22,8 +24,9 @@ export class PerfilImportacionRepositorioPrisma implements PerfilImportacionRepo
     tipoServicio: TipoServicio,
     mapeo: MapeoColumnas,
     usuarioId: string | null,
-    nombreHoja?: string | null,
+    opciones: { nombreHoja?: string | null; sinEncabezado?: boolean } = {},
   ): Promise<void> {
+    const { nombreHoja, sinEncabezado } = opciones;
     const tipoServicioPrisma = tipoServicio as unknown as $Enums.TipoServicio;
     await this.prisma.perfilImportacion.upsert({
       where: { clienteId_tipoServicio: { clienteId, tipoServicio: tipoServicioPrisma } },
@@ -32,27 +35,33 @@ export class PerfilImportacionRepositorioPrisma implements PerfilImportacionRepo
         tipoServicio: tipoServicioPrisma,
         mapeoColumnas: mapeo as Prisma.InputJsonValue,
         nombreHoja: nombreHoja ?? null,
+        sinEncabezado: sinEncabezado ?? false,
         creadoPorId: usuarioId,
       },
       update: {
         mapeoColumnas: mapeo as Prisma.InputJsonValue,
         // undefined = no tocar la hoja que ya tenía guardada.
         ...(nombreHoja !== undefined ? { nombreHoja } : {}),
+        ...(sinEncabezado !== undefined ? { sinEncabezado } : {}),
         actualizadoPorId: usuarioId,
       },
     });
   }
 
-  async actualizarNombreHoja(
+  async actualizarOpcionesLectura(
     clienteId: string,
     tipoServicio: TipoServicio,
-    nombreHoja: string | null,
+    opciones: { nombreHoja?: string; sinEncabezado?: boolean },
     usuarioId: string | null,
   ): Promise<void> {
     const tipoServicioPrisma = tipoServicio as unknown as $Enums.TipoServicio;
     await this.prisma.perfilImportacion.update({
       where: { clienteId_tipoServicio: { clienteId, tipoServicio: tipoServicioPrisma } },
-      data: { nombreHoja, actualizadoPorId: usuarioId },
+      data: {
+        ...(opciones.nombreHoja !== undefined ? { nombreHoja: opciones.nombreHoja } : {}),
+        ...(opciones.sinEncabezado !== undefined ? { sinEncabezado: opciones.sinEncabezado } : {}),
+        actualizadoPorId: usuarioId,
+      },
     });
   }
 }

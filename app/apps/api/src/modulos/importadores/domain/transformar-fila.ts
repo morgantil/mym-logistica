@@ -121,6 +121,8 @@ export function transformarFila(
       retiroDeReceta: null,
       tiempoDeEntrega: null,
       horarioEntrega: null,
+      entreCalles: null,
+      afiliadoIlegible: false,
       prioridad: PrioridadPedido.NORMAL,
     },
   };

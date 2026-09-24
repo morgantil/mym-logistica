@@ -5,6 +5,8 @@ export interface PerfilGuardado {
   mapeo: MapeoColumnas;
   // Hoja del Excel a leer — null = la primera.
   nombreHoja: string | null;
+  // El archivo no trae fila de encabezados: columnas por letra (A, B, C…).
+  sinEncabezado: boolean;
 }
 
 export interface PerfilImportacionRepositorio {
@@ -16,12 +18,12 @@ export interface PerfilImportacionRepositorio {
     tipoServicio: TipoServicio,
     mapeo: MapeoColumnas,
     usuarioId: string | null,
-    nombreHoja?: string | null,
+    opciones?: { nombreHoja?: string | null; sinEncabezado?: boolean },
   ): Promise<void>;
-  actualizarNombreHoja(
+  actualizarOpcionesLectura(
     clienteId: string,
     tipoServicio: TipoServicio,
-    nombreHoja: string | null,
+    opciones: { nombreHoja?: string; sinEncabezado?: boolean },
     usuarioId: string | null,
   ): Promise<void>;
 }

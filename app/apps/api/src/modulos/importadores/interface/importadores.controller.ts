@@ -38,6 +38,7 @@ export class ImportadoresController {
     @Body("fechaEntrega") fechaEntrega: string | undefined,
     @Body("tipoServicio") tipoServicio: TipoServicio | undefined,
     @Body("nombreHoja") nombreHoja: string | undefined,
+    @Body("sinEncabezado") sinEncabezado: string | undefined,
     @UsuarioActual() usuario: UsuarioAutenticado,
   ) {
     if (!archivo) {
@@ -60,6 +61,8 @@ export class ImportadoresController {
       tipoServicio: tipoServicio || undefined,
       // Opcional — hoja del libro a leer; se guarda en el perfil del cliente.
       nombreHoja: nombreHoja || undefined,
+      // "true"/"false" del formulario; sin informar = lo guardado en el perfil.
+      sinEncabezado: sinEncabezado === undefined || sinEncabezado === "" ? undefined : sinEncabezado === "true",
     });
   }
 
@@ -76,6 +79,7 @@ export class ImportadoresController {
     @Body("fechaEntrega") fechaEntrega: string | undefined,
     @Body("tipoServicio") tipoServicio: TipoServicio | undefined,
     @Body("nombreHoja") nombreHoja: string | undefined,
+    @Body("sinEncabezado") sinEncabezado: string | undefined,
     @UsuarioActual() usuario: UsuarioAutenticado,
   ) {
     if (!archivo) {
@@ -106,6 +110,8 @@ export class ImportadoresController {
       fechaEntrega,
       tipoServicio: tipoServicio || undefined,
       nombreHoja: nombreHoja || undefined,
+      // "true"/"false" del formulario; sin informar = lo guardado en el perfil.
+      sinEncabezado: sinEncabezado === undefined || sinEncabezado === "" ? undefined : sinEncabezado === "true",
     });
   }
 }

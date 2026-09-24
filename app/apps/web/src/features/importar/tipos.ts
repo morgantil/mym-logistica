@@ -18,6 +18,7 @@ export type CampoCanonico =
   | "retiroDeReceta"
   | "tiempoDeEntrega"
   | "horarioEntrega"
+  | "entreCalles"
   | "envaseTexto"
   | "cantidadBulto"
   | "cantidadBolsa";

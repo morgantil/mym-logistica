@@ -71,4 +71,32 @@ describe("LectorExcelExceljsAdapter", () => {
 
     expect(filas[0].DOMICILIO).toBe("Hughes N° 225");
   });
+
+  it("sin encabezado: las columnas se llaman A, B, C… y la fila 1 es un dato", async () => {
+    const buffer = await bufferDeWorkbook((hoja) => {
+      hoja.addRow([83275, "PILAR", "ACCIARI GRACIELA"]);
+      hoja.addRow([83302, "ESCOBAR", "ALDAX LIDIA"]);
+    });
+
+    const { encabezados, filas } = await adapter.leer(buffer, { sinEncabezado: true });
+
+    expect(encabezados).toEqual(["A", "B", "C"]);
+    expect(filas).toEqual([
+      { A: 83275, B: "PILAR", C: "ACCIARI GRACIELA" },
+      { A: 83302, B: "ESCOBAR", C: "ALDAX LIDIA" },
+    ]);
+  });
+
+  it("elige la hoja por nombre", async () => {
+    const workbook = new ExcelJS.Workbook();
+    workbook.addWorksheet("Primera").addRow(["X"]);
+    const segunda = workbook.addWorksheet("Hoja1");
+    segunda.addRow(["PACIENTE"]);
+    segunda.addRow(["Juan"]);
+    const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+
+    const { filas } = await adapter.leer(buffer, { nombreHoja: "hoja1" });
+
+    expect(filas).toEqual([{ PACIENTE: "Juan" }]);
+  });
 });

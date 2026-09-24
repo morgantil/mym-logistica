@@ -19,6 +19,7 @@ export const CAMPO_CANONICO_LABELS: Record<CampoCanonico, string> = {
   retiroDeReceta: "Retiro de receta",
   tiempoDeEntrega: "Tiempo de entrega",
   horarioEntrega: "Horario de entrega",
+  entreCalles: "Entre calles / info adicional",
   envaseTexto: "Bolsa/Bulto (texto)",
   cantidadBulto: "Cantidad de bultos",
   cantidadBolsa: "Cantidad de bolsas",

@@ -19,6 +19,7 @@ import {
 } from "../domain/perfil-importacion.repositorio";
 import { transformarFila } from "../domain/transformar-fila";
 import { transformarFilaMedicamento } from "../domain/transformar-fila-medicamento";
+import { resolverAfiliadosIlegibles } from "../domain/afiliado-ilegible";
 import { PerfilGuardado } from "../domain/perfil-importacion.repositorio";
 import { ReglaImportacionService } from "./regla-importacion.service";
 import { SinonimoRecetaService } from "./sinonimo-receta.service";
@@ -80,14 +81,15 @@ export class ImportarExcelService {
     // Hoja del Excel a leer (decisión 2026-09-24). Si se informa, queda
     // guardada en el perfil del cliente; si no, se usa la del perfil o la primera.
     nombreHoja?: string;
+    // El archivo no trae fila de encabezados (Farmaet) — columnas por letra.
+    // Sin informar (undefined) se usa lo guardado en el perfil del cliente.
+    sinEncabezado?: boolean;
   }): Promise<ResultadoImportacion> {
     const tipoServicio = params.tipoServicio ?? TipoServicio.PANAL;
     const perfil = await this.perfilesRepositorio.buscarPorCliente(params.clienteId, tipoServicio);
-    const hojaInformada = params.nombreHoja?.trim() || undefined;
-    const { encabezados, filas } = await this.lectorExcel.leer(
-      params.buffer,
-      hojaInformada ?? perfil?.nombreHoja ?? undefined,
-    );
+    const informadas = { nombreHoja: params.nombreHoja?.trim() || undefined, sinEncabezado: params.sinEncabezado };
+    const opciones = this.opcionesDeLectura(perfil, informadas);
+    const { encabezados, filas } = await this.lectorExcel.leer(params.buffer, opciones);
     return this.resolverMapeoYProcesar(
       params.clienteId,
       encabezados,
@@ -97,8 +99,21 @@ export class ImportarExcelService {
       params.fechaEntrega,
       tipoServicio,
       perfil,
-      hojaInformada,
+      informadas,
+      opciones.sinEncabezado ? 1 : 2,
     );
+  }
+
+  // Hoja y encabezados: lo que se informó ahora gana, si no lo guardado en el
+  // perfil del cliente, si no los valores por defecto (primera hoja, con encabezados).
+  private opcionesDeLectura(
+    perfil: PerfilGuardado | null,
+    informadas: { nombreHoja?: string; sinEncabezado?: boolean },
+  ) {
+    return {
+      nombreHoja: informadas.nombreHoja ?? perfil?.nombreHoja ?? undefined,
+      sinEncabezado: informadas.sinEncabezado ?? perfil?.sinEncabezado ?? false,
+    };
   }
 
   // Segundo paso cuando el primero devolvió "requiereMapeoManual": el front
@@ -113,14 +128,13 @@ export class ImportarExcelService {
     fechaEntrega: string;
     tipoServicio?: TipoServicio;
     nombreHoja?: string;
+    sinEncabezado?: boolean;
   }): Promise<ResultadoImportacion> {
     const tipoServicio = params.tipoServicio ?? TipoServicio.PANAL;
     const perfil = await this.perfilesRepositorio.buscarPorCliente(params.clienteId, tipoServicio);
-    const hojaInformada = params.nombreHoja?.trim() || undefined;
-    const { encabezados, filas } = await this.lectorExcel.leer(
-      params.buffer,
-      hojaInformada ?? perfil?.nombreHoja ?? undefined,
-    );
+    const informadas = { nombreHoja: params.nombreHoja?.trim() || undefined, sinEncabezado: params.sinEncabezado };
+    const opciones = this.opcionesDeLectura(perfil, informadas);
+    const { encabezados, filas } = await this.lectorExcel.leer(params.buffer, opciones);
     const { mapeo: automatico } = intentarMapeoAutomatico(encabezados, tipoServicio);
     const mapeoCompleto = { ...automatico, ...params.mapeoManual };
 
@@ -129,7 +143,7 @@ export class ImportarExcelService {
       tipoServicio,
       mapeoCompleto,
       params.usuarioId,
-      hojaInformada,
+      informadas,
     );
 
     return this.ejecutarPipeline(
@@ -140,6 +154,7 @@ export class ImportarExcelService {
       params.usuarioId,
       params.fechaEntrega,
       tipoServicio,
+      opciones.sinEncabezado ? 1 : 2,
     );
   }
 
@@ -152,11 +167,15 @@ export class ImportarExcelService {
     fechaEntrega: string,
     tipoServicio: TipoServicio,
     perfil: PerfilGuardado | null,
-    hojaInformada: string | undefined,
+    informadas: { nombreHoja?: string; sinEncabezado?: boolean },
+    primeraFilaDatos: number,
   ): Promise<ResultadoImportacion> {
     if (perfil) {
-      if (hojaInformada && hojaInformada !== perfil.nombreHoja) {
-        await this.perfilesRepositorio.actualizarNombreHoja(clienteId, tipoServicio, hojaInformada, usuarioId);
+      const cambioHoja = informadas.nombreHoja !== undefined && informadas.nombreHoja !== perfil.nombreHoja;
+      const cambioEncabezado =
+        informadas.sinEncabezado !== undefined && informadas.sinEncabezado !== perfil.sinEncabezado;
+      if (cambioHoja || cambioEncabezado) {
+        await this.perfilesRepositorio.actualizarOpcionesLectura(clienteId, tipoServicio, informadas, usuarioId);
       }
       // Suma columnas nuevas que este archivo trae y el perfil no tenía (ver
       // completarMapeoGuardado) y las deja guardadas.
@@ -172,6 +191,7 @@ export class ImportarExcelService {
         usuarioId,
         fechaEntrega,
         tipoServicio,
+        primeraFilaDatos,
       );
     }
 
@@ -190,8 +210,17 @@ export class ImportarExcelService {
     // El diccionario de sinónimos alcanzó para mapear todo solo — se guarda
     // igual como perfil confirmado, así la próxima importación de este cliente
     // ni siquiera vuelve a pasar por acá.
-    await this.perfilesRepositorio.guardar(clienteId, tipoServicio, mapeo, null, hojaInformada);
-    return this.ejecutarPipeline(clienteId, filas, mapeo, nombreArchivo, usuarioId, fechaEntrega, tipoServicio);
+    await this.perfilesRepositorio.guardar(clienteId, tipoServicio, mapeo, null, informadas);
+    return this.ejecutarPipeline(
+      clienteId,
+      filas,
+      mapeo,
+      nombreArchivo,
+      usuarioId,
+      fechaEntrega,
+      tipoServicio,
+      primeraFilaDatos,
+    );
   }
 
   private async ejecutarPipeline(
@@ -202,6 +231,9 @@ export class ImportarExcelService {
     usuarioId: string,
     fechaEntrega: string,
     tipoServicio: TipoServicio,
+    // Número de fila del Excel donde arrancan los datos (2 si hay encabezados,
+    // 1 si no) — para indicar bien la fila en los errores.
+    primeraFilaDatos = 2,
   ): Promise<ResultadoImportacionCompleta> {
     if (filas.length === 0) {
       throw new BadRequestException("El Excel no tiene filas de datos.");
@@ -232,7 +264,7 @@ export class ImportarExcelService {
         if (resultado.valida) {
           lineasValidas.push(...resultado.lineas);
         } else {
-          filasConError.push({ fila: indice + 2, errores: resultado.errores });
+          filasConError.push({ fila: indice + primeraFilaDatos, errores: resultado.errores });
         }
         return;
       }
@@ -242,11 +274,16 @@ export class ImportarExcelService {
         lineasValidas.push(resultado.linea);
       } else {
         // +2: fila 1 es el encabezado, y las filas de datos arrancan visualmente en 2.
-        filasConError.push({ fila: indice + 2, errores: resultado.errores });
+        filasConError.push({ fila: indice + primeraFilaDatos, errores: resultado.errores });
       }
     });
 
-    const grupos = agruparLineasEnPedidos(lineasValidas);
+    // Afiliados truncados por Excel ("6.04E+14"): se recuperan desde el mismo
+    // archivo o se reemplazan por un identificador por nombre (ver
+    // afiliado-ilegible.ts). Solo medicamentos: es el caso real que se vio.
+    const lineasParaAgrupar =
+      tipoServicio === TipoServicio.MEDICAMENTO ? resolverAfiliadosIlegibles(lineasValidas) : lineasValidas;
+    const grupos = agruparLineasEnPedidos(lineasParaAgrupar);
     let pedidosCreados = 0;
     let alertasDireccion = 0;
 
@@ -326,6 +363,8 @@ export class ImportarExcelService {
       const ticketsDistintos = [...new Set(grupo.productos.map((producto) => producto.ticket).filter(Boolean))];
       const observacionesPartes = [
         grupo.notaFecha,
+        grupo.entreCalles,
+        grupo.afiliadoIlegible ? "Nº de afiliado ilegible en el archivo (Excel lo truncó)" : null,
         ticketsDistintos.length === 1
           ? `Ticket: ${ticketsDistintos[0]}`
           : ticketsDistintos.length > 1

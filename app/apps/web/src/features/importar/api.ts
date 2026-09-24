@@ -25,9 +25,13 @@ export async function subirExcel(
   // Decisión 2026-09-24: hoja del libro a leer (opcional — queda guardada en el
   // perfil del cliente; sin ella se usa la guardada o la primera).
   nombreHoja?: string,
+  // Decisión 2026-09-24: el archivo no trae fila de encabezados (Farmaet).
+  // undefined = usar lo guardado para el cliente.
+  sinEncabezado?: boolean,
 ): Promise<ResultadoImportacion> {
   const formData = new FormData();
   if (nombreHoja) formData.append("nombreHoja", nombreHoja);
+  if (sinEncabezado !== undefined) formData.append("sinEncabezado", String(sinEncabezado));
   formData.append("archivo", archivo);
   formData.append("fechaEntrega", fechaEntrega);
   formData.append("tipoServicio", tipoServicio);
@@ -44,9 +48,11 @@ export async function confirmarMapeo(params: {
   fechaEntrega: string;
   tipoServicio: TipoServicio;
   nombreHoja?: string;
+  sinEncabezado?: boolean;
 }): Promise<ResultadoImportacion> {
   const formData = new FormData();
   if (params.nombreHoja) formData.append("nombreHoja", params.nombreHoja);
+  if (params.sinEncabezado !== undefined) formData.append("sinEncabezado", String(params.sinEncabezado));
   formData.append("archivo", params.archivo);
   formData.append("clienteId", params.clienteId);
   formData.append("mapeoManual", JSON.stringify(params.mapeoManual));
