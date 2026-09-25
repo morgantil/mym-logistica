@@ -508,7 +508,29 @@ export function PedidosTabla() {
     const orden = ordenarColumnas([...IDS_COLUMNAS_DEFAULT], columnasFijas);
     const columnaSeleccion: LegacyColumnDef<PedidoListado> = {
       id: "seleccion",
-      header: "",
+      // Marcar todos: tilda/destilda todos los pedidos de la página que se está
+      // viendo (la selección se conserva al cambiar de página).
+      header: () => {
+        const idsPagina = (data?.datos ?? []).map((pedido) => pedido.id);
+        const todosMarcados = idsPagina.length > 0 && idsPagina.every((id) => seleccionados.has(id));
+        return (
+          <Checkbox
+            checked={todosMarcados}
+            onCheckedChange={() =>
+              setSeleccionados((actual) => {
+                const nuevo = new Set(actual);
+                for (const id of idsPagina) {
+                  if (todosMarcados) nuevo.delete(id);
+                  else nuevo.add(id);
+                }
+                return nuevo;
+              })
+            }
+            disabled={!puedeEliminar || idsPagina.length === 0}
+            aria-label="Seleccionar todos los pedidos de esta página"
+          />
+        );
+      },
       cell: ({ row }) => {
         return (
           <Checkbox
@@ -552,7 +574,7 @@ export function PedidosTabla() {
         ),
       },
     ];
-  }, [columnasFijas, definicionesColumna, puedeEliminar, seleccionados, mutacionEliminarUno]);
+  }, [columnasFijas, definicionesColumna, puedeEliminar, seleccionados, mutacionEliminarUno, data]);
 
   const tabla = useLegacyTable({
     data: data?.datos ?? [],
