@@ -299,11 +299,26 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
     // `@@unique([clienteMedicamentoId, clientePanalId])` en el schema evitaría
     // el duplicado igual, pero con un error crudo de Postgres — este chequeo
     // da un mensaje entendible, mismo criterio que crearTarifa/crearPorcentaje.
+    // Busca INCLUYENDO las quitadas (borrado lógico): la restricción única las
+    // cuenta igual. Si la que existe estaba quitada, se reactiva con el nombre
+    // nuevo en vez de dar un "ya existe" por algo que la pantalla no muestra
+    // (encontrado por Leonardo, 2026-09-25).
     const existente = await this.prisma.combinacionUnificacionClientes.findFirst({
       where: { clienteMedicamentoId: datos.clienteMedicamentoId, clientePanalId: datos.clientePanalId },
     });
-    if (existente) {
+    if (existente && existente.eliminadoEn === null) {
       throw new BadRequestException("Ya existe esta combinación entre estos dos clientes.");
+    }
+    if (existente) {
+      const reactivada = await this.prisma.combinacionUnificacionClientes.update({
+        where: { id: existente.id },
+        data: { eliminadoEn: null, activa: true, nombre: datos.nombre ?? null },
+        include: {
+          clienteMedicamento: { select: { nombre: true } },
+          clientePanal: { select: { nombre: true } },
+        },
+      });
+      return mapearCombinacion(reactivada);
     }
     const creada = await this.prisma.combinacionUnificacionClientes.create({
       data: {
