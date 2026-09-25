@@ -97,6 +97,8 @@ export type CampoOrdenPedido =
   | "receta"
   | "tipoPedido"
   | "tiempoDeEntrega"
+  | "retiroDeReceta"
+  | "horarioEntrega"
   | "prioridad";
 
 export interface PaginaPedidos {

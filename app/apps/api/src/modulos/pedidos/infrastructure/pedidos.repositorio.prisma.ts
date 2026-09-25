@@ -153,6 +153,10 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
         return { tipoPedido: direccion };
       case "tiempoDeEntrega":
         return { tiempoDeEntrega: direccion };
+      case "retiroDeReceta":
+        return { retiroDeReceta: direccion };
+      case "horarioEntrega":
+        return { horarioEntrega: direccion };
       case "prioridad":
         return { prioridad: direccion };
     }

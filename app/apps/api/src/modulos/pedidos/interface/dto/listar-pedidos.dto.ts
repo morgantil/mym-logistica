@@ -27,6 +27,8 @@ const CAMPOS_ORDEN: CampoOrdenPedido[] = [
   "receta",
   "tipoPedido",
   "tiempoDeEntrega",
+  "retiroDeReceta",
+  "horarioEntrega",
   "prioridad",
 ];
 
