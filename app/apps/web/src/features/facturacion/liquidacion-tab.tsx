@@ -30,11 +30,73 @@ const TEXTO_REGLA: Record<ReglaAplicada, string> = {
   INDIVIDUAL: "Individual",
 };
 
+// Decisión 2026-09-27 (Leonardo: "graficar bien que estamos facturando
+// unificado y luego el otro"): mismo color por regla en el badge de cada
+// grupo Y en el encabezado de bloque de abajo — un solo sistema de colores,
+// no dos que puedan desalinearse.
+const TONO_REGLA: Record<ReglaAplicada, keyof typeof CLASES_TONO> = {
+  UNIFICADA: "verde",
+  "2x1": "ambar",
+  INDIVIDUAL: "gris",
+};
+
 function BadgeRegla({ regla }: { regla: ReglaAplicada }) {
   return (
-    <Badge variant="outline" className={cn("border-transparent", CLASES_TONO.gris)}>
+    <Badge variant="outline" className={cn("border-transparent", CLASES_TONO[TONO_REGLA[regla]])}>
       {TEXTO_REGLA[regla]}
     </Badge>
+  );
+}
+
+// Los grupos ya vienen ordenados UNIFICADA → 2×1 → INDIVIDUAL (ver
+// FacturacionService.ordenarYNombrarGrupos, backend) — acá solo se detectan
+// los cortes entre un bloque y el siguiente para poder ponerles un
+// encabezado de sección con su propio subtotal, sin tocar el orden ni el
+// cálculo. `reduce` en vez de agrupar por clave: si el orden alguna vez
+// dejara de ser contiguo, esto lo respeta igual (nunca junta dos tramos
+// separados de la misma regla en un solo bloque).
+interface BloqueGrupos {
+  regla: ReglaAplicada;
+  grupos: GrupoFacturacion[];
+  totalViajes: number;
+  totalImporte: number;
+}
+
+function agruparEnBloques(grupos: GrupoFacturacion[]): BloqueGrupos[] {
+  return grupos.reduce<BloqueGrupos[]>((bloques, grupo) => {
+    const actual = bloques[bloques.length - 1];
+    if (actual && actual.regla === grupo.reglaAplicada) {
+      actual.grupos.push(grupo);
+      actual.totalViajes += grupo.cantidadViajes;
+      actual.totalImporte += grupo.importeCalculado;
+    } else {
+      bloques.push({
+        regla: grupo.reglaAplicada,
+        grupos: [grupo],
+        totalViajes: grupo.cantidadViajes,
+        totalImporte: grupo.importeCalculado,
+      });
+    }
+    return bloques;
+  }, []);
+}
+
+function EncabezadoBloque({ bloque }: { bloque: BloqueGrupos }) {
+  return (
+    <TableRow className={cn("hover:bg-transparent", CLASES_TONO[TONO_REGLA[bloque.regla]])}>
+      <TableCell colSpan={7} className="py-1.5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="text-xs font-semibold tracking-wide uppercase">
+            Facturando {TEXTO_REGLA[bloque.regla]}
+          </span>
+          <span className="text-xs font-medium">
+            {bloque.grupos.length} {bloque.grupos.length === 1 ? "grupo" : "grupos"} ·{" "}
+            {bloque.totalViajes} {bloque.totalViajes === 1 ? "viaje" : "viajes"} ·{" "}
+            {formatearMonto(bloque.totalImporte)}
+          </span>
+        </div>
+      </TableCell>
+    </TableRow>
   );
 }
 
@@ -199,7 +261,14 @@ export function LiquidacionTab({
                 </TableCell>
               </TableRow>
             ) : (
-              grupos!.map((grupo) => <FilasGrupo key={grupo.id} grupo={grupo} pedidos={pedidosPorGrupo.get(grupo.id) ?? []} />)
+              agruparEnBloques(grupos!).map((bloque) => (
+                <Fragment key={bloque.regla}>
+                  <EncabezadoBloque bloque={bloque} />
+                  {bloque.grupos.map((grupo) => (
+                    <FilasGrupo key={grupo.id} grupo={grupo} pedidos={pedidosPorGrupo.get(grupo.id) ?? []} />
+                  ))}
+                </Fragment>
+              ))
             )}
           </TableBody>
           {hayGrupos && (

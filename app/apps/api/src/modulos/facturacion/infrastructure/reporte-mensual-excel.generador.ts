@@ -19,6 +19,16 @@ const TEXTO_ESTADO: Record<string, string> = {
   CONFIRMADO: "Confirmado",
 };
 
+// Mismo color por regla que en la pantalla de Liquidación (ver TONO_REGLA en
+// liquidacion-tab.tsx) — decisión 2026-09-27, para que se note al mismo
+// golpe de vista que primero se factura lo unificado, después el 2×1 y
+// después lo individual.
+const COLOR_REGLA: Record<string, string> = {
+  UNIFICADA: "FFD1FAE5", // verde
+  "2x1": "FFFEF3C7", // ámbar
+  INDIVIDUAL: "FFE5E7EB", // gris
+};
+
 // §31 funcional: "Reporte mensual", por mes y cliente, exportable a Excel.
 // Dos hojas en vez de una sola tabla: un viaje (2×1/unificada) agrupa hasta 2
 // pedidos y el documento funcional no define una regla para repartir el
@@ -110,7 +120,26 @@ export async function generarReporteMensualExcel(datos: {
   ];
   hojaResumen.getRow(1).font = { bold: true };
 
+  // Una fila separadora con el nombre del bloque cada vez que cambia la
+  // regla — los grupos ya vienen ordenados UNIFICADA → 2×1 → INDIVIDUAL
+  // (backend), acá solo se marca el corte, igual que en la pantalla.
+  let reglaAnterior: string | null = null;
   for (const grupo of datos.grupos) {
+    if (grupo.reglaAplicada !== reglaAnterior) {
+      reglaAnterior = grupo.reglaAplicada;
+      const filaSeparadora = hojaResumen.addRow({
+        fecha: `Facturando ${TEXTO_REGLA[grupo.reglaAplicada] ?? grupo.reglaAplicada}`,
+      });
+      filaSeparadora.font = { bold: true };
+      filaSeparadora.eachCell({ includeEmpty: true }, (celda) => {
+        celda.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: COLOR_REGLA[grupo.reglaAplicada] ?? "FFE5E7EB" },
+        };
+      });
+    }
+
     const referencia = fechaYDireccionPorGrupo.get(grupo.id);
     hojaResumen.addRow({
       fecha: referencia?.fecha.toISOString().slice(0, 10) ?? "",
