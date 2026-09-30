@@ -25,8 +25,8 @@ export class ClientesService {
     return this.repositorio.buscarPorId(id);
   }
 
-  crear(datos: { nombre: string; tipoServicio: TipoServicioCliente }): Promise<Cliente> {
-    return this.repositorio.crear(datos);
+  crear(datos: { nombre: string; tipoServicio: TipoServicioCliente; facturaPorCordon?: boolean }): Promise<Cliente> {
+    return this.repositorio.crear({ ...datos, facturaPorCordon: datos.facturaPorCordon ?? false });
   }
 
   // Decisión 2026-09-29: si se cambia el tipo de servicio, primero se

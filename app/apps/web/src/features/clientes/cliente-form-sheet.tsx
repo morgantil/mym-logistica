@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { TipoServicioCliente } from "@mym/shared-types";
 import { Button } from "@/components/ui/button";
 import { FilaFormulario, TablaFormulario } from "@/components/shell/fila-formulario";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -44,14 +45,17 @@ export function ClienteFormSheet({
 
   const [nombre, setNombre] = useState("");
   const [tipoServicio, setTipoServicio] = useState<TipoServicioCliente>(TipoServicioCliente.PANAL);
+  const [facturaPorCordon, setFacturaPorCordon] = useState(false);
 
   useEffect(() => {
     if (editando) {
       setNombre(cliente.nombre);
       setTipoServicio(cliente.tipoServicio);
+      setFacturaPorCordon(cliente.facturaPorCordon);
     } else {
       setNombre("");
       setTipoServicio(TipoServicioCliente.PANAL);
+      setFacturaPorCordon(false);
     }
   }, [cliente, editando]);
 
@@ -59,9 +63,9 @@ export function ClienteFormSheet({
   const mutacion = useMutation({
     mutationFn: async () => {
       if (editando) {
-        return actualizarCliente(cliente.id, { nombre, tipoServicio });
+        return actualizarCliente(cliente.id, { nombre, tipoServicio, facturaPorCordon });
       }
-      return crearCliente({ nombre, tipoServicio });
+      return crearCliente({ nombre, tipoServicio, facturaPorCordon });
     },
     onSuccess: () => {
       toast.success(editando ? "Cliente actualizado." : "Cliente creado.");
@@ -117,6 +121,24 @@ export function ClienteFormSheet({
                   ))}
                 </SelectContent>
               </Select>
+            </FilaFormulario>
+
+            <FilaFormulario
+              label="Factura por Cordón"
+              htmlFor="factura-por-cordon-cliente"
+              anchoEtiqueta="140px"
+              descripcion={
+                facturaPorCordon
+                  ? "Un pedido fuera de CABA busca el partido y factura por Cordón (Primer/Segundo/Tercer) — como Bella Vista Medicamentos."
+                  : "Un pedido fuera de CABA factura siempre a la tarifa plana \"Provincia\", sin distinguir Cordón — como Biosíntesis o Bella Vista PAÑALES."
+              }
+            >
+              <Checkbox
+                id="factura-por-cordon-cliente"
+                checked={facturaPorCordon}
+                onCheckedChange={(valor) => setFacturaPorCordon(valor === true)}
+                disabled={mutacion.isPending}
+              />
             </FilaFormulario>
           </TablaFormulario>
 

@@ -141,20 +141,31 @@ export class ZonasTarifariasService {
   }
 
   // Resuelve la ZonaTarifaria del pedido considerando, en orden: (1) CABA
-  // siempre resuelve directo (ver resolverPorLocalidad); (2) si se conoce el
-  // partido (viene de GeorefArAdapter, es un límite administrativo exacto) y
-  // está mapeado, se usa ese; (3) si no, fallback al mapeo por localidad de
-  // siempre. Nunca inventa un cordón. (Se sacó el fallback intermedio por
-  // Zona de SimpliRoute el 2026-09-08 — ver DOCUMENTO TECNICO.md historial:
-  // esas zonas cruzan varios partidos reales cada una, el mapeo por partido
-  // ya las reemplaza con mejor precisión.)
+  // siempre resuelve directo (ver resolverPorLocalidad); (2) si el cliente
+  // NO factura por Cordón (Cliente.facturaPorCordon, decisión 2026-09-30 —
+  // Biosíntesis, Bella Vista PAÑALES), cualquier pedido de Provincia va
+  // siempre a la zona plana "Provincia", sin mirar el partido — es la tarifa
+  // única que tienen cargada esos clientes; (3) si el cliente SÍ factura por
+  // Cordón (Bella Vista Medicamentos) y se conoce el partido (viene de
+  // GeorefArAdapter, es un límite administrativo exacto) y está mapeado, se
+  // usa ese; (4) si no, fallback al mapeo por localidad de siempre. Nunca
+  // inventa un cordón. (Se sacó el fallback intermedio por Zona de
+  // SimpliRoute el 2026-09-08 — ver DOCUMENTO TECNICO.md historial: esas
+  // zonas cruzan varios partidos reales cada una, el mapeo por partido ya
+  // las reemplaza con mejor precisión.)
   async resolverParaPedido(
     clasificacion: CabaProvincia | null,
     localidad: string,
     partido: string | null = null,
+    facturaPorCordon = false,
   ): Promise<string | null> {
     if (clasificacion === CabaProvincia.CABA) {
       return this.resolverPorLocalidad(clasificacion, localidad);
+    }
+    if (clasificacion === null) return null;
+
+    if (!facturaPorCordon) {
+      return this.resolverZonaProvinciaPlana();
     }
 
     if (partido !== null) {
@@ -163,6 +174,16 @@ export class ZonasTarifariasService {
     }
 
     return this.resolverPorLocalidad(clasificacion, localidad);
+  }
+
+  // Cliente con tarifa plana (facturaPorCordon=false): cualquier pedido de
+  // Provincia factura siempre acá, sin importar el partido — mismo criterio
+  // que la zona "CABA" (nombre fijo, único, se busca por nombre en vez de
+  // guardar un id fijo en código). Null si la zona no está cargada, nunca se
+  // inventa una.
+  private async resolverZonaProvinciaPlana(): Promise<string | null> {
+    const zona = await this.prisma.zonaTarifaria.findUnique({ where: { nombre: "Provincia" } });
+    return zona?.id ?? null;
   }
 
   // Resuelve la ZonaTarifaria de un pedido a partir de la clasificación

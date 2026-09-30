@@ -17,6 +17,7 @@ export async function listarTodosLosClientes(): Promise<Cliente[]> {
 export interface DatosCliente {
   nombre: string;
   tipoServicio: TipoServicioCliente;
+  facturaPorCordon?: boolean;
 }
 
 export async function crearCliente(datos: DatosCliente): Promise<Cliente> {

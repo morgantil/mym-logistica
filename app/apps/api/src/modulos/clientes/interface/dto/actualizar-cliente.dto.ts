@@ -13,4 +13,8 @@ export class ActualizarClienteDto {
   @IsOptional()
   @IsEnum(TipoServicioCliente)
   tipoServicio?: TipoServicioCliente;
+
+  @IsOptional()
+  @IsBoolean()
+  facturaPorCordon?: boolean;
 }

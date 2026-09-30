@@ -267,6 +267,11 @@ export class ImportarExcelService {
       throw new BadRequestException("El Excel no tiene filas de datos.");
     }
 
+    // Para resolverParaPedido más abajo — decisión 2026-09-30, ver
+    // Cliente.facturaPorCordon (schema.prisma).
+    const cliente = await this.clientesService.buscarPorId(clienteId);
+    if (!cliente) throw new BadRequestException(`Cliente ${clienteId} no encontrado.`);
+
     const { id: importacionId } = await this.importacionesRepositorio.crear({
       clienteId,
       nombreArchivo,
@@ -360,19 +365,22 @@ export class ImportarExcelService {
 
       // §23 funcional + v6 §10.2: la clasificación CABA/Provincia se resuelve
       // con la API oficial de datos.gob.ar (georef-ar-api) — ver DOCUMENTO
-      // TECNICO.md. A partir de ahí, la zona tarifaria (CABA o el Cordón que
-      // corresponda) se resuelve en orden: CABA siempre directo; si no, por
-      // Partido (el más preciso, decisión 2026-09-08 — las zonas de
-      // SimpliRoute cruzan varios partidos reales cada una, se sacó ese
-      // mapeo del sistema); si no está mapeado, fallback al mapeo
-      // configurable Localidad → ZonaTarifaria de siempre. Nunca fija en
-      // código, nunca frena la importación si no se puede resolver: el
-      // pedido queda sin zona tarifaria asignada, para revisión manual.
+      // TECNICO.md. A partir de ahí, la zona tarifaria se resuelve en orden:
+      // CABA siempre directo; si el cliente no factura por Cordón (decisión
+      // 2026-09-30, Cliente.facturaPorCordon), va directo a la zona plana
+      // "Provincia"; si factura por Cordón, por Partido (el más preciso,
+      // decisión 2026-09-08 — las zonas de SimpliRoute cruzan varios
+      // partidos reales cada una, se sacó ese mapeo del sistema); si no está
+      // mapeado, fallback al mapeo configurable Localidad → ZonaTarifaria de
+      // siempre. Nunca fija en código, nunca frena la importación si no se
+      // puede resolver: el pedido queda sin zona tarifaria asignada, para
+      // revisión manual.
       const clasificacionLocalidad = await this.normalizadorDirecciones.clasificarCabaProvincia(grupo.localidad);
       const zonaTarifariaId = await this.zonasTarifariasService.resolverParaPedido(
         clasificacionLocalidad?.clasificacion ?? null,
         grupo.localidad,
         clasificacionLocalidad?.partido ?? null,
+        cliente.facturaPorCordon,
       );
 
       // Dos fuentes posibles de observación, pueden darse juntas: la nota que

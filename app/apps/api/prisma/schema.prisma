@@ -187,6 +187,15 @@ model Cliente {
   // clientes que también manejen medicamentos (ej. Bella Vista) se marcan
   // "AMBOS" a mano desde esta pantalla, no se asume.
   tipoServicio      TipoServicioCliente @default(PANAL)
+  // Decisión 2026-09-30 (Leonardo: "poder elegir qué clientes usan la
+  // lógica de Cordones"): false (default) = tarifa plana CABA/Provincia,
+  // ignora a qué partido pertenece un pedido de Provincia y factura siempre
+  // a la zona "Provincia" (Biosíntesis, Bella Vista PAÑALES). true = resuelve
+  // el partido y factura por Cordón (Primer/Segundo/Tercer), como ya hace
+  // Bella Vista Medicamentos. No cambia CÓMO se calcula 2x1/unificado, solo
+  // a qué ZonaTarifaria se le busca la tarifa — ver
+  // ZonasTarifariasService.resolverParaPedido.
+  facturaPorCordon  Boolean             @default(false)
 
   creadoEn         DateTime  @default(now())
   actualizadoEn    DateTime  @updatedAt

@@ -1,5 +1,5 @@
 import { TipoServicioCliente } from "@mym/shared-types";
-import { IsEnum, IsString } from "class-validator";
+import { IsBoolean, IsEnum, IsOptional, IsString } from "class-validator";
 
 export class CrearClienteDto {
   @IsString()
@@ -7,4 +7,9 @@ export class CrearClienteDto {
 
   @IsEnum(TipoServicioCliente)
   tipoServicio!: TipoServicioCliente;
+
+  // Default false (tarifa plana CABA/Provincia) — ver Cliente.facturaPorCordon.
+  @IsOptional()
+  @IsBoolean()
+  facturaPorCordon?: boolean;
 }

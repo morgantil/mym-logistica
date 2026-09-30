@@ -51,6 +51,7 @@ export function ClientesPage() {
             <TableRow>
               <TableHead>Nombre</TableHead>
               <TableHead>Tipo de servicio</TableHead>
+              <TableHead>Factura por Cordón</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Acciones</TableHead>
             </TableRow>
@@ -58,13 +59,13 @@ export function ClientesPage() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-muted-foreground">
+                <TableCell colSpan={5} className="text-muted-foreground">
                   Cargando…
                 </TableCell>
               </TableRow>
             ) : clientes?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-muted-foreground">
+                <TableCell colSpan={5} className="text-muted-foreground">
                   Todavía no hay clientes cargados.
                 </TableCell>
               </TableRow>
@@ -73,6 +74,7 @@ export function ClientesPage() {
                 <TableRow key={cliente.id}>
                   <TableCell>{cliente.nombre}</TableCell>
                   <TableCell>{ETIQUETAS_TIPO_SERVICIO[cliente.tipoServicio]}</TableCell>
+                  <TableCell>{cliente.facturaPorCordon ? "Sí" : "No"}</TableCell>
                   <TableCell>
                     {cliente.activo ? (
                       <Badge

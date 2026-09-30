@@ -5,6 +5,7 @@ export interface DatosActualizarCliente {
   nombre?: string;
   activo?: boolean;
   tipoServicio?: TipoServicioCliente;
+  facturaPorCordon?: boolean;
 }
 
 export interface ClientesRepositorio {
