@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { AxiosError } from "axios";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { TipoEnvase, TipoServicio } from "@mym/shared-types";
+import { TipoEnvase, TipoServicio, TipoServicioCliente } from "@mym/shared-types";
 import { Button } from "@/components/ui/button";
 import { FilaFormulario, TablaFormulario } from "@/components/shell/fila-formulario";
 import { Input } from "@/components/ui/input";
@@ -36,15 +36,27 @@ function mensajeError(error: unknown): string {
 // Las zonas (CABA, Cordón 1/2/3, ...) son configurables — ver Zonas tarifarias.
 export function TarifaFormSheet({
   clienteId,
+  tipoServicioCliente,
   tarifa,
   onOpenChange,
 }: {
   clienteId: string;
+  // Decisión 2026-09-29 (Leonardo: tarifa de Pañales cargada por error en un
+  // cliente de Medicamentos): si el cliente no es Ambos, el tipo de servicio
+  // de la tarifa queda fijo al que tiene el cliente — no se ofrece elegir
+  // el que no corresponde.
+  tipoServicioCliente: TipoServicioCliente;
   tarifa: TarifaCliente | null | "nuevo";
   onOpenChange: (abierto: boolean) => void;
 }) {
   const abierto = tarifa !== null;
   const editando = tarifa !== null && tarifa !== "nuevo";
+  const tipoServicioFijo =
+    tipoServicioCliente === TipoServicioCliente.PANAL
+      ? TipoServicio.PANAL
+      : tipoServicioCliente === TipoServicioCliente.MEDICAMENTO
+        ? TipoServicio.MEDICAMENTO
+        : null;
 
   const { data: zonas } = useQuery({
     queryKey: ["zonas-tarifarias"],
@@ -66,12 +78,12 @@ export function TarifaFormSheet({
       setMonto(String(tarifa.monto));
     } else {
       setZonaTarifariaId("");
-      setTipoServicio(TipoServicio.PANAL);
+      setTipoServicio(tipoServicioFijo ?? TipoServicio.PANAL);
       setTipoEnvase("");
       setMonto("");
     }
     setError(null);
-  }, [tarifa, editando]);
+  }, [tarifa, editando, tipoServicioFijo]);
 
   const esMedicamento = tipoServicio === TipoServicio.MEDICAMENTO;
 
@@ -146,7 +158,7 @@ export function TarifaFormSheet({
             </FilaFormulario>
 
             <FilaFormulario label="Tipo de servicio" htmlFor="tipo-servicio-tarifa" anchoEtiqueta="140px">
-              {editando ? (
+              {editando || tipoServicioFijo !== null ? (
                 <p className="text-sm">{ETIQUETAS_TIPO_SERVICIO[tipoServicio]}</p>
               ) : (
                 <Select

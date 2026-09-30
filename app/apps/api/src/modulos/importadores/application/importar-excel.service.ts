@@ -1,5 +1,13 @@
 import { BadRequestException, Inject, Injectable } from "@nestjs/common";
-import { EstadoImportacion, EstadoSimpliroute, EstadoValidacion, ResolucionDireccion, TipoServicio } from "@mym/shared-types";
+import {
+  EstadoImportacion,
+  EstadoSimpliroute,
+  EstadoValidacion,
+  ResolucionDireccion,
+  TipoServicio,
+  TipoServicioCliente,
+} from "@mym/shared-types";
+import { ClientesService } from "../../clientes/application/clientes.service";
 import { DestinatariosService } from "../../destinatarios/application/destinatarios.service";
 import { PedidosService } from "../../pedidos/application/pedidos.service";
 import { ZonasChoferesService } from "../../zonas-choferes/application/zonas-choferes.service";
@@ -58,7 +66,25 @@ export class ImportarExcelService {
     private zonasTarifariasService: ZonasTarifariasService,
     private sinonimoRecetaService: SinonimoRecetaService,
     private reglaImportacionService: ReglaImportacionService,
+    private clientesService: ClientesService,
   ) {}
+
+  // Decisión 2026-09-29 (mismo hallazgo que las tarifas: nada impedía
+  // importar un Excel de Medicamentos para un cliente de Pañales, o al
+  // revés) — mismo criterio que FacturacionService.validarTipoServicioDeCliente.
+  private async validarTipoServicioDeCliente(clienteId: string, tipoServicio: TipoServicio): Promise<void> {
+    const cliente = await this.clientesService.buscarPorId(clienteId);
+    if (!cliente) throw new BadRequestException(`Cliente ${clienteId} no encontrado.`);
+    if (cliente.tipoServicio === TipoServicioCliente.AMBOS) return;
+    const tipoDelCliente =
+      cliente.tipoServicio === TipoServicioCliente.PANAL ? TipoServicio.PANAL : TipoServicio.MEDICAMENTO;
+    if (tipoDelCliente !== tipoServicio) {
+      const etiqueta = (t: TipoServicio) => (t === TipoServicio.PANAL ? "Pañales" : "Medicamentos");
+      throw new BadRequestException(
+        `"${cliente.nombre}" está configurado como ${etiqueta(tipoDelCliente)} — no se puede importar un archivo de ${etiqueta(tipoServicio)} para este cliente.`,
+      );
+    }
+  }
 
   // Punto de entrada. Elegir el cliente es obligatorio siempre — decisión
   // 2026-09-16 (Leonardo, QA): la detección automática por nombre de archivo
@@ -86,6 +112,7 @@ export class ImportarExcelService {
     sinEncabezado?: boolean;
   }): Promise<ResultadoImportacion> {
     const tipoServicio = params.tipoServicio ?? TipoServicio.PANAL;
+    await this.validarTipoServicioDeCliente(params.clienteId, tipoServicio);
     const perfil = await this.perfilesRepositorio.buscarPorCliente(params.clienteId, tipoServicio);
     const informadas = { nombreHoja: params.nombreHoja?.trim() || undefined, sinEncabezado: params.sinEncabezado };
     const opciones = this.opcionesDeLectura(perfil, informadas);
@@ -131,6 +158,7 @@ export class ImportarExcelService {
     sinEncabezado?: boolean;
   }): Promise<ResultadoImportacion> {
     const tipoServicio = params.tipoServicio ?? TipoServicio.PANAL;
+    await this.validarTipoServicioDeCliente(params.clienteId, tipoServicio);
     const perfil = await this.perfilesRepositorio.buscarPorCliente(params.clienteId, tipoServicio);
     const informadas = { nombreHoja: params.nombreHoja?.trim() || undefined, sinEncabezado: params.sinEncabezado };
     const opciones = this.opcionesDeLectura(perfil, informadas);

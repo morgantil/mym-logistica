@@ -1,5 +1,6 @@
-import { BadRequestException, Inject, Injectable } from "@nestjs/common";
-import { TipoServicio } from "@mym/shared-types";
+import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { TipoServicio, TipoServicioCliente } from "@mym/shared-types";
+import { ClientesService } from "../../clientes/application/clientes.service";
 import { TODOS_LOS_CAMPOS_CANONICOS } from "../domain/campo-canonico";
 import {
   DatosReglaImportacion,
@@ -16,6 +17,7 @@ import { CAMPOS_DESTINO_REGLA, esPrioridadValida } from "../domain/reglas-import
 export class ReglaImportacionService {
   constructor(
     @Inject(REGLA_IMPORTACION_REPOSITORIO) private readonly repositorio: ReglaImportacionRepositorio,
+    private clientesService: ClientesService,
   ) {}
 
   listar(filtro: { clienteId?: string; tipoServicio?: TipoServicio }) {
@@ -26,21 +28,31 @@ export class ReglaImportacionService {
     return this.repositorio.listarActivas(clienteId, tipoServicio);
   }
 
-  crear(datos: DatosReglaImportacion, usuarioId: string) {
-    return this.repositorio.crear(this.validar(datos), usuarioId);
+  async crear(datos: DatosReglaImportacion, usuarioId: string) {
+    return this.repositorio.crear(await this.validar(datos), usuarioId);
   }
 
-  actualizar(id: string, datos: DatosReglaImportacion, usuarioId: string) {
-    return this.repositorio.actualizar(id, this.validar(datos), usuarioId);
+  async actualizar(id: string, datos: DatosReglaImportacion, usuarioId: string) {
+    return this.repositorio.actualizar(id, await this.validar(datos), usuarioId);
   }
 
   eliminar(id: string) {
     return this.repositorio.eliminar(id);
   }
 
-  private validar(datos: DatosReglaImportacion): DatosReglaImportacion {
+  // Decisión 2026-09-29: mismo hallazgo que las tarifas — el cliente elegido
+  // tiene que manejar realmente medicamentos, si no la regla nunca se
+  // aplica (ese cliente no importa archivos de ese tipo).
+  private async validar(datos: DatosReglaImportacion): Promise<DatosReglaImportacion> {
     if (datos.tipoServicio !== TipoServicio.MEDICAMENTO) {
       throw new BadRequestException("Las reglas de importación por ahora solo aplican a medicamentos.");
+    }
+    const cliente = await this.clientesService.buscarPorId(datos.clienteId);
+    if (!cliente) throw new NotFoundException(`Cliente ${datos.clienteId} no encontrado.`);
+    if (cliente.tipoServicio === TipoServicioCliente.PANAL) {
+      throw new BadRequestException(
+        `"${cliente.nombre}" está configurado como Pañales — no puede tener reglas de importación de Medicamentos.`,
+      );
     }
     const valor = datos.valor.trim();
     if (!valor) throw new BadRequestException("Falta el texto de la condición.");

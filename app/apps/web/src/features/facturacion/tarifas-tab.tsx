@@ -49,6 +49,13 @@ export function TarifasTab({ clienteId }: { clienteId: string | null }) {
   const [montoEnEdicion, setMontoEnEdicion] = useState<MontoUnificadoMedicamento | "nuevo" | null>(null);
   const queryClient = useQueryClient();
 
+  // Para restringir "Nueva tarifa"/"Nuevo monto" al tipo de servicio real del
+  // cliente (decisión 2026-09-29, ver FacturacionService.validarTipoServicioDeCliente
+  // en el backend — acá es la misma regla, pero evitando el viaje al servidor
+  // para avisar).
+  const { data: clientes } = useQuery({ queryKey: ["clientes"], queryFn: listarClientesActivos });
+  const clienteActual = clientes?.find((c) => c.id === clienteId) ?? null;
+
   const { data: tarifas, isLoading: cargandoTarifas } = useQuery({
     queryKey: ["facturacion", "tarifas", clienteId],
     queryFn: () => listarTarifas(clienteId!),
@@ -193,13 +200,14 @@ export function TarifasTab({ clienteId }: { clienteId: string | null }) {
         </Table>
       </div>
 
+      {clienteActual?.tipoServicio !== TipoServicioCliente.PANAL && (
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="font-medium">Monto de medicamento en entrega unificada</h2>
             <p className="text-sm text-muted-foreground">
               Monto fijo "de paso" por compartir el viaje con el pañal — varía por zona, no por un porcentaje de
-              ninguna tarifa.
+              ninguna tarifa. Solo aplica a clientes de Medicamentos o Ambos.
             </p>
           </div>
           <Button type="button" variant="outline" size="sm" onClick={() => setMontoEnEdicion("nuevo")}>
@@ -259,11 +267,13 @@ export function TarifasTab({ clienteId }: { clienteId: string | null }) {
           </TableBody>
         </Table>
       </div>
+      )}
 
       <CombinacionesUnificacion />
 
       <TarifaFormSheet
         clienteId={clienteId}
+        tipoServicioCliente={clienteActual?.tipoServicio ?? TipoServicioCliente.AMBOS}
         tarifa={tarifaEnEdicion}
         onOpenChange={(abierto) => !abierto && setTarifaEnEdicion(null)}
       />

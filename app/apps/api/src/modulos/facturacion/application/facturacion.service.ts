@@ -60,13 +60,34 @@ export class FacturacionService {
     return this.repositorio.listarTarifas(clienteId);
   }
 
-  crearTarifa(
+  // Decisión 2026-09-29 (Leonardo, viendo una tarifa de Pañales cargada por
+  // error en un cliente de Medicamentos): mismo criterio que ya usa
+  // crearCombinacion (riesgo #3, 2026-09-11) — el tipo de servicio de una
+  // tarifa tiene que ser compatible con el que tiene configurado el cliente
+  // (Cliente.tipoServicio), si no queda una fila que nunca se va a usar y
+  // confunde a quien mira la lista.
+  private async validarTipoServicioDeCliente(clienteId: string, tipoServicio: TipoServicio, queSeCrea: string) {
+    const cliente = await this.clientesService.buscarPorId(clienteId);
+    if (!cliente) throw new NotFoundException(`Cliente ${clienteId} no encontrado.`);
+    if (cliente.tipoServicio === TipoServicioCliente.AMBOS) return;
+    const tipoDelCliente =
+      cliente.tipoServicio === TipoServicioCliente.PANAL ? TipoServicio.PANAL : TipoServicio.MEDICAMENTO;
+    if (tipoDelCliente !== tipoServicio) {
+      const etiqueta = (t: TipoServicio) => (t === TipoServicio.PANAL ? "Pañales" : "Medicamentos");
+      throw new BadRequestException(
+        `"${cliente.nombre}" está configurado como ${etiqueta(tipoDelCliente)} — no se puede cargar ${queSeCrea} de ${etiqueta(tipoServicio)} para este cliente.`,
+      );
+    }
+  }
+
+  async crearTarifa(
     clienteId: string,
     zonaTarifariaId: string,
     tipoServicio: TipoServicio,
     tipoEnvase: TipoEnvase | null,
     monto: number,
   ) {
+    await this.validarTipoServicioDeCliente(clienteId, tipoServicio, "una tarifa");
     return this.repositorio.crearTarifa({ clienteId, zonaTarifariaId, tipoServicio, tipoEnvase, monto });
   }
 
@@ -90,12 +111,23 @@ export class FacturacionService {
     return this.repositorio.listarMontosUnificadoMedicamento(clienteId);
   }
 
-  crearMontoUnificadoMedicamento(
+  // Este monto es siempre del lado MEDICAMENTO de una entrega unificada (ver
+  // comentario en MontoUnificadoMedicamento, schema.prisma) — nunca tiene
+  // sentido en un cliente que solo maneja Pañales (encontrado 2026-09-29:
+  // había quedado uno activo en un cliente de Pañales, sin usarse nunca).
+  async crearMontoUnificadoMedicamento(
     clienteId: string,
     zonaTarifariaId: string,
     tipoEnvase: TipoEnvase | null,
     monto: number,
   ) {
+    const cliente = await this.clientesService.buscarPorId(clienteId);
+    if (!cliente) throw new NotFoundException(`Cliente ${clienteId} no encontrado.`);
+    if (cliente.tipoServicio === TipoServicioCliente.PANAL) {
+      throw new BadRequestException(
+        `"${cliente.nombre}" está configurado como Pañales — el monto de medicamento en unificado solo aplica a un cliente de Medicamentos o Ambos.`,
+      );
+    }
     return this.repositorio.crearMontoUnificadoMedicamento({ clienteId, zonaTarifariaId, tipoEnvase, monto });
   }
 
