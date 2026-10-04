@@ -272,11 +272,15 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
     return filas.map((fila) => fila.localidad);
   }
 
+  // Decisión 2026-10-04 (reunión con el cliente): una entrega fallida
+  // (ausencia en el domicilio, "visita fallida" en SimpliRoute) también se
+  // factura — el viaje se hizo igual. Mismo criterio para el cliente acá y
+  // para el chofer en listarEntregadosPorChoferEnPeriodo (facturación).
   async listarFacturables(filtro: FiltroPedidosFacturables): Promise<PedidoFacturable[]> {
     const pedidos = await this.prisma.pedido.findMany({
       where: {
         clienteId: filtro.clienteId,
-        estado: "ENTREGADO",
+        estado: { in: ["ENTREGADO", "ENTREGA_FALLIDA"] },
         grupoFacturacionId: null,
         fechaProgramada: { gte: filtro.fechaDesde, lt: filtro.fechaHasta },
       },
@@ -290,7 +294,7 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
     const pedidos = await this.prisma.pedido.findMany({
       where: {
         clienteId: filtro.clienteId,
-        estado: "ENTREGADO",
+        estado: { in: ["ENTREGADO", "ENTREGA_FALLIDA"] },
         fechaProgramada: { gte: filtro.fechaDesde, lt: filtro.fechaHasta },
       },
       include: { productos: { select: { tipoEnvase: true } } },

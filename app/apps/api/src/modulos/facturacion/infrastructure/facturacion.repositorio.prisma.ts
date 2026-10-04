@@ -434,13 +434,15 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
     return mapearTarifaTransportista(actualizada);
   }
 
+  // Decisión 2026-10-04: una entrega fallida también se le paga al chofer
+  // (hizo el viaje igual) — mismo criterio que la facturación a clientes.
   async listarEntregadosPorChoferEnPeriodo(
     fechaDesde: Date,
     fechaHasta: Date,
   ): Promise<PedidoParaLiquidarTransportista[]> {
     const pedidos = await this.prisma.pedido.findMany({
       where: {
-        estado: "ENTREGADO",
+        estado: { in: ["ENTREGADO", "ENTREGA_FALLIDA"] },
         choferId: { not: null },
         fechaEntregaEfectiva: { gte: fechaDesde, lt: fechaHasta },
       },
