@@ -57,6 +57,15 @@ export function DetallePedidoSheet({
                   <p className="text-sm text-muted-foreground">{pedido.observaciones}</p>
                 </div>
               )}
+
+              {/* Editable desde la columna "Comentarios" de la grilla — acá
+                  solo de lectura, para no duplicar el guardado en dos lugares. */}
+              {pedido.comentario && (
+                <div>
+                  <p className="text-sm font-medium">Comentarios</p>
+                  <p className="text-sm text-muted-foreground">{pedido.comentario}</p>
+                </div>
+              )}
             </div>
           </>
         )}

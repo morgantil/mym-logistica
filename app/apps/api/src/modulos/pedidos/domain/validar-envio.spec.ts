@@ -31,6 +31,7 @@ function pedidoListoParaEnviar(overrides: Partial<Pedido> = {}): Pedido {
     geocodeAlert: null,
     bultos: 2,
     observaciones: null,
+    comentario: null,
     alertaDireccionPendiente: false,
     etiquetaImpresaEn: null,
     cantidadPedidoOriginal: 1,

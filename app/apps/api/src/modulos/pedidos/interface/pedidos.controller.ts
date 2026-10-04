@@ -17,6 +17,7 @@ import { UsuarioActual, UsuarioAutenticado } from "../../../common/decorators/us
 import { PedidosService } from "../application/pedidos.service";
 import { ActualizarPrioridadDto } from "./dto/actualizar-prioridad.dto";
 import { ActualizarBultosDto } from "./dto/actualizar-bultos.dto";
+import { ActualizarComentarioDto } from "./dto/actualizar-comentario.dto";
 import { EliminarPedidosDto } from "./dto/eliminar-pedidos.dto";
 import { EnviarSimpliRouteDto } from "./dto/enviar-simpliroute.dto";
 import { ListarPedidosDto } from "./dto/listar-pedidos.dto";
@@ -82,6 +83,15 @@ export class PedidosController {
   @Patch(":id/bultos")
   actualizarBultos(@Param("id") id: string, @Body() dto: ActualizarBultosDto) {
     return this.pedidosService.actualizarBultos(id, dto.bultos, dto.version);
+  }
+
+  // Decisión 2026-10-04 (reunión con el cliente): comentario libre por
+  // pedido, editable en cualquier momento — mismos roles que ya operan
+  // pedidos día a día (no es exclusivo de Logística, a diferencia de bultos).
+  @Roles(Rol.OPERACIONES, Rol.LOGISTICA, Rol.ADMINISTRACION)
+  @Patch(":id/comentario")
+  actualizarComentario(@Param("id") id: string, @Body() dto: ActualizarComentarioDto) {
+    return this.pedidosService.actualizarComentario(id, dto.comentario ?? null, dto.version);
   }
 
   // Decisión 2026-09-16: resuelve una "dirección distinta a la registrada en

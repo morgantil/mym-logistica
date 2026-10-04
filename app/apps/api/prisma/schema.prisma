@@ -589,6 +589,11 @@ model Pedido {
   ticket               String? // opcional — Farmapal (§4 funcional)
   simplirouteId        String?
   observaciones        String?
+  // Decisión 2026-10-04 (reunión con el cliente, Pablo Renzo): campo libre
+  // para que el operador escriba en cualquier momento (ej. motivo de una
+  // entrega fallida, "no había nadie en el domicilio") — a propósito
+  // separado de `observaciones`, que viene del Excel y no se edita a mano.
+  comentario           String?
   // Decisión 2026-09-16 (Leonardo, QA): antes, una dirección distinta a la
   // registrada en el padrón solo quedaba anotada como texto libre en
   // `observaciones` y el pedido se podía enviar igual — esta es la "Etapa 2"

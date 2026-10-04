@@ -130,6 +130,12 @@ export class PedidosService {
     return this.repositorio.actualizarBultos(pedidoId, bultos, version);
   }
 
+  // Decisión 2026-10-04: campo libre, editable en cualquier momento (ej.
+  // motivo de una entrega fallida) — mismo bloqueo optimista que bultos.
+  async actualizarComentario(pedidoId: string, comentario: string | null, version: number) {
+    return this.repositorio.actualizarComentario(pedidoId, comentario?.trim() || null, version);
+  }
+
   // Decisión 2026-09-16 (Leonardo, QA): la "Etapa 2" del §11 funcional que
   // había quedado pendiente — resolver una dirección distinta a la
   // registrada en el padrón ya no es solo una nota en observaciones, ahora

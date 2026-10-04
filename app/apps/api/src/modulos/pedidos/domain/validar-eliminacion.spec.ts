@@ -31,6 +31,7 @@ function pedido(overrides: Partial<Pedido> = {}): Pedido {
     geocodeAlert: null,
     bultos: null,
     observaciones: null,
+    comentario: null,
     alertaDireccionPendiente: false,
     etiquetaImpresaEn: null,
     cantidadPedidoOriginal: 1,

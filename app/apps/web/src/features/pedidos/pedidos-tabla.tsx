@@ -39,6 +39,7 @@ import {
   obtenerColumnasPedidos,
 } from "./api";
 import { BultosCelda } from "./bultos-celda";
+import { ComentarioCelda } from "./comentario-celda";
 import { DetallePedidoSheet } from "./detalle-pedido-sheet";
 import { ordenarColumnas } from "./orden-columnas";
 import {
@@ -120,6 +121,7 @@ const IDS_COLUMNAS_DEFAULT = [
   "validacion",
   "simpliroute",
   "observaciones",
+  "comentario",
 ] as const;
 
 const LABEL_COLUMNA: Record<(typeof IDS_COLUMNAS_DEFAULT)[number], string> = {
@@ -147,6 +149,7 @@ const LABEL_COLUMNA: Record<(typeof IDS_COLUMNAS_DEFAULT)[number], string> = {
   validacion: "Validación",
   simpliroute: "SimpliRoute",
   observaciones: "Observaciones",
+  comentario: "Comentarios",
 };
 
 // "productos" es un cálculo agregado (suma de varios renglones), no una
@@ -159,6 +162,11 @@ export function PedidosTabla() {
   const queryClient = useQueryClient();
   const puedeEditarBultos = Boolean(
     usuario?.roles.some((rol) => rol === "LOGISTICA" || rol === "ADMINISTRACION"),
+  );
+  // Comentario: cualquiera de los roles que opera pedidos día a día, no solo
+  // Logística — decisión 2026-10-04.
+  const puedeEditarComentario = Boolean(
+    usuario?.roles.some((rol) => rol === "OPERACIONES" || rol === "LOGISTICA" || rol === "ADMINISTRACION"),
   );
   // Borrado lógico — decisión 2026-09-11, ver validar-eliminacion.ts (solo
   // pedidos que todavía no se mandaron a SimpliRoute).
@@ -500,8 +508,13 @@ export function PedidosTabla() {
         header: "Observaciones",
         cell: ({ row }) => row.original.observaciones ?? "—",
       },
+      comentario: {
+        id: "comentario",
+        header: "Comentarios",
+        cell: ({ row }) => <ComentarioCelda pedido={row.original} puedeEditar={puedeEditarComentario} />,
+      },
     }),
-    [puedeEditarBultos, puedeEliminar, mutacionPrioridad],
+    [puedeEditarBultos, puedeEditarComentario, puedeEliminar, mutacionPrioridad],
   );
 
   const columnas = useMemo<LegacyColumnDef<PedidoListado>[]>(() => {

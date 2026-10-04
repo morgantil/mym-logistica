@@ -181,6 +181,9 @@ export interface PedidosRepositorio {
   // Ambos con bloqueo optimista: lanzan ConflictoVersionError (ver ese archivo)
   // si `version` no coincide con la fila actual — alguien más lo modificó primero.
   actualizarBultos(id: string, bultos: number, version: number): Promise<Pedido>;
+  // Decisión 2026-10-04: comentario libre, editable en cualquier momento
+  // (ej. motivo de una entrega fallida) — mismo bloqueo optimista que bultos.
+  actualizarComentario(id: string, comentario: string | null, version: number): Promise<Pedido>;
   // Decisión 2026-09-16: aplica la resolución elegida por el usuario para una
   // "dirección distinta al padrón" — actualiza `direccionUsada` (según lo que
   // haya decidido resolverDiferenciaDireccion) y apaga `alertaDireccionPendiente`,

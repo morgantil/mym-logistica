@@ -67,6 +67,19 @@ export async function actualizarBultos(
   return data;
 }
 
+// Decisión 2026-10-04: comentario libre por pedido, editable en cualquier momento.
+export async function actualizarComentario(
+  pedidoId: string,
+  comentario: string,
+  version: number,
+): Promise<PedidoListado> {
+  const { data } = await apiClient.patch<PedidoListado>(`/pedidos/${pedidoId}/comentario`, {
+    comentario,
+    version,
+  });
+  return data;
+}
+
 // Decisión 2026-09-16: resuelve una "dirección distinta a la registrada en
 // el padrón" y desbloquea el envío del pedido (ver validar-envio.ts).
 export async function resolverAlertaDireccion(

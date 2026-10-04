@@ -42,6 +42,9 @@ export interface PedidoListado {
   choferId: string | null;
   bultos: number | null;
   observaciones: string | null;
+  // Campo libre editable por el operador en cualquier momento — decisión
+  // 2026-10-04, separado de `observaciones` (que viene del Excel).
+  comentario: string | null;
   // Decisión 2026-09-16: true bloquea el envío hasta resolverse (ver
   // ResolverDireccionDialog).
   alertaDireccionPendiente: boolean;
