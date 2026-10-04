@@ -6,6 +6,7 @@ import { FilaExcelCruda } from "./lector-excel.port";
 import { esAfiliadoIlegible } from "./afiliado-ilegible";
 import { aplicarReglasImportacion, ReglaImportacion } from "./reglas-importacion";
 import { aTexto, extraerNotaDeCeldaFecha } from "./transformar-fila";
+import { normalizarTelefono } from "./normalizar-telefono";
 
 export interface ResultadoTransformarFilaMedicamento {
   valida: boolean;
@@ -76,7 +77,8 @@ export function transformarFilaMedicamento(
   const direccion = aTexto(leer("direccion"));
   const localidad = aTexto(leer("localidad"));
   const notaFecha = extraerNotaDeCeldaFecha(leer("fechaEntrega"));
-  const telefono = aTexto(leer("telefono"));
+  // Normalizado a +54 9 11... acá, al importar — ver normalizar-telefono.ts.
+  const telefono = normalizarTelefono(aTexto(leer("telefono")));
   const ticket = aTexto(leer("ticket"));
   const receta = aTexto(leer("receta"));
   const tipoPedido = aTexto(leer("tipoPedido"));

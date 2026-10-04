@@ -2,6 +2,7 @@ import { PrioridadPedido } from "@mym/shared-types";
 import { LineaExcelImportada } from "../../pedidos/domain/pedido";
 import { CAMPOS_OBLIGATORIOS, MapeoColumnas } from "./campo-canonico";
 import { FilaExcelCruda } from "./lector-excel.port";
+import { normalizarTelefono } from "./normalizar-telefono";
 
 export interface ResultadoTransformarFila {
   valida: boolean;
@@ -84,7 +85,10 @@ export function transformarFila(
   const descripcionProducto = aTexto(leer("descripcionProducto"));
   const cantidad = aCantidad(leer("cantidad"));
   const codigoProducto = aTexto(leer("codigoProducto"));
-  const telefono = aTexto(leer("telefono"));
+  // Normalizado a +54 9 11... acá, al importar — decisión 2026-10-04
+  // (Pablo Renzo): es el formato que necesita SimpliRoute, más simple
+  // resolverlo una vez al cargar que cada vez que se envía.
+  const telefono = normalizarTelefono(aTexto(leer("telefono")));
   const ticket = aTexto(leer("ticket"));
 
   if (!numeroAfiliado) errores.push("Falta número de afiliado.");
