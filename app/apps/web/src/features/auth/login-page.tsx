@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FilaFormulario, TablaFormulario } from "@/components/shell/fila-formulario";
 import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
 import { useAuth } from "./auth-context";
 
 function mensajeError(error: unknown): string {
@@ -16,7 +15,7 @@ function mensajeError(error: unknown): string {
 }
 
 export function LoginPage() {
-  const { login, urlLoginGoogle } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -101,16 +100,6 @@ export function LoginPage() {
               {enviando ? "Ingresando…" : "Iniciar sesión"}
             </Button>
           </form>
-
-          <div className="my-4 flex items-center gap-3">
-            <Separator className="flex-1" />
-            <span className="text-sm text-muted-foreground">o</span>
-            <Separator className="flex-1" />
-          </div>
-
-          <Button variant="outline" className="w-full" asChild>
-            <a href={urlLoginGoogle}>Continuar con Google</a>
-          </Button>
         </CardContent>
       </Card>
     </div>

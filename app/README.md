@@ -63,10 +63,6 @@ En `apps/api/.env`:
 
 - `JWT_SECRET` / `JWT_REFRESH_SECRET`: cualquier string largo y random para
   desarrollo (ej. `openssl rand -hex 32`).
-- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`: solo hacen falta para probar el
-  login con Google. Se consiguen en Google Cloud Console → Credentials → OAuth
-  Client ID (tipo "Web application"). Mientras tanto, el login propio
-  (email/password) funciona sin esto.
 - El resto (Redis, R2, SimpliRoute) puede quedar sin completar por ahora —
   `SIMPLIROUTE_MOCK=true` hace que el sistema use datos simulados en vez de
   fallar.
@@ -102,8 +98,8 @@ cp apps/web/.env.example apps/web/.env   # ya trae http://localhost:3000 por def
 pnpm --filter @mym/web dev
 ```
 
-Levanta en `http://localhost:5173` (el `CORS_ORIGIN` del backend y el
-`FRONTEND_URL` que usa el redirect de Google ya apuntan ahí por defecto).
+Levanta en `http://localhost:5173` (el `CORS_ORIGIN` y el `FRONTEND_URL` del
+backend ya apuntan ahí por defecto).
 
 ## Comandos útiles (desde la raíz del monorepo)
 

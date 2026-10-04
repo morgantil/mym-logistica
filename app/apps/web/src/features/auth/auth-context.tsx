@@ -6,9 +6,7 @@ interface AuthContextValor {
   usuario: UsuarioAutenticado | null;
   cargando: boolean;
   login: (email: string, password: string) => Promise<void>;
-  completarLoginGoogle: (accessToken: string) => Promise<void>;
   logout: () => Promise<void>;
-  urlLoginGoogle: string;
 }
 
 const AuthContext = createContext<AuthContextValor | null>(null);
@@ -66,12 +64,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUsuario(perfil);
   }, []);
 
-  const completarLoginGoogle = useCallback(async (accessToken: string) => {
-    setAccessToken(accessToken);
-    const perfil = await cargarPerfil();
-    setUsuario(perfil);
-  }, []);
-
   const logout = useCallback(async () => {
     try {
       await apiClient.post("/auth/logout");
@@ -80,14 +72,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [cerrarSesionLocal]);
 
-  const urlLoginGoogle = useMemo(
-    () => `${import.meta.env.VITE_API_URL ?? "http://localhost:3000"}/auth/google`,
-    [],
-  );
-
   const valor = useMemo(
-    () => ({ usuario, cargando, login, completarLoginGoogle, logout, urlLoginGoogle }),
-    [usuario, cargando, login, completarLoginGoogle, logout, urlLoginGoogle],
+    () => ({ usuario, cargando, login, logout }),
+    [usuario, cargando, login, logout],
   );
 
   return <AuthContext.Provider value={valor}>{children}</AuthContext.Provider>;

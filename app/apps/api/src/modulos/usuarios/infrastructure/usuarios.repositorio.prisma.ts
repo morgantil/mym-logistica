@@ -15,22 +15,13 @@ export class UsuariosRepositorioPrisma implements UsuariosRepositorio {
     return this.prisma.usuario.findUnique({ where: { id } });
   }
 
-  buscarPorGoogleId(googleId: string): Promise<Usuario | null> {
-    return this.prisma.usuario.findUnique({ where: { googleId } });
-  }
-
   crear(datos: {
     email: string;
     nombre: string;
     passwordHash?: string | null;
-    googleId?: string | null;
     roles: Usuario["roles"];
   }): Promise<Usuario> {
     return this.prisma.usuario.create({ data: datos });
-  }
-
-  actualizarGoogleId(usuarioId: string, googleId: string): Promise<Usuario> {
-    return this.prisma.usuario.update({ where: { id: usuarioId }, data: { googleId } });
   }
 
   listar(): Promise<Usuario[]> {

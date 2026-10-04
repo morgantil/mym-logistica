@@ -5,15 +5,12 @@ import { Usuario } from "./usuario";
 export interface UsuariosRepositorio {
   buscarPorEmail(email: string): Promise<Usuario | null>;
   buscarPorId(id: string): Promise<Usuario | null>;
-  buscarPorGoogleId(googleId: string): Promise<Usuario | null>;
   crear(datos: {
     email: string;
     nombre: string;
     passwordHash?: string | null;
-    googleId?: string | null;
     roles: Usuario["roles"];
   }): Promise<Usuario>;
-  actualizarGoogleId(usuarioId: string, googleId: string): Promise<Usuario>;
 
   // Administración de usuarios (pantalla "Usuarios", rol Administración) —
   // agregado 2026-08-26 al sacar el login con Google del MVP: hasta acá el

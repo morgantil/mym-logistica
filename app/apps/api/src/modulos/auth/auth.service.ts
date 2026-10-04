@@ -111,13 +111,4 @@ export class AuthService {
   async cerrarSesion(refreshToken: string): Promise<void> {
     await this.sesionesService.revocarToken(refreshToken);
   }
-
-  async iniciarSesionConGoogle(perfil: {
-    googleId: string;
-    email: string;
-    nombre: string;
-  }): Promise<ParTokens> {
-    const usuario = await this.usuariosService.buscarOCrearPorGoogle(perfil);
-    return this.emitirTokens(usuario);
-  }
 }

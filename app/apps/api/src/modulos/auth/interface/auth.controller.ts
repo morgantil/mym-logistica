@@ -4,7 +4,6 @@ import { Request, Response } from "express";
 import { parseDuracionAMs } from "../../../common/utils/duracion";
 import { AuthService } from "../auth.service";
 import { LocalAuthGuard } from "../estrategias/local-auth.guard";
-import { GoogleAuthGuard } from "../estrategias/google-auth.guard";
 import { Publico } from "../../../common/decorators/publico.decorator";
 import { UsuarioActual, UsuarioAutenticado } from "../../../common/decorators/usuario-actual.decorator";
 import { LoginDto } from "./dto/login.dto";
@@ -91,28 +90,6 @@ export class AuthController {
     }
     this.limpiarCookieRefresh(res);
     return { ok: true };
-  }
-
-  @Publico()
-  @UseGuards(GoogleAuthGuard)
-  @Get("google")
-  iniciarGoogle() {
-    // Passport redirige a Google. No hay body: el guard maneja todo el flujo.
-  }
-
-  @Publico()
-  @UseGuards(GoogleAuthGuard)
-  @Get("google/callback")
-  async callbackGoogle(@Req() req: Request, @Res() res: Response) {
-    const perfil = req.user as { googleId: string; email: string; nombre: string };
-    const { accessToken, refreshToken } = await this.authService.iniciarSesionConGoogle(perfil);
-    this.setearCookieRefresh(res, refreshToken);
-    // Es un GET de navegador completo (Google redirige acá), no un fetch del
-    // front — por eso la sesión se completa con un redirect en vez de un JSON.
-    // El accessToken va en el fragment (#), no en el query string, para que
-    // no quede en logs de servidor ni en el historial de navegación.
-    const frontendUrl = this.configService.get<string>("frontendUrl")!;
-    res.redirect(`${frontendUrl}/auth/callback#accessToken=${accessToken}`);
   }
 
   @Get("perfil")

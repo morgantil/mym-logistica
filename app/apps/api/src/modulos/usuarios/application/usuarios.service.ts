@@ -38,31 +38,6 @@ export class UsuariosService {
     return usuario ? sinCredenciales(usuario) : null;
   }
 
-  async buscarOCrearPorGoogle(perfil: {
-    googleId: string;
-    email: string;
-    nombre: string;
-  }): Promise<Usuario> {
-    const existentePorGoogleId = await this.repositorio.buscarPorGoogleId(perfil.googleId);
-    if (existentePorGoogleId) {
-      return existentePorGoogleId;
-    }
-
-    const existentePorEmail = await this.repositorio.buscarPorEmail(perfil.email);
-    if (existentePorEmail) {
-      // Ya existía con login propio — vinculamos la cuenta de Google, no duplicamos usuario.
-      return this.repositorio.actualizarGoogleId(existentePorEmail.id, perfil.googleId);
-    }
-
-    // Usuario nuevo vía Google: sin rol todavía — un admin se lo asigna (ver §33 funcional).
-    return this.repositorio.crear({
-      email: perfil.email,
-      nombre: perfil.nombre,
-      googleId: perfil.googleId,
-      roles: [] as Rol[],
-    });
-  }
-
   // --- Administración de usuarios (pantalla "Usuarios", rol Administración) ---
   // Agregado 2026-08-26: hasta acá el único alta posible era vía Google o
   // directo en la base — necesario para poder sacar Google del login sin

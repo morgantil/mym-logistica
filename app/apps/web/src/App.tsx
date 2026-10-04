@@ -2,7 +2,6 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "@/components/shell/app-shell";
 import { ProtectedRoute } from "@/components/shell/protected-route";
 import { DashboardPage } from "@/features/dashboard/dashboard-page";
-import { GoogleCallbackPage } from "@/features/auth/google-callback-page";
 import { LoginPage } from "@/features/auth/login-page";
 import { ImportarPage } from "@/features/importar/importar-page";
 import { ClientesPage } from "@/features/clientes/clientes-page";
@@ -16,7 +15,6 @@ function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/auth/callback" element={<GoogleCallbackPage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route element={<AppShell />}>
