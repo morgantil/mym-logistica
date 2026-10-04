@@ -84,7 +84,7 @@ function agruparEnBloques(grupos: GrupoFacturacion[]): BloqueGrupos[] {
 function EncabezadoBloque({ bloque }: { bloque: BloqueGrupos }) {
   return (
     <TableRow className={cn("hover:bg-transparent", CLASES_TONO[TONO_REGLA[bloque.regla]])}>
-      <TableCell colSpan={7} className="py-1.5">
+      <TableCell colSpan={8} className="py-1.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="text-xs font-semibold tracking-wide uppercase">
             Facturando {TEXTO_REGLA[bloque.regla]}
@@ -245,18 +245,19 @@ export function LiquidacionTab({
               <TableHead>Fecha</TableHead>
               <TableHead>Zona</TableHead>
               <TableHead>Chofer</TableHead>
+              <TableHead>Comentarios</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {cargando ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-muted-foreground">
+                <TableCell colSpan={8} className="text-muted-foreground">
                   Cargando…
                 </TableCell>
               </TableRow>
             ) : !hayGrupos ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-muted-foreground">
+                <TableCell colSpan={8} className="text-muted-foreground">
                   Todavía no se generó una vista previa para este mes.
                 </TableCell>
               </TableRow>
@@ -274,7 +275,7 @@ export function LiquidacionTab({
           {hayGrupos && (
             <TableFooter>
               <TableRow>
-                <TableCell colSpan={5} className="font-medium">
+                <TableCell colSpan={6} className="font-medium">
                   Total
                 </TableCell>
                 <TableCell colSpan={2} className="font-medium">
@@ -293,7 +294,7 @@ function FilasGrupo({ grupo, pedidos }: { grupo: GrupoFacturacion; pedidos: Pedi
   return (
     <Fragment>
       <TableRow className="bg-muted/50 hover:bg-muted/50">
-        <TableCell colSpan={7}>
+        <TableCell colSpan={8}>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <BadgeRegla regla={grupo.reglaAplicada} />
@@ -320,6 +321,7 @@ function FilasGrupo({ grupo, pedidos }: { grupo: GrupoFacturacion; pedidos: Pedi
           <TableCell className="whitespace-nowrap">{formatearFecha(pedido.fechaProgramada)}</TableCell>
           <TableCell className="whitespace-nowrap">{pedido.zonaTarifariaNombre ?? "—"}</TableCell>
           <TableCell className="whitespace-nowrap">{pedido.choferNombre ?? "Sin asignar"}</TableCell>
+          <TableCell className="whitespace-nowrap">{pedido.comentario ?? "—"}</TableCell>
         </TableRow>
       ))}
     </Fragment>

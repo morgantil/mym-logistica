@@ -58,6 +58,10 @@ export interface PedidoFacturado {
   zonaTarifariaNombre: string | null;
   tipoServicio: TipoServicio;
   choferNombre: string | null;
+  // Decisión 2026-10-04 (reunión con el cliente): el comentario que haya
+  // cargado el operador en Pedidos, visible acá como respaldo para el
+  // cliente al revisar la liquidación.
+  comentario: string | null;
   grupoId: string;
   reglaAplicada: string;
   tarifaUtilizada: number | null;

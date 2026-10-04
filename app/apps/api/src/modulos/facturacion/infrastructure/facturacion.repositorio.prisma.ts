@@ -599,6 +599,7 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
       zonaTarifariaNombre: pedido.zonaTarifaria?.nombre ?? null,
       tipoServicio: pedido.tipoServicio as unknown as PedidoFacturado["tipoServicio"],
       choferNombre: pedido.choferNombre,
+      comentario: pedido.comentario,
       // grupoFacturacion no puede ser null acá: el `where` de arriba
       // (`grupoFacturacion: { mes, anio }`) ya excluye los pedidos sin grupo.
       grupoId: pedido.grupoFacturacion!.id,
