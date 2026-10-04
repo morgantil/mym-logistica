@@ -38,6 +38,11 @@ export enum TipoEnvase {
 // según este valor.
 export enum PrioridadPedido {
   NORMAL = "NORMAL",
+  // Decisión 2026-10-04 (reunión con el cliente, Pablo Renzo): un pedido de
+  // fin de semana necesita más atención que uno normal mientras se reparte,
+  // pero no es necesariamente tan grave como Urgente/Crítica — queda
+  // segundo en la escala. Ver severidad en pedido.ts (prioridadMasAlta).
+  FIN_DE_SEMANA = "FIN_DE_SEMANA",
   URGENTE = "URGENTE",
   CRITICA = "CRITICA",
 }

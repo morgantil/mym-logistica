@@ -48,6 +48,7 @@ enum TipoServicioCliente {
 // Prioridad de un pedido (ver PrioridadPedido en @mym/shared-types).
 enum PrioridadPedido {
   NORMAL
+  FIN_DE_SEMANA
   URGENTE
   CRITICA
 }

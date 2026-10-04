@@ -182,10 +182,13 @@ function unirDistintos(actual: string | null, nuevo: string | null): string | nu
   return actual.split(" / ").includes(nuevo) ? actual : `${actual} / ${nuevo}`;
 }
 
+// Mismo orden que reglas-importacion.ts (SEVERIDAD) — Fin de semana queda
+// segundo en la escala (decisión 2026-10-04).
 const SEVERIDAD_PRIORIDAD: Record<PrioridadPedido, number> = {
   [PrioridadPedido.NORMAL]: 0,
-  [PrioridadPedido.URGENTE]: 1,
-  [PrioridadPedido.CRITICA]: 2,
+  [PrioridadPedido.FIN_DE_SEMANA]: 1,
+  [PrioridadPedido.URGENTE]: 2,
+  [PrioridadPedido.CRITICA]: 3,
 };
 
 // DOCUMENTO FUNCIONAL.md §7: una línea del Excel = un producto, no un pedido.

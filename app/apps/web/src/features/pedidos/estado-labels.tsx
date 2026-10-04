@@ -79,18 +79,21 @@ export function estadoBorrable(estado: EstadoSimpliroute): boolean {
 // de la grilla se pinta según la prioridad (ver CLASE_FILA_PRIORIDAD).
 export const LABEL_PRIORIDAD: Record<PrioridadPedido, string> = {
   [PrioridadPedido.NORMAL]: "Normal",
+  [PrioridadPedido.FIN_DE_SEMANA]: "Fin de semana",
   [PrioridadPedido.URGENTE]: "Urgente",
   [PrioridadPedido.CRITICA]: "Crítica",
 };
 
 export const CLASE_FILA_PRIORIDAD: Record<PrioridadPedido, string | undefined> = {
   [PrioridadPedido.NORMAL]: undefined,
+  [PrioridadPedido.FIN_DE_SEMANA]: "bg-indigo-50 hover:bg-indigo-100/70 dark:bg-indigo-500/10",
   [PrioridadPedido.URGENTE]: "bg-orange-50 hover:bg-orange-100/70 dark:bg-orange-500/10",
   [PrioridadPedido.CRITICA]: "bg-red-100 hover:bg-red-200/70 dark:bg-red-500/15",
 };
 
 const CLASE_BADGE_PRIORIDAD: Record<PrioridadPedido, string> = {
   [PrioridadPedido.NORMAL]: CLASES_TONO.gris,
+  [PrioridadPedido.FIN_DE_SEMANA]: "bg-indigo-100 text-indigo-800 dark:bg-indigo-500/15 dark:text-indigo-400",
   [PrioridadPedido.URGENTE]: "bg-orange-100 text-orange-800 dark:bg-orange-500/15 dark:text-orange-400",
   [PrioridadPedido.CRITICA]: "bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-400",
 };

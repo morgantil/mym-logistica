@@ -100,4 +100,19 @@ describe("agruparLineasEnPedidos", () => {
     expect(pedidos[0].tipoPedido).toBe("DT ESP");
     expect(pedidos[0].prioridad).toBe(PrioridadPedido.URGENTE);
   });
+
+  // Decisión 2026-10-04: Fin de semana queda entre Normal y Urgente.
+  it("Fin de semana pesa más que Normal pero menos que Urgente", () => {
+    const normalYFinde = agruparLineasEnPedidos([
+      linea({ prioridad: PrioridadPedido.NORMAL }),
+      linea({ prioridad: PrioridadPedido.FIN_DE_SEMANA }),
+    ]);
+    expect(normalYFinde[0].prioridad).toBe(PrioridadPedido.FIN_DE_SEMANA);
+
+    const findeYUrgente = agruparLineasEnPedidos([
+      linea({ prioridad: PrioridadPedido.FIN_DE_SEMANA }),
+      linea({ prioridad: PrioridadPedido.URGENTE }),
+    ]);
+    expect(findeYUrgente[0].prioridad).toBe(PrioridadPedido.URGENTE);
+  });
 });

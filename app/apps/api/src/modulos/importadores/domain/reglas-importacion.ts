@@ -52,10 +52,14 @@ export function coincideTexto(
   }
 }
 
+// Decisión 2026-10-04: orden de severidad para "cuál gana si varias reglas
+// aplican" — Fin de semana pide más atención que Normal pero no tanta como
+// Urgente/Crítica. Mismo mapa que pedido.ts (agrupación por línea de Excel).
 const SEVERIDAD: Record<PrioridadPedido, number> = {
   [PrioridadPedido.NORMAL]: 0,
-  [PrioridadPedido.URGENTE]: 1,
-  [PrioridadPedido.CRITICA]: 2,
+  [PrioridadPedido.FIN_DE_SEMANA]: 1,
+  [PrioridadPedido.URGENTE]: 2,
+  [PrioridadPedido.CRITICA]: 3,
 };
 
 export function esPrioridadValida(valor: string): valor is PrioridadPedido {
