@@ -140,6 +140,8 @@ export interface PedidoParaSincronizar {
 
 export interface PedidosRepositorio {
   listar(filtro: FiltroPedidos, pagina: number, porPagina: number, orden?: OrdenPedidos): Promise<PaginaPedidos>;
+  // Decisión 2026-10-04: para "Exportar a Excel" — mismos filtros, sin paginar.
+  listarTodosParaExportar(filtro: FiltroPedidos, orden?: OrdenPedidos): Promise<PedidoListado[]>;
   contarPorEstado(clienteIds?: string[]): Promise<Record<string, number>>;
   crear(datos: DatosCrearPedido): Promise<Pedido>;
   obtenerPorId(id: string): Promise<Pedido | null>;

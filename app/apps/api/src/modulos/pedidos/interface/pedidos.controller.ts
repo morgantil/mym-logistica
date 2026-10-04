@@ -27,33 +27,61 @@ import { ResolverAlertaDireccionDto } from "./dto/resolver-alerta-direccion.dto"
 export class PedidosController {
   constructor(private pedidosService: PedidosService) {}
 
+  // Filtros compartidos por `listar` y `exportar` — mismo criterio para que
+  // "Exportar a Excel" nunca pueda quedar desalineado de lo que se ve en la grilla.
+  private extraerFiltro(query: ListarPedidosDto) {
+    return {
+      estado: query.estado,
+      clienteId: query.clienteId,
+      fechaDesde: query.fechaDesde,
+      fechaHasta: query.fechaHasta,
+      bultosDesde: query.bultosDesde,
+      bultosHasta: query.bultosHasta,
+      busqueda: query.busqueda,
+      tipoServicio: query.tipoServicio,
+      zonaId: query.zonaId,
+      choferId: query.choferId,
+      tipoEnvase: query.tipoEnvase,
+      estadoSimpliroute: query.estadoSimpliroute,
+      prioridad: query.prioridad,
+      localidad: query.localidad,
+      sinEtiquetaImpresa: query.sinEtiquetaImpresa,
+    };
+  }
+
+  private extraerOrden(query: ListarPedidosDto) {
+    return query.ordenarPor ? { campo: query.ordenarPor, direccion: query.direccionOrden ?? "asc" } : undefined;
+  }
+
   // Grilla principal (§14 funcional) y Embalaje y Despacho (§8.1 — filtra
   // además por clienteId/fechaDesde/fechaHasta).
   @Get()
   listar(@UsuarioActual() usuario: UsuarioAutenticado, @Query() query: ListarPedidosDto) {
     return this.pedidosService.listarParaUsuario(
       usuario.id,
-      {
-        estado: query.estado,
-        clienteId: query.clienteId,
-        fechaDesde: query.fechaDesde,
-        fechaHasta: query.fechaHasta,
-        bultosDesde: query.bultosDesde,
-        bultosHasta: query.bultosHasta,
-        busqueda: query.busqueda,
-        tipoServicio: query.tipoServicio,
-        zonaId: query.zonaId,
-        choferId: query.choferId,
-        tipoEnvase: query.tipoEnvase,
-        estadoSimpliroute: query.estadoSimpliroute,
-        prioridad: query.prioridad,
-        localidad: query.localidad,
-        sinEtiquetaImpresa: query.sinEtiquetaImpresa,
-      },
+      this.extraerFiltro(query),
       query.pagina,
       query.porPagina,
-      query.ordenarPor ? { campo: query.ordenarPor, direccion: query.direccionOrden ?? "asc" } : undefined,
+      this.extraerOrden(query),
     );
+  }
+
+  // Decisión 2026-10-04 (reunión con el cliente): "descarga de pedidos a
+  // Excel usando los filtros seleccionados" — mismos filtros y mismos
+  // permisos por cliente que la grilla, sin paginar.
+  @Get("exportar")
+  @Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+  async exportar(
+    @UsuarioActual() usuario: UsuarioAutenticado,
+    @Query() query: ListarPedidosDto,
+  ): Promise<StreamableFile> {
+    const buffer = await this.pedidosService.exportarParaUsuario(
+      usuario.id,
+      this.extraerFiltro(query),
+      this.extraerOrden(query),
+    );
+    const fecha = new Date().toISOString().slice(0, 10);
+    return new StreamableFile(buffer, { disposition: `attachment; filename="pedidos-${fecha}.xlsx"` });
   }
 
   // Dropdown del filtro de Localidad (decisión 2026-09-16) — valores reales

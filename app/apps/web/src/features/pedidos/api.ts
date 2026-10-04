@@ -44,6 +44,19 @@ export async function listarPedidos(parametros: ParametrosListarPedidos): Promis
   return data;
 }
 
+// Decisión 2026-10-04 (reunión con el cliente): "Exportar a Excel" con los
+// mismos filtros que estén aplicados en la grilla (sin pagina/porPagina —
+// el backend trae todo lo que matchea, sin paginar).
+export async function exportarPedidos(
+  parametros: Omit<ParametrosListarPedidos, "pagina" | "porPagina">,
+): Promise<Blob> {
+  const { data } = await apiClient.get<Blob>("/pedidos/exportar", {
+    params: parametros,
+    responseType: "blob",
+  });
+  return data;
+}
+
 // Dropdown del filtro de Localidad — valores reales ya cargados.
 export async function listarLocalidadesPedidos(): Promise<string[]> {
   const { data } = await apiClient.get<string[]>("/pedidos/localidades");

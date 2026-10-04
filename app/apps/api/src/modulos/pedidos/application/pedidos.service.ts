@@ -9,6 +9,7 @@ import {
 } from "../../geografia/domain/normalizador-direcciones.port";
 import { ZonasChoferesService } from "../../zonas-choferes/application/zonas-choferes.service";
 import { generarEtiquetasPdf } from "../infrastructure/etiqueta-pdf.generador";
+import { generarPedidosExcel } from "../infrastructure/pedidos-excel.generador";
 import { mapearEstadoSimpliRoute } from "../domain/mapear-estado-simpliroute";
 import { estaDentroDeBuenosAires } from "../domain/validar-coordenada-buenos-aires";
 import { armarDireccionParaSimpliRoute } from "../domain/armar-direccion-para-simpliroute";
@@ -82,6 +83,30 @@ export class PedidosService {
     }
 
     return this.repositorio.listar({ ...resto, clienteIds }, pagina, porPagina, orden);
+  }
+
+  // Decisión 2026-10-04 (reunión con el cliente): "Exportar a Excel" respeta
+  // los mismos filtros Y los mismos permisos por cliente que la grilla.
+  async exportarParaUsuario(
+    usuarioId: string,
+    filtro: Omit<FiltroPedidos, "clienteIds"> & { clienteId?: string },
+    orden?: OrdenPedidos,
+  ): Promise<Buffer> {
+    const { clienteId, ...resto } = filtro;
+    const clientesPermitidos = await this.permisosCliente.clientesPermitidosPara(usuarioId);
+
+    let clienteIds: string[] | undefined;
+    if (clienteId) {
+      if (clientesPermitidos && !clientesPermitidos.includes(clienteId)) {
+        return generarPedidosExcel([]);
+      }
+      clienteIds = [clienteId];
+    } else {
+      clienteIds = clientesPermitidos ?? undefined;
+    }
+
+    const pedidos = await this.repositorio.listarTodosParaExportar({ ...resto, clienteIds }, orden);
+    return generarPedidosExcel(pedidos);
   }
 
   async contarPorEstadoParaUsuario(usuarioId: string) {

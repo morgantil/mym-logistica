@@ -182,6 +182,18 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
     return { datos: datos.map(mapearListado), total };
   }
 
+  // Decisión 2026-10-04: "Exportar a Excel" respeta los mismos filtros que
+  // la grilla (reusa armarWhere/armarOrderBy) pero trae TODO lo que matchea,
+  // sin paginar — es un archivo para descargar, no una página para scrollear.
+  async listarTodosParaExportar(filtro: FiltroPedidos, orden?: OrdenPedidos): Promise<PedidoListado[]> {
+    const datos = await this.prisma.pedido.findMany({
+      where: this.armarWhere(filtro),
+      orderBy: this.armarOrderBy(orden),
+      include: INCLUDE_LISTADO,
+    });
+    return datos.map(mapearListado);
+  }
+
   // Base de los endpoints de dashboard/KPIs (DOCUMENTO TECNICO.md, ítem confirmado
   // "endpoints ahora, pantalla después").
   async contarPorEstado(clienteIds?: string[]): Promise<Record<string, number>> {

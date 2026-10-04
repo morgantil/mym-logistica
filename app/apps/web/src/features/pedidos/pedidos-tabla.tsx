@@ -34,6 +34,7 @@ import {
   actualizarPrioridad,
   eliminarPedido,
   eliminarPedidos,
+  exportarPedidos,
   listarLocalidadesPedidos,
   listarPedidos,
   obtenerColumnasPedidos,
@@ -285,6 +286,28 @@ export function PedidosTabla() {
     sinEtiquetaImpresa,
   ]);
 
+  // Factoreado para que "Exportar a Excel" nunca pueda quedar desalineado de
+  // los filtros que se ven en la grilla — decisión 2026-10-04.
+  const filtrosActivos = {
+    estado: estado === "TODOS" ? undefined : estado,
+    fechaDesde: fechaDesde || undefined,
+    fechaHasta: fechaHasta || undefined,
+    bultosDesde: bultosDesde ? Number(bultosDesde) : undefined,
+    bultosHasta: bultosHasta ? Number(bultosHasta) : undefined,
+    busqueda: busqueda || undefined,
+    clienteId: clienteId === SENTINEL_TODOS ? undefined : clienteId,
+    tipoServicio: tipoServicio === SENTINEL_TODOS ? undefined : (tipoServicio as TipoServicio),
+    zonaId: zonaId === SENTINEL_TODOS ? undefined : zonaId,
+    choferId: choferId === SENTINEL_TODOS ? undefined : choferId,
+    tipoEnvase: tipoEnvase === SENTINEL_TODOS ? undefined : (tipoEnvase as TipoEnvase),
+    estadoSimpliroute: estadoSimpliroute === SENTINEL_TODOS ? undefined : (estadoSimpliroute as EstadoSimpliroute),
+    prioridad: prioridad === SENTINEL_TODOS ? undefined : (prioridad as PrioridadPedido),
+    localidad: localidad === SENTINEL_TODOS ? undefined : localidad,
+    sinEtiquetaImpresa: sinEtiquetaImpresa || undefined,
+    ordenarPor: orden?.campo,
+    direccionOrden: orden?.direccion,
+  };
+
   const { data, isLoading, isError } = useQuery({
     queryKey: [
       "pedidos",
@@ -310,30 +333,21 @@ export function PedidosTabla() {
         sinEtiquetaImpresa,
       },
     ],
-    queryFn: () =>
-      listarPedidos({
-        pagina,
-        porPagina: POR_PAGINA,
-        estado: estado === "TODOS" ? undefined : estado,
-        fechaDesde: fechaDesde || undefined,
-        fechaHasta: fechaHasta || undefined,
-        bultosDesde: bultosDesde ? Number(bultosDesde) : undefined,
-        bultosHasta: bultosHasta ? Number(bultosHasta) : undefined,
-        busqueda: busqueda || undefined,
-        clienteId: clienteId === SENTINEL_TODOS ? undefined : clienteId,
-        tipoServicio: tipoServicio === SENTINEL_TODOS ? undefined : (tipoServicio as TipoServicio),
-        zonaId: zonaId === SENTINEL_TODOS ? undefined : zonaId,
-        choferId: choferId === SENTINEL_TODOS ? undefined : choferId,
-        tipoEnvase: tipoEnvase === SENTINEL_TODOS ? undefined : (tipoEnvase as TipoEnvase),
-        estadoSimpliroute:
-          estadoSimpliroute === SENTINEL_TODOS ? undefined : (estadoSimpliroute as EstadoSimpliroute),
-        prioridad: prioridad === SENTINEL_TODOS ? undefined : (prioridad as PrioridadPedido),
-        localidad: localidad === SENTINEL_TODOS ? undefined : localidad,
-        sinEtiquetaImpresa: sinEtiquetaImpresa || undefined,
-        ordenarPor: orden?.campo,
-        direccionOrden: orden?.direccion,
-      }),
+    queryFn: () => listarPedidos({ pagina, porPagina: POR_PAGINA, ...filtrosActivos }),
     placeholderData: (data) => data,
+  });
+
+  const mutacionExportar = useMutation({
+    mutationFn: () => exportarPedidos(filtrosActivos),
+    onSuccess: (blob) => {
+      const url = URL.createObjectURL(blob);
+      const enlace = document.createElement("a");
+      enlace.href = url;
+      enlace.download = `pedidos-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      enlace.click();
+      URL.revokeObjectURL(url);
+    },
+    onError: () => toast.error("No se pudo exportar. Probá de nuevo en unos segundos."),
   });
 
   // Personalización de columnas (por usuario, decisión 2026-09-01): fijas
@@ -877,7 +891,18 @@ export function PedidosTabla() {
         )}
 
         <div className="flex items-center justify-between gap-3">
-          <p className="text-sm text-muted-foreground">{total} pedido{total === 1 ? "" : "s"}</p>
+          <div className="flex items-center gap-3">
+            <p className="text-sm text-muted-foreground">{total} pedido{total === 1 ? "" : "s"}</p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={mutacionExportar.isPending}
+              onClick={() => mutacionExportar.mutate()}
+            >
+              {mutacionExportar.isPending ? "Exportando…" : "Exportar a Excel"}
+            </Button>
+          </div>
           {puedeEliminar && seleccionados.size > 0 && (
             <div className="flex flex-wrap items-center gap-2">
               <Select
