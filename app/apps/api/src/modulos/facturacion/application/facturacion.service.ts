@@ -135,6 +135,33 @@ export class FacturacionService {
     return this.repositorio.actualizarMontoUnificadoMedicamento(id, datos);
   }
 
+  // Decisión 2026-10-04 (reunión con el cliente, Sandra vía Pablo Renzo):
+  // "un % para actualizar automáticamente los valores base" — actualiza el
+  // monto de CADA tarifa y monto de medicamento ACTIVOS de este cliente,
+  // multiplicando el valor que ya tenían cargado por (1 + %/100). Las
+  // inactivas no se tocan (no se usan; si se reactivan después, se ajustan
+  // aparte). Un % negativo es una rebaja, válido — pero nunca deja un monto
+  // negativo (se corta en 0 antes que inventar un número raro).
+  async aplicarAjustePorcentual(
+    clienteId: string,
+    porcentaje: number,
+  ): Promise<{ tarifasActualizadas: number; montosActualizados: number }> {
+    const factor = 1 + porcentaje / 100;
+    const ajustar = (monto: number) => Math.max(0, Math.round(monto * factor * 100) / 100);
+
+    const tarifas = (await this.repositorio.listarTarifas(clienteId)).filter((t) => t.activa);
+    for (const tarifa of tarifas) {
+      await this.repositorio.actualizarTarifa(tarifa.id, { monto: ajustar(tarifa.monto) });
+    }
+
+    const montos = (await this.repositorio.listarMontosUnificadoMedicamento(clienteId)).filter((m) => m.activa);
+    for (const monto of montos) {
+      await this.repositorio.actualizarMontoUnificadoMedicamento(monto.id, { monto: ajustar(monto.monto) });
+    }
+
+    return { tarifasActualizadas: tarifas.length, montosActualizados: montos.length };
+  }
+
   listarCombinaciones() {
     return this.repositorio.listarCombinaciones();
   }

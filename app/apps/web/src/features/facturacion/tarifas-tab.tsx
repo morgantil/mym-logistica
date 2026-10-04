@@ -12,6 +12,7 @@ import { listarClientesActivos } from "@/features/clientes/api";
 import {
   actualizarMontoUnificadoMedicamento,
   actualizarTarifa,
+  aplicarAjustePorcentual,
   crearCombinacion,
   eliminarCombinacion,
   listarCombinaciones,
@@ -88,12 +89,67 @@ export function TarifasTab({ clienteId }: { clienteId: string | null }) {
     onError: () => toast.error("No se pudo cambiar el estado."),
   });
 
+  // Decisión 2026-10-04 (reunión con el cliente): "% de ajuste" — actualiza
+  // de una el monto base de todas las tarifas y montos ACTIVOS de este cliente.
+  const [porcentajeAjuste, setPorcentajeAjuste] = useState("");
+  const mutacionAjuste = useMutation({
+    mutationFn: () => aplicarAjustePorcentual(clienteId!, Number(porcentajeAjuste)),
+    onSuccess: ({ tarifasActualizadas, montosActualizados }) => {
+      toast.success(`Ajustadas ${tarifasActualizadas} tarifa(s) y ${montosActualizados} monto(s).`);
+      setPorcentajeAjuste("");
+      queryClient.invalidateQueries({ queryKey: ["facturacion", "tarifas", clienteId] });
+      queryClient.invalidateQueries({ queryKey: ["facturacion", "montos-unificado-medicamento", clienteId] });
+    },
+    onError: (error) => toast.error(mensajeError(error)),
+  });
+
   if (clienteId === null) {
     return <p className="text-sm text-muted-foreground">Elegí un cliente arriba para ver sus tarifas.</p>;
   }
 
   return (
     <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-2 rounded-md border p-3">
+        <h2 className="font-medium">Ajuste de tarifas por porcentaje</h2>
+        <p className="text-sm text-muted-foreground">
+          Actualiza de una todas las tarifas por zona y los montos de medicamento en unificado que estén{" "}
+          <strong>activos</strong> para este cliente, multiplicando el valor que ya tienen cargado. Un porcentaje
+          negativo es una rebaja.
+        </p>
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="flex flex-col gap-1">
+            <span className="text-sm text-muted-foreground">% de ajuste</span>
+            <Input
+              type="number"
+              step="0.01"
+              value={porcentajeAjuste}
+              onChange={(e) => setPorcentajeAjuste(e.target.value)}
+              placeholder="Ej. 10 o -5"
+              className="w-32"
+            />
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={
+              porcentajeAjuste.trim() === "" || Number.isNaN(Number(porcentajeAjuste)) || mutacionAjuste.isPending
+            }
+            onClick={() => {
+              if (
+                window.confirm(
+                  `¿Aplicar un ${porcentajeAjuste}% a todas las tarifas y montos ACTIVOS de este cliente? No se puede deshacer con un clic.`,
+                )
+              ) {
+                mutacionAjuste.mutate();
+              }
+            }}
+          >
+            {mutacionAjuste.isPending ? "Aplicando…" : "Aplicar"}
+          </Button>
+        </div>
+      </div>
+
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <h2 className="font-medium">Tarifas por zona</h2>

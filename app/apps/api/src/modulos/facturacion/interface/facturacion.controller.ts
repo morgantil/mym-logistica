@@ -4,6 +4,7 @@ import { Roles } from "../../../common/decorators/roles.decorator";
 import { UsuarioActual, UsuarioAutenticado } from "../../../common/decorators/usuario-actual.decorator";
 import { FacturacionService } from "../application/facturacion.service";
 import { ActualizarMontoUnificadoMedicamentoDto } from "./dto/actualizar-monto-unificado-medicamento.dto";
+import { AjustePorcentualDto } from "./dto/ajuste-porcentual.dto";
 import { ActualizarPorcentajeDto } from "./dto/actualizar-porcentaje.dto";
 import { ActualizarTarifaDto } from "./dto/actualizar-tarifa.dto";
 import { ActualizarTarifaTransportistaDto } from "./dto/actualizar-tarifa-transportista.dto";
@@ -82,6 +83,14 @@ export class FacturacionController {
     @Body() dto: ActualizarMontoUnificadoMedicamentoDto,
   ) {
     return this.facturacionService.actualizarMontoUnificadoMedicamento(id, dto);
+  }
+
+  // Decisión 2026-10-04: "% de ajuste" — actualiza de una el monto base de
+  // todas las tarifas por zona Y todos los montos de medicamento en
+  // unificado activos de un cliente.
+  @Post("ajuste-porcentual")
+  aplicarAjustePorcentual(@Body() dto: AjustePorcentualDto) {
+    return this.facturacionService.aplicarAjustePorcentual(dto.clienteId, dto.porcentaje);
   }
 
   // Guia Arbet paso 4/8: combinaciones habilitadas de unificación ENTRE

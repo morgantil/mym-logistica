@@ -96,6 +96,20 @@ export async function actualizarMontoUnificadoMedicamento(
   return data;
 }
 
+// Decisión 2026-10-04: "% de ajuste" — actualiza de una el monto base de
+// todas las tarifas por zona y todos los montos de medicamento en unificado
+// activos del cliente.
+export async function aplicarAjustePorcentual(
+  clienteId: string,
+  porcentaje: number,
+): Promise<{ tarifasActualizadas: number; montosActualizados: number }> {
+  const { data } = await apiClient.post<{ tarifasActualizadas: number; montosActualizados: number }>(
+    "/facturacion/ajuste-porcentual",
+    { clienteId, porcentaje },
+  );
+  return data;
+}
+
 export async function listarCombinaciones(): Promise<CombinacionUnificacionClientes[]> {
   const { data } = await apiClient.get<CombinacionUnificacionClientes[]>("/facturacion/combinaciones");
   return data;
