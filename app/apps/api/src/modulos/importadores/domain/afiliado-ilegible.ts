@@ -20,8 +20,15 @@ function normalizarNombre(nombre: string): string {
     .trim();
 }
 
-// Prefijo del identificador sintético — legible en la grilla y en el padrón.
-export const PREFIJO_AFILIADO_SINTETICO = "SIN-AFI-";
+// Decisión 2026-10-04 (reunión con el cliente, Pablo Renzo — Farmaet): el
+// proceso manual de ellos, hoy, es cargar el número de afiliado roto como
+// "Apellido Nombre" (sin la coma), porque así es como matchea contra el
+// registro que ya existe en SimpliRoute. Antes usábamos un identificador
+// propio ("SIN-AFI-...") — se cambia al texto tal cual lo necesita
+// SimpliRoute, sin inventar un formato nuestro para este caso puntual.
+function quitarComasYEspaciosDeMas(texto: string): string {
+  return texto.replace(/,/g, " ").replace(/\s+/g, " ").trim();
+}
 
 // Arma un identificador estable a partir del nombre para los afiliados
 // ilegibles: mismo paciente = mismo identificador en cada importación, y dos
@@ -31,7 +38,7 @@ export const PREFIJO_AFILIADO_SINTETICO = "SIN-AFI-";
 // nombre) aparece en OTRA línea del mismo archivo con el afiliado completo, se
 // usa ese (el bulto de un paciente suele traerlo completo aunque sus bolsas no).
 // Si ese nombre tiene más de un afiliado completo distinto no se elige ninguno
-// (sería adivinar) y cae al identificador por nombre.
+// (sería adivinar) y cae al nombre completo sin comas.
 export function resolverAfiliadosIlegibles(lineas: LineaExcelImportada[]): LineaExcelImportada[] {
   const completosPorNombre = new Map<string, Set<string>>();
   for (const linea of lineas) {
@@ -51,7 +58,7 @@ export function resolverAfiliadosIlegibles(lineas: LineaExcelImportada[]): Linea
     }
     return {
       ...linea,
-      numeroAfiliado: `${PREFIJO_AFILIADO_SINTETICO}${nombre.replace(/ /g, "-")}`,
+      numeroAfiliado: quitarComasYEspaciosDeMas(linea.destinatario),
       afiliadoIlegible: true,
     };
   });

@@ -52,13 +52,16 @@ describe("resolverAfiliadosIlegibles", () => {
     expect(resultado.every((l) => !l.afiliadoIlegible)).toBe(true);
   });
 
-  it("sin afiliado completo en el archivo, usa un identificador estable por nombre", () => {
+  // Decisión 2026-10-04 (Pablo Renzo, Farmaet): sin afiliado completo en el
+  // archivo, se usa "Apellido Nombre" sin coma — es el mismo formato que
+  // ellos ya cargan a mano, con eso matchea contra SimpliRoute.
+  it("sin afiliado completo en el archivo, usa el nombre del destinatario sin comas", () => {
     const resultado = resolverAfiliadosIlegibles([
       linea("ACCIARI GRACIELA SUSANA", "6.04E+14"),
       linea("ALTIERI, CAMILA SOLEDAD", "6.04E+14"),
     ]);
-    expect(resultado[0].numeroAfiliado).toBe("SIN-AFI-ACCIARI-GRACIELA-SUSANA");
-    expect(resultado[1].numeroAfiliado).toBe("SIN-AFI-ALTIERI-CAMILA-SOLEDAD");
+    expect(resultado[0].numeroAfiliado).toBe("ACCIARI GRACIELA SUSANA");
+    expect(resultado[1].numeroAfiliado).toBe("ALTIERI CAMILA SOLEDAD");
     expect(resultado.every((l) => l.afiliadoIlegible)).toBe(true);
   });
 
@@ -68,7 +71,7 @@ describe("resolverAfiliadosIlegibles", () => {
       linea("PEREZ JUAN", "60000000001"),
       linea("PEREZ JUAN", "60000000002"),
     ]);
-    expect(resultado[0].numeroAfiliado).toBe("SIN-AFI-PEREZ-JUAN");
+    expect(resultado[0].numeroAfiliado).toBe("PEREZ JUAN");
     expect(resultado[0].afiliadoIlegible).toBe(true);
   });
 
