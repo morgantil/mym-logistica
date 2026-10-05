@@ -1,4 +1,4 @@
-import { Outlet, NavLink } from "react-router-dom";
+import { Navigate, Outlet, NavLink, useLocation } from "react-router-dom";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,11 +19,29 @@ function iniciales(email: string) {
 
 export function AppShell() {
   const { usuario, logout } = useAuth();
+  const location = useLocation();
   if (!usuario) return null;
 
-  const itemsVisibles = navItems.filter(
-    (item) => !item.roles || item.roles.some((rol) => usuario.roles.includes(rol)),
-  );
+  // Decisión 2026-10-04 (reunión con el cliente): Administración puede
+  // elegir a mano qué pantallas ve cada usuario puntual, encima de lo que ya
+  // habilitan sus roles — vacío (la mayoría de los usuarios hoy) = sigue
+  // viendo el menú de siempre, según rol. Esto es solo navegación/UX: la
+  // autorización real de cada acción la sigue dando el rol en el backend.
+  const tienePantallasPropias = usuario.pantallasPermitidas.length > 0;
+  const itemsVisibles = navItems.filter((item) => {
+    if (tienePantallasPropias) {
+      return item.to === "/" || usuario.pantallasPermitidas.includes(item.to);
+    }
+    return !item.roles || item.roles.some((rol) => usuario.roles.includes(rol));
+  });
+
+  if (
+    tienePantallasPropias &&
+    location.pathname !== "/" &&
+    !usuario.pantallasPermitidas.includes(location.pathname)
+  ) {
+    return <Navigate to="/" replace />;
+  }
 
   return (
     <div className="flex min-h-svh flex-col">

@@ -11,9 +11,14 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { navItems } from "@/components/shell/nav-items";
 import type { Cliente } from "@/features/clientes/tipos";
 import type { Rol } from "@/features/auth/tipos";
 import type { DatosActualizarUsuario, DatosCrearUsuario, Usuario } from "./tipos";
+
+// Catálogo de pantallas elegibles — mismo listado que arma el menú
+// (nav-items.ts), sin "Inicio" (siempre visible para cualquiera).
+const PANTALLAS_DISPONIBLES = navItems.filter((item) => item.to !== "/");
 
 export interface ResultadoFormularioUsuario {
   crear?: DatosCrearUsuario;
@@ -42,10 +47,20 @@ interface FormularioUsuario {
   roles: Rol[];
   verTodosLosClientes: boolean;
   clienteIds: string[];
+  usaMenuDeRoles: boolean;
+  pantallasPermitidas: string[];
 }
 
 function vacio(): FormularioUsuario {
-  return { email: "", nombre: "", roles: [], verTodosLosClientes: true, clienteIds: [] };
+  return {
+    email: "",
+    nombre: "",
+    roles: [],
+    verTodosLosClientes: true,
+    clienteIds: [],
+    usaMenuDeRoles: true,
+    pantallasPermitidas: [],
+  };
 }
 
 // Alta/edición de usuario — pantalla agregada 2026-08-26 al sacar Google del
@@ -78,6 +93,8 @@ export function UsuarioFormSheet({
               roles: usuarioEnEdicion.roles,
               verTodosLosClientes: usuarioEnEdicion.clientesPermitidosIds.length === 0,
               clienteIds: usuarioEnEdicion.clientesPermitidosIds,
+              usaMenuDeRoles: usuarioEnEdicion.pantallasPermitidas.length === 0,
+              pantallasPermitidas: usuarioEnEdicion.pantallasPermitidas,
             }
           : vacio(),
       );
@@ -99,15 +116,29 @@ export function UsuarioFormSheet({
     }));
   }
 
+  function alternarPantalla(to: string, marcado: boolean) {
+    setDatos((d) => ({
+      ...d,
+      pantallasPermitidas: marcado
+        ? [...d.pantallasPermitidas, to]
+        : d.pantallasPermitidas.filter((p) => p !== to),
+    }));
+  }
+
   async function manejarSubmit(evento: FormEvent) {
     evento.preventDefault();
     setEnviando(true);
     setError(null);
     try {
       const clienteIds = datos.verTodosLosClientes ? [] : datos.clienteIds;
+      const pantallasPermitidas = datos.usaMenuDeRoles ? [] : datos.pantallasPermitidas;
       if (usuarioEnEdicion) {
         await onGuardar({
-          actualizar: { nombre: datos.nombre, roles: datos.roles } satisfies DatosActualizarUsuario,
+          actualizar: {
+            nombre: datos.nombre,
+            roles: datos.roles,
+            pantallasPermitidas,
+          } satisfies DatosActualizarUsuario,
           clienteIds,
         });
       } else {
@@ -204,6 +235,34 @@ export function UsuarioFormSheet({
               </div>
             )}
           </div>
+
+          {usuarioEnEdicion && (
+            <div className="flex flex-col gap-2">
+              <p className="text-sm font-medium">Pantallas que ve</p>
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={datos.usaMenuDeRoles}
+                  onCheckedChange={(marcado) => setDatos((d) => ({ ...d, usaMenuDeRoles: marcado === true }))}
+                  disabled={enviando}
+                />
+                Usar el menú de sus roles (por defecto)
+              </label>
+              {!datos.usaMenuDeRoles && (
+                <div className="flex flex-col gap-2 border-l-2 pl-4">
+                  {PANTALLAS_DISPONIBLES.map((item) => (
+                    <label key={item.to} className="flex items-center gap-2 text-sm">
+                      <Checkbox
+                        checked={datos.pantallasPermitidas.includes(item.to)}
+                        onCheckedChange={(marcado) => alternarPantalla(item.to, marcado === true)}
+                        disabled={enviando}
+                      />
+                      {item.label}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           <SheetFooter className="px-0">
             <Button type="submit" disabled={enviando}>

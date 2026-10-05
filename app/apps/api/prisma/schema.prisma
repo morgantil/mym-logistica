@@ -153,6 +153,16 @@ model Usuario {
   // por defecto). Sin drag-and-drop: el orden dentro de las fijas es el orden
   // en que las fue marcando. Vacío = usa el orden por defecto de la grilla.
   columnasFijasPedidos String[] @default([])
+  // Decisión 2026-10-04 (reunión con el cliente): qué pantallas ve este
+  // usuario en el menú — ids de ruta (ej. "/pedidos"), elegidos a mano por
+  // Administración desde la pantalla Usuarios. Vacío (default) = sin
+  // restricción propia, usa el menú que ya definen sus roles (como hasta
+  // ahora — ningún usuario existente pierde acceso con esta migración). Esto
+  // es una capa de navegación encima de los roles, NO los reemplaza como
+  // autorización real: cada endpoint del backend sigue protegido por
+  // @Roles() igual que siempre (tocar eso es mucho más riesgoso — es la
+  // seguridad real de la app, no la UX del menú).
+  pantallasPermitidas String[] @default([])
 
   creadoEn      DateTime  @default(now())
   actualizadoEn DateTime  @updatedAt

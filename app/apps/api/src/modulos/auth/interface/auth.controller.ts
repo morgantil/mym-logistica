@@ -92,9 +92,14 @@ export class AuthController {
     return { ok: true };
   }
 
+  // Decisión 2026-10-04: además de lo que ya traía el JWT (id/email/roles),
+  // suma pantallasPermitidas (requiere ir a buscarlo a la base — no viaja en
+  // el token) para que el menú (AppShell) sepa qué mostrarle a este usuario
+  // en particular, sin pedirle a cada pantalla que lo resuelva por su cuenta.
   @Get("perfil")
-  perfil(@UsuarioActual() usuario: UsuarioAutenticado) {
-    return usuario;
+  async perfil(@UsuarioActual() usuario: UsuarioAutenticado) {
+    const usuarioCompleto = await this.usuariosService.buscarPorId(usuario.id);
+    return { ...usuario, pantallasPermitidas: usuarioCompleto?.pantallasPermitidas ?? [] };
   }
 
   // Preferencia personal de la grilla de Pedidos (columnas fijas a la

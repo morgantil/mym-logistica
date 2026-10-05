@@ -12,6 +12,9 @@ export interface Usuario {
   activo: boolean;
   // Preferencia personal de la grilla de Pedidos — ver schema.prisma.
   columnasFijasPedidos: string[];
+  // Qué pantallas ve este usuario en el menú — ver comentario en
+  // schema.prisma. Vacío = sin restricción propia, usa el menú de sus roles.
+  pantallasPermitidas: string[];
 }
 
 export type UsuarioSinCredenciales = Omit<Usuario, "passwordHash">;

@@ -36,6 +36,14 @@ export class ActualizarUsuarioDto {
   @IsOptional()
   @IsBoolean()
   activo?: boolean;
+
+  // Qué pantallas ve este usuario en el menú — decisión 2026-10-04, ver
+  // comentario en schema.prisma. Vacío/omitido = sin restricción propia.
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsString({ each: true })
+  pantallasPermitidas?: string[];
 }
 
 export class AsignarClientesDto {

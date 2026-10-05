@@ -6,4 +6,7 @@ export interface UsuarioAutenticado {
   id: string;
   email: string;
   roles: Rol[];
+  // Qué pantallas ve en el menú — decisión 2026-10-04, ver nav-items.ts.
+  // Vacío = sin restricción propia, usa el menú de sus roles.
+  pantallasPermitidas: string[];
 }
