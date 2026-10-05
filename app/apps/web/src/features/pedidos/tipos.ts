@@ -2,6 +2,7 @@ import type {
   EstadoPedido,
   EstadoSimpliroute,
   EstadoValidacion,
+  FormatoRemito,
   PrioridadPedido,
   TipoEnvase,
   TipoServicio,
@@ -65,6 +66,8 @@ export interface PedidoListado {
   cantidadPedidoOriginal: number;
   version: number;
   clienteNombre: string;
+  // Null = el cliente no tiene remito preimpreso configurado (pantalla Clientes).
+  clienteFormatoRemito: FormatoRemito | null;
   destinatarioNombre: string;
   destinatarioTelefono: string | null;
   zonaNombre: string | null;

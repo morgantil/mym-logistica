@@ -45,6 +45,18 @@ enum TipoServicioCliente {
   AMBOS
 }
 
+// Qué remito preimpreso usa este cliente para imprimir — decisión 2026-10-04
+// (reunión con Pablo Renzo): cada cliente trae su propio papel preimpreso con
+// membrete propio, y el sistema solo imprime los datos variables en las
+// coordenadas exactas de ESE formato (ver remito-pdf.generador.ts). Null =
+// el cliente no tiene remito preimpreso configurado todavía (no se puede
+// imprimir). Genérico a propósito: agregar un cliente nuevo con remito propio
+// es sumar un valor acá + un layout nuevo, no tocar código del flujo.
+enum FormatoRemito {
+  BELLA_VISTA
+  FARMAPAL
+}
+
 // Prioridad de un pedido (ver PrioridadPedido en @mym/shared-types).
 enum PrioridadPedido {
   NORMAL
@@ -197,6 +209,9 @@ model Cliente {
   // a qué ZonaTarifaria se le busca la tarifa — ver
   // ZonasTarifariasService.resolverParaPedido.
   facturaPorCordon  Boolean             @default(false)
+  // Ver comentario en el enum FormatoRemito. Null = sin remito preimpreso
+  // configurado (el botón de imprimir remito queda deshabilitado).
+  formatoRemito     FormatoRemito?
 
   creadoEn         DateTime  @default(now())
   actualizadoEn    DateTime  @updatedAt

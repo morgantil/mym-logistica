@@ -22,6 +22,15 @@ export enum TipoServicioCliente {
   AMBOS = "AMBOS",
 }
 
+// Qué remito preimpreso usa un cliente — decisión 2026-10-04 (reunión con
+// Pablo Renzo): cada cliente trae su propio papel con membrete propio, el
+// sistema solo imprime los datos variables en las coordenadas de ESE
+// formato. Null en Cliente.formatoRemito = sin remito preimpreso configurado.
+export enum FormatoRemito {
+  BELLA_VISTA = "BELLA_VISTA",
+  FARMAPAL = "FARMAPAL",
+}
+
 // Clasificación de un pedido de medicamentos para facturación (Guia_Desarrollo_
 // Logica_Facturacion_Arbet.docx, paso 2): Bolsa o Bulto tienen tarifa propia
 // por cliente+zona. Un pedido nunca es "los dos" a nivel de facturación — si

@@ -174,6 +174,16 @@ export class PedidosController {
     });
   }
 
+  // Remito preimpreso del pedido — desde el detalle del pedido o desde
+  // Embalaje y Despacho, mismos roles que ya imprimen etiquetas.
+  @Roles(Rol.LOGISTICA, Rol.ADMINISTRACION)
+  @Get(":id/remito")
+  @Header("Content-Type", "application/pdf")
+  async remito(@Param("id") id: string): Promise<StreamableFile> {
+    const pdf = await this.pedidosService.generarRemito(id);
+    return new StreamableFile(pdf, { disposition: `inline; filename="remito-pedido-${id}.pdf"` });
+  }
+
   // Borrado lógico — solo pedidos que todavía no se mandaron a SimpliRoute
   // (ver validar-eliminacion.ts). Mismos roles que ya pueden operar sobre
   // pedidos día a día.

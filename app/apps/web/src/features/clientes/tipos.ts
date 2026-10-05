@@ -1,4 +1,4 @@
-import type { TipoServicioCliente } from "@mym/shared-types";
+import type { FormatoRemito, TipoServicioCliente } from "@mym/shared-types";
 
 export interface Cliente {
   id: string;
@@ -10,4 +10,6 @@ export interface Cliente {
   // (Bella Vista Medicamentos) — ver ZonasTarifariasService.resolverParaPedido
   // en el backend.
   facturaPorCordon: boolean;
+  // Null = sin remito preimpreso configurado (no se puede imprimir).
+  formatoRemito: FormatoRemito | null;
 }

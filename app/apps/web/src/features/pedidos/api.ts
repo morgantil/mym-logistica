@@ -57,6 +57,14 @@ export async function exportarPedidos(
   return data;
 }
 
+// Remito preimpreso del pedido (ítem reunión 02/10/2026, Pablo Renzo) — ver
+// clienteFormatoRemito en tipos.ts: sin formato configurado el backend
+// rechaza con 400.
+export async function descargarRemito(pedidoId: string): Promise<Blob> {
+  const { data } = await apiClient.get<Blob>(`/pedidos/${pedidoId}/remito`, { responseType: "blob" });
+  return data;
+}
+
 // Dropdown del filtro de Localidad — valores reales ya cargados.
 export async function listarLocalidadesPedidos(): Promise<string[]> {
   const { data } = await apiClient.get<string[]>("/pedidos/localidades");

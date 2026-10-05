@@ -10,6 +10,7 @@ import {
 import { ZonasChoferesService } from "../../zonas-choferes/application/zonas-choferes.service";
 import { generarEtiquetasPdf } from "../infrastructure/etiqueta-pdf.generador";
 import { generarPedidosExcel } from "../infrastructure/pedidos-excel.generador";
+import { generarRemitoPdf } from "../infrastructure/remito-pdf.generador";
 import { mapearEstadoSimpliRoute } from "../domain/mapear-estado-simpliroute";
 import { estaDentroDeBuenosAires } from "../domain/validar-coordenada-buenos-aires";
 import { armarDireccionParaSimpliRoute } from "../domain/armar-direccion-para-simpliroute";
@@ -207,6 +208,23 @@ export class PedidosService {
     const pdf = await generarEtiquetasPdf(pedido, numerosBulto);
     await this.repositorio.marcarEtiquetaImpresa(pedidoId);
     return pdf;
+  }
+
+  // Ítem "remitos preimpresos" (reunión 02/10/2026, Pablo Renzo): imprime
+  // los datos variables del pedido sobre el papel preimpreso del cliente —
+  // ver remito-pdf.generador.ts. Sin formatoRemito configurado no hay en qué
+  // coordenadas imprimir, así que no se puede generar.
+  async generarRemito(pedidoId: string): Promise<Buffer> {
+    const pedido = await this.repositorio.obtenerListadoPorId(pedidoId);
+    if (!pedido) {
+      throw new NotFoundException(`Pedido ${pedidoId} no encontrado.`);
+    }
+    if (!pedido.clienteFormatoRemito) {
+      throw new BadRequestException(
+        `${pedido.clienteNombre} todavía no tiene un formato de remito configurado (pantalla Clientes).`,
+      );
+    }
+    return generarRemitoPdf(pedido, pedido.clienteFormatoRemito);
   }
 
   // §18 funcional: el usuario selecciona pedidos y el sistema intenta enviarlos.

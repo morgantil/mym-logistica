@@ -11,7 +11,7 @@ import { listarClientesActivos } from "@/features/clientes/api";
 import { listarPedidos } from "@/features/pedidos/api";
 import { BultosCelda } from "@/features/pedidos/bultos-celda";
 import { BadgeEstadoPedido, LABEL_ESTADO_PEDIDO } from "@/features/pedidos/estado-labels";
-import { descargarEtiquetas } from "./api";
+import { descargarEtiquetas, descargarRemito } from "./api";
 
 const HOY = new Date().toISOString().slice(0, 10);
 const TODOS = "TODOS";
@@ -29,6 +29,7 @@ export function EmbalajeDespachoPage() {
   const [clienteId, setClienteId] = useState<string>(TODOS);
   const [estado, setEstado] = useState<string>(TODOS);
   const [descargando, setDescargando] = useState<string | null>(null);
+  const [imprimiendoRemito, setImprimiendoRemito] = useState<string | null>(null);
 
   const { data: clientes } = useQuery({ queryKey: ["clientes"], queryFn: listarClientesActivos });
 
@@ -60,6 +61,23 @@ export function EmbalajeDespachoPage() {
       toast.error("No se pudieron generar las etiquetas. Verificá que el pedido tenga bultos cargados.");
     } finally {
       setDescargando(null);
+    }
+  }
+
+  async function imprimirRemito(pedidoId: string, numeroPedido: number) {
+    setImprimiendoRemito(pedidoId);
+    try {
+      const blob = await descargarRemito(pedidoId);
+      const url = URL.createObjectURL(blob);
+      const enlace = document.createElement("a");
+      enlace.href = url;
+      enlace.download = `remito-pedido-${numeroPedido}.pdf`;
+      enlace.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("No se pudo generar el remito. Verificá que el cliente tenga un formato configurado.");
+    } finally {
+      setImprimiendoRemito(null);
     }
   }
 
@@ -189,19 +207,35 @@ export function EmbalajeDespachoPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={!pedido.bultos || descargando === pedido.id}
-                        onClick={() => imprimirEtiquetas(pedido.id, pedido.numero)}
-                      >
-                        {descargando === pedido.id
-                          ? "Generando…"
-                          : pedido.etiquetaImpresaEn
-                            ? "Reimprimir"
-                            : "Imprimir etiquetas"}
-                      </Button>
+                      <div className="flex flex-col gap-1 sm:flex-row">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={!pedido.bultos || descargando === pedido.id}
+                          onClick={() => imprimirEtiquetas(pedido.id, pedido.numero)}
+                        >
+                          {descargando === pedido.id
+                            ? "Generando…"
+                            : pedido.etiquetaImpresaEn
+                              ? "Reimprimir"
+                              : "Imprimir etiquetas"}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={!pedido.clienteFormatoRemito || imprimiendoRemito === pedido.id}
+                          title={
+                            pedido.clienteFormatoRemito
+                              ? undefined
+                              : "Este cliente no tiene un formato de remito configurado (pantalla Clientes)."
+                          }
+                          onClick={() => imprimirRemito(pedido.id, pedido.numero)}
+                        >
+                          {imprimiendoRemito === pedido.id ? "Generando…" : "Imprimir remito"}
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))

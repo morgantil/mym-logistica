@@ -2,6 +2,7 @@ import {
   EstadoPedido,
   EstadoSimpliroute,
   EstadoValidacion,
+  FormatoRemito,
   PrioridadPedido,
   TipoEnvase,
   TipoServicio,
@@ -78,6 +79,9 @@ export interface Pedido {
 // acoplarse a qué necesita mostrar la UI.
 export interface PedidoListado extends Pedido {
   clienteNombre: string;
+  // Ver FormatoRemito (@mym/shared-types) — null = el cliente no tiene remito
+  // preimpreso configurado, PedidosService.generarRemito rechaza imprimir.
+  clienteFormatoRemito: FormatoRemito | null;
   destinatarioNombre: string;
   destinatarioTelefono: string | null;
   productos: {

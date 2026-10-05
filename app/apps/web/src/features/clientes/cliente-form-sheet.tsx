@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { AxiosError } from "axios";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { TipoServicioCliente } from "@mym/shared-types";
+import { FormatoRemito, TipoServicioCliente } from "@mym/shared-types";
 import { Button } from "@/components/ui/button";
 import { FilaFormulario, TablaFormulario } from "@/components/shell/fila-formulario";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -22,6 +22,12 @@ const ETIQUETAS_TIPO_SERVICIO: Record<TipoServicioCliente, string> = {
   [TipoServicioCliente.PANAL]: "Pañales",
   [TipoServicioCliente.MEDICAMENTO]: "Medicamentos",
   [TipoServicioCliente.AMBOS]: "Ambos",
+};
+
+const SIN_REMITO = "SIN_REMITO";
+const ETIQUETAS_FORMATO_REMITO: Record<FormatoRemito, string> = {
+  [FormatoRemito.BELLA_VISTA]: "Bella Vista (A4 triplicado)",
+  [FormatoRemito.FARMAPAL]: "Farmapal (17×22cm duplicado)",
 };
 
 function mensajeError(error: unknown): string {
@@ -46,16 +52,19 @@ export function ClienteFormSheet({
   const [nombre, setNombre] = useState("");
   const [tipoServicio, setTipoServicio] = useState<TipoServicioCliente>(TipoServicioCliente.PANAL);
   const [facturaPorCordon, setFacturaPorCordon] = useState(false);
+  const [formatoRemito, setFormatoRemito] = useState<string>(SIN_REMITO);
 
   useEffect(() => {
     if (editando) {
       setNombre(cliente.nombre);
       setTipoServicio(cliente.tipoServicio);
       setFacturaPorCordon(cliente.facturaPorCordon);
+      setFormatoRemito(cliente.formatoRemito ?? SIN_REMITO);
     } else {
       setNombre("");
       setTipoServicio(TipoServicioCliente.PANAL);
       setFacturaPorCordon(false);
+      setFormatoRemito(SIN_REMITO);
     }
   }, [cliente, editando]);
 
@@ -63,7 +72,12 @@ export function ClienteFormSheet({
   const mutacion = useMutation({
     mutationFn: async () => {
       if (editando) {
-        return actualizarCliente(cliente.id, { nombre, tipoServicio, facturaPorCordon });
+        return actualizarCliente(cliente.id, {
+          nombre,
+          tipoServicio,
+          facturaPorCordon,
+          formatoRemito: formatoRemito === SIN_REMITO ? null : (formatoRemito as FormatoRemito),
+        });
       }
       return crearCliente({ nombre, tipoServicio, facturaPorCordon });
     },
@@ -140,6 +154,29 @@ export function ClienteFormSheet({
                 disabled={mutacion.isPending}
               />
             </FilaFormulario>
+
+            {editando && (
+              <FilaFormulario
+                label="Remito preimpreso"
+                htmlFor="formato-remito-cliente"
+                anchoEtiqueta="140px"
+                descripcion="Papel con membrete propio del cliente — define en qué coordenadas se imprimen los datos del pedido. Sin esto configurado no se puede imprimir el remito."
+              >
+                <Select value={formatoRemito} onValueChange={setFormatoRemito} disabled={mutacion.isPending}>
+                  <SelectTrigger id="formato-remito-cliente">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={SIN_REMITO}>Sin remito preimpreso</SelectItem>
+                    {Object.values(FormatoRemito).map((valor) => (
+                      <SelectItem key={valor} value={valor}>
+                        {ETIQUETAS_FORMATO_REMITO[valor]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FilaFormulario>
+            )}
           </TablaFormulario>
 
           <SheetFooter className="px-0">

@@ -1,5 +1,9 @@
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { useState } from "react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { descargarRemito } from "./api";
 import type { PedidoListado } from "./tipos";
 
 // §15 funcional: detalle del pedido con sus productos y el total de unidades.
@@ -14,6 +18,25 @@ export function DetallePedidoSheet({
   // Solo se muestra la columna si algún producto trae ticket — la mayoría
   // de los clientes no usa este campo, no tiene sentido una columna vacía.
   const mostrarColumnaTicket = pedido?.productos.some((p) => p.ticket) ?? false;
+  const [imprimiendoRemito, setImprimiendoRemito] = useState(false);
+
+  async function imprimirRemito() {
+    if (!pedido) return;
+    setImprimiendoRemito(true);
+    try {
+      const blob = await descargarRemito(pedido.id);
+      const url = URL.createObjectURL(blob);
+      const enlace = document.createElement("a");
+      enlace.href = url;
+      enlace.download = `remito-pedido-${pedido.numero}.pdf`;
+      enlace.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("No se pudo generar el remito. Verificá que el cliente tenga un formato configurado.");
+    } finally {
+      setImprimiendoRemito(false);
+    }
+  }
 
   return (
     <Sheet open={pedido !== null} onOpenChange={onOpenChange}>
@@ -67,6 +90,22 @@ export function DetallePedidoSheet({
                 </div>
               )}
             </div>
+
+            <SheetFooter>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!pedido.clienteFormatoRemito || imprimiendoRemito}
+                title={
+                  pedido.clienteFormatoRemito
+                    ? undefined
+                    : "Este cliente no tiene un formato de remito configurado (pantalla Clientes)."
+                }
+                onClick={imprimirRemito}
+              >
+                {imprimiendoRemito ? "Generando…" : "Imprimir remito"}
+              </Button>
+            </SheetFooter>
           </>
         )}
       </SheetContent>

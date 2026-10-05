@@ -11,3 +11,8 @@ export async function descargarEtiquetaPuntual(pedidoId: string, numeroBulto: nu
   });
   return data;
 }
+
+export async function descargarRemito(pedidoId: string): Promise<Blob> {
+  const { data } = await apiClient.get<Blob>(`/pedidos/${pedidoId}/remito`, { responseType: "blob" });
+  return data;
+}

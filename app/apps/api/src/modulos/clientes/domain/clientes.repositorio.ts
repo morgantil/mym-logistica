@@ -1,4 +1,4 @@
-import { TipoServicioCliente } from "@mym/shared-types";
+import { FormatoRemito, TipoServicioCliente } from "@mym/shared-types";
 import { Cliente } from "./cliente";
 
 export interface DatosActualizarCliente {
@@ -6,6 +6,7 @@ export interface DatosActualizarCliente {
   activo?: boolean;
   tipoServicio?: TipoServicioCliente;
   facturaPorCordon?: boolean;
+  formatoRemito?: FormatoRemito | null;
 }
 
 export interface ClientesRepositorio {

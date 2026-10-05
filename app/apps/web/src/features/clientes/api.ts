@@ -1,4 +1,4 @@
-import type { TipoServicioCliente } from "@mym/shared-types";
+import type { FormatoRemito, TipoServicioCliente } from "@mym/shared-types";
 import { apiClient } from "@/lib/api-client";
 import type { Cliente } from "./tipos";
 
@@ -27,7 +27,7 @@ export async function crearCliente(datos: DatosCliente): Promise<Cliente> {
 
 export async function actualizarCliente(
   id: string,
-  datos: Partial<DatosCliente & { activo: boolean }>,
+  datos: Partial<DatosCliente & { activo: boolean; formatoRemito: FormatoRemito | null }>,
 ): Promise<Cliente> {
   const { data } = await apiClient.patch<Cliente>(`/clientes/${id}`, datos);
   return data;

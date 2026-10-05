@@ -22,7 +22,7 @@ import {
 // de resolverlas, ver DOCUMENTO TECNICO.md historial 2026-08-26), no hace
 // falta joinearlas.
 const INCLUDE_LISTADO = {
-  cliente: { select: { nombre: true } },
+  cliente: { select: { nombre: true, formatoRemito: true } },
   destinatario: { select: { nombre: true, telefono: true } },
   productos: { select: { codigo: true, descripcion: true, cantidad: true, ticket: true, tipoEnvase: true } },
 } satisfies Prisma.PedidoInclude;
@@ -34,6 +34,7 @@ function mapearListado(fila: FilaPedidoListado): PedidoListado {
   return {
     ...(resto as unknown as Pedido),
     clienteNombre: cliente.nombre,
+    clienteFormatoRemito: cliente.formatoRemito as unknown as PedidoListado["clienteFormatoRemito"],
     destinatarioNombre: destinatario.nombre,
     destinatarioTelefono: destinatario.telefono,
     productos: fila.productos as unknown as PedidoListado["productos"],

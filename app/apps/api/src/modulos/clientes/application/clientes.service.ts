@@ -26,7 +26,13 @@ export class ClientesService {
   }
 
   crear(datos: { nombre: string; tipoServicio: TipoServicioCliente; facturaPorCordon?: boolean }): Promise<Cliente> {
-    return this.repositorio.crear({ ...datos, facturaPorCordon: datos.facturaPorCordon ?? false });
+    return this.repositorio.crear({
+      ...datos,
+      facturaPorCordon: datos.facturaPorCordon ?? false,
+      // El remito preimpreso se configura después (pantalla Clientes, editar)
+      // una vez que se consigue/confirma el papel real de ese cliente.
+      formatoRemito: null,
+    });
   }
 
   // Decisión 2026-09-29: si se cambia el tipo de servicio, primero se

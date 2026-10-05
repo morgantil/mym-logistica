@@ -1,4 +1,4 @@
-import { TipoServicioCliente } from "@mym/shared-types";
+import { FormatoRemito, TipoServicioCliente } from "@mym/shared-types";
 import { IsBoolean, IsEnum, IsOptional, IsString } from "class-validator";
 
 export class ActualizarClienteDto {
@@ -17,4 +17,9 @@ export class ActualizarClienteDto {
   @IsOptional()
   @IsBoolean()
   facturaPorCordon?: boolean;
+
+  // Null explícito = sacarle el remito preimpreso configurado.
+  @IsOptional()
+  @IsEnum(FormatoRemito)
+  formatoRemito?: FormatoRemito | null;
 }

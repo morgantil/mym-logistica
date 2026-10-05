@@ -27,7 +27,11 @@ export class ClientesRepositorioPrisma implements ClientesRepositorio {
 
   async crear(datos: Omit<Cliente, "id" | "activo">): Promise<Cliente> {
     const creado = await this.prisma.cliente.create({
-      data: { ...datos, tipoServicio: datos.tipoServicio as unknown as Prisma.ClienteCreateInput["tipoServicio"] },
+      data: {
+        ...datos,
+        tipoServicio: datos.tipoServicio as unknown as Prisma.ClienteCreateInput["tipoServicio"],
+        formatoRemito: datos.formatoRemito as unknown as Prisma.ClienteCreateInput["formatoRemito"],
+      },
     });
     return creado as unknown as Cliente;
   }
@@ -88,6 +92,7 @@ export class ClientesRepositorioPrisma implements ClientesRepositorio {
       data: {
         ...datos,
         tipoServicio: datos.tipoServicio as unknown as Prisma.ClienteUpdateInput["tipoServicio"],
+        formatoRemito: datos.formatoRemito as unknown as Prisma.ClienteUpdateInput["formatoRemito"],
         actualizadoPorId: obtenerUsuarioActual()?.usuarioId ?? null,
       },
     });
