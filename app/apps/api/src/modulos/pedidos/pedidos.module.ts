@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { PermisosModule } from "../../common/permisos/permisos.module";
+import { ClientesModule } from "../clientes/clientes.module";
 import { DestinatariosModule } from "../destinatarios/destinatarios.module";
 import { SimplirouteModule } from "../simpliroute/simpliroute.module";
 import { GeografiaModule } from "../geografia/geografia.module";
@@ -10,7 +11,14 @@ import { PedidosService } from "./application/pedidos.service";
 import { PedidosController } from "./interface/pedidos.controller";
 
 @Module({
-  imports: [PermisosModule, DestinatariosModule, SimplirouteModule, ZonasChoferesModule, GeografiaModule],
+  imports: [
+    PermisosModule,
+    ClientesModule,
+    DestinatariosModule,
+    SimplirouteModule,
+    ZonasChoferesModule,
+    GeografiaModule,
+  ],
   controllers: [PedidosController],
   providers: [
     PedidosService,

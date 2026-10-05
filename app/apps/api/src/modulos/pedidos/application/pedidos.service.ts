@@ -1,6 +1,7 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { PrioridadPedido, ResolucionDireccion } from "@mym/shared-types";
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { PrioridadPedido, ResolucionDireccion, TipoServicio } from "@mym/shared-types";
 import { PermisosClienteService } from "../../../common/permisos/permisos-cliente.service";
+import { ClientesService } from "../../clientes/application/clientes.service";
 import { DestinatariosService } from "../../destinatarios/application/destinatarios.service";
 import { LOGISTICA_PROVIDER, LogisticaProviderPort } from "../../simpliroute/domain/logistica-provider.port";
 import {
@@ -48,6 +49,8 @@ export interface ResultadoEliminacionMasiva {
 
 @Injectable()
 export class PedidosService {
+  private readonly logger = new Logger(PedidosService.name);
+
   constructor(
     @Inject(PEDIDOS_REPOSITORIO) private readonly repositorio: PedidosRepositorio,
     @Inject(LOGISTICA_PROVIDER) private readonly logisticaProvider: LogisticaProviderPort,
@@ -55,6 +58,7 @@ export class PedidosService {
     private destinatariosService: DestinatariosService,
     private zonasChoferesService: ZonasChoferesService,
     @Inject(NORMALIZADOR_DIRECCIONES) private readonly normalizadorDirecciones: NormalizadorDireccionesPort,
+    private clientesService: ClientesService,
   ) {}
 
   // La grilla principal (§14 funcional) y Embalaje y Despacho (§8.1, con
@@ -264,6 +268,7 @@ export class PedidosService {
         // Buenos Aires, Argentina" según corresponda. Ver DOCUMENTO
         // TECNICO.md y armar-direccion-para-simpliroute.ts.
         const clasificacion = await this.normalizadorDirecciones.clasificarCabaProvincia(pedido.localidad);
+        const cliente = await this.clientesService.buscarPorId(pedido.clienteId);
         const envio = await this.logisticaProvider.enviarPedido({
           pedidoId: pedido.id,
           destinatarioIdExterno: destinatario.simplirouteId,
@@ -273,6 +278,8 @@ export class PedidosService {
           fechaProgramada: pedido.fechaProgramada,
           bultos: pedido.bultos,
           observaciones: pedido.observaciones,
+          cargaPanal: pedido.tipoServicio === TipoServicio.PANAL,
+          cargaEspecial: cliente?.usaCarga3 ?? false,
         });
 
         // El cliente confirmó que ninguna entrega sale nunca de Buenos Aires
@@ -329,6 +336,29 @@ export class PedidosService {
               choferPreEnvioId: pedido.choferId,
               choferPreEnvioNombre: pedido.choferNombre,
             };
+          }
+
+          // Decisión 2026-10-04: además de guardarlo acá, se lo decimos a
+          // SimpliRoute (campos driver/vehicle de la Visit) — hasta ahora
+          // resolvíamos chofer/zona solo para uso interno, nunca se lo
+          // comunicábamos al proveedor. Si esto falla, no se pierde el
+          // envío (la Visit ya existe y quedó marcada abajo) — se loguea y
+          // se sigue, igual que un pedido puede quedar sin asignación
+          // automática en SimpliRoute hoy.
+          if (resuelto.choferId !== null && resuelto.vehiculoId !== null) {
+            try {
+              await this.logisticaProvider.asignarChoferVehiculo(
+                envio.idExterno,
+                Number(resuelto.choferId),
+                Number(resuelto.vehiculoId),
+              );
+            } catch (error) {
+              this.logger.warn(
+                `No se pudo asignar chofer/vehículo a la Visita ${envio.idExterno} (pedido ${pedidoId}): ${
+                  error instanceof Error ? error.message : "error desconocido"
+                }`,
+              );
+            }
           }
         }
 

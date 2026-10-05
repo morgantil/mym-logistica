@@ -12,4 +12,7 @@ export interface Cliente {
   // Ver comentario en el enum FormatoRemito (schema.prisma). Null = sin
   // remito preimpreso configurado para este cliente.
   formatoRemito: FormatoRemito | null;
+  // Decisión 2026-10-04: "Carga 3" (load_3) al enviar a SimpliRoute, solo
+  // para pedidos de este cliente — ver comentario en schema.prisma.
+  usaCarga3: boolean;
 }

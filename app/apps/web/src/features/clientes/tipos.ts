@@ -12,4 +12,7 @@ export interface Cliente {
   facturaPorCordon: boolean;
   // Null = sin remito preimpreso configurado (no se puede imprimir).
   formatoRemito: FormatoRemito | null;
+  // Decisión 2026-10-04: "Carga 3" al enviar a SimpliRoute, solo para
+  // pedidos de este cliente (ej. SACEIP SOLIS) — ver PedidosService.
+  usaCarga3: boolean;
 }

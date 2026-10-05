@@ -7,6 +7,7 @@ export interface DatosActualizarCliente {
   tipoServicio?: TipoServicioCliente;
   facturaPorCordon?: boolean;
   formatoRemito?: FormatoRemito | null;
+  usaCarga3?: boolean;
 }
 
 export interface ClientesRepositorio {

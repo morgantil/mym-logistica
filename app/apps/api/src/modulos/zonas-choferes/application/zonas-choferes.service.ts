@@ -14,6 +14,10 @@ export interface ResultadoZonaChofer {
   zonaNombre: string | null;
   choferId: string | null;
   choferNombre: string | null;
+  // Decisión 2026-10-04: Id de SimpliRoute del vehículo del chofer resuelto
+  // — necesario para asignar la Visit a Conductor/Vehículo al enviarla (ver
+  // PedidosService.enviarASimpliRoute). Null si no se resolvió chofer.
+  vehiculoId: string | null;
 }
 
 // Cache de solo lectura de Zonas/Choferes/Vehículos de SimpliRoute — decisión
@@ -232,7 +236,7 @@ export class ZonasChoferesService {
     }
 
     if (!zonaEncontrada) {
-      return { zonaId: null, zonaNombre: null, choferId: null, choferNombre: null };
+      return { zonaId: null, zonaNombre: null, choferId: null, choferNombre: null, vehiculoId: null };
     }
 
     const vehiculoId = zonaEncontrada.vehiculosIds[0] ?? null;
@@ -257,6 +261,7 @@ export class ZonasChoferesService {
       zonaNombre: zonaEncontrada.nombre,
       choferId: choferId !== null ? String(choferId) : null,
       choferNombre,
+      vehiculoId: vehiculoId !== null ? String(vehiculoId) : null,
     };
   }
 
@@ -273,14 +278,26 @@ export class ZonasChoferesService {
 
     const chofer = await this.prisma.choferSimpliRouteCache.findUnique({ where: { id: choferIdExterno } });
     if (!chofer) {
-      return { zonaId: null, zonaNombre: null, choferId: String(choferIdExterno), choferNombre: null };
+      return {
+        zonaId: null,
+        zonaNombre: null,
+        choferId: String(choferIdExterno),
+        choferNombre: null,
+        vehiculoId: null,
+      };
     }
 
     const vehiculo = await this.prisma.vehiculoSimpliRouteCache.findFirst({
       where: { choferPredeterminadoId: choferIdExterno },
     });
     if (!vehiculo) {
-      return { zonaId: null, zonaNombre: null, choferId: String(chofer.id), choferNombre: chofer.nombre };
+      return {
+        zonaId: null,
+        zonaNombre: null,
+        choferId: String(chofer.id),
+        choferNombre: chofer.nombre,
+        vehiculoId: null,
+      };
     }
 
     const zona = await this.prisma.zonaSimpliRouteCache.findFirst({
@@ -292,6 +309,7 @@ export class ZonasChoferesService {
       zonaNombre: zona?.nombre ?? null,
       choferId: String(chofer.id),
       choferNombre: chofer.nombre,
+      vehiculoId: String(vehiculo.id),
     };
   }
 }

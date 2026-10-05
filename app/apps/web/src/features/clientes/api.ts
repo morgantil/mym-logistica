@@ -27,7 +27,7 @@ export async function crearCliente(datos: DatosCliente): Promise<Cliente> {
 
 export async function actualizarCliente(
   id: string,
-  datos: Partial<DatosCliente & { activo: boolean; formatoRemito: FormatoRemito | null }>,
+  datos: Partial<DatosCliente & { activo: boolean; formatoRemito: FormatoRemito | null; usaCarga3: boolean }>,
 ): Promise<Cliente> {
   const { data } = await apiClient.patch<Cliente>(`/clientes/${id}`, datos);
   return data;

@@ -32,6 +32,7 @@ export class ClientesService {
       // El remito preimpreso se configura después (pantalla Clientes, editar)
       // una vez que se consigue/confirma el papel real de ese cliente.
       formatoRemito: null,
+      usaCarga3: false,
     });
   }
 

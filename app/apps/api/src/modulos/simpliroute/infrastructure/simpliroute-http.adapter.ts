@@ -15,6 +15,12 @@ import {
 
 const BASE_URL = "https://api.simpliroute.com";
 
+// Tiempo de Servicio confirmado por el cliente (reunión 02/10/2026, Pablo
+// Renzo, captura real de una Visit corregida a mano): fijo para todos los
+// envíos, formato HH:mm:ss tal como documenta el campo `duration` del Visit
+// Object (Documentacion simpliroute/02).
+const DURACION_SERVICIO_FIJA = "00:02:00";
+
 // SimpliRoute no publica un envelope de error único para toda la API
 // (Documentacion simpliroute/01, "Regla sobre errores") ni un status HTTP de
 // éxito garantizado por endpoint — se revisa 2xx/no-2xx, se intenta parsear
@@ -251,7 +257,14 @@ export class SimplirouteHttpAdapter implements LogisticaProviderPort {
         contact_name: pedido.destinatarioNombre,
         contact_phone: pedido.destinatarioTelefono ?? "",
         notes: pedido.observaciones ?? "",
-        ...(pedido.bultos !== null ? { load: pedido.bultos } : {}),
+        // Tiempo de Servicio confirmado por el cliente (reunión 02/10/2026,
+        // Pablo Renzo): fijo 2 minutos para todos los envíos.
+        duration: DURACION_SERVICIO_FIJA,
+        // Decisión 2026-10-04: "Carga 1"/"Carga 3" — ver comentario en
+        // PedidoParaEnviar (logistica-provider.port.ts). Reemplaza el uso
+        // anterior de `load` para la cantidad de bultos.
+        ...(pedido.cargaPanal ? { load: 1 } : {}),
+        ...(pedido.cargaEspecial ? { load_3: 1 } : {}),
       },
     ];
 
@@ -267,6 +280,17 @@ export class SimplirouteHttpAdapter implements LogisticaProviderPort {
       longitud: aNumero(visita.longitude),
       geocodeAlert: visita.geocode_alert ?? null,
     };
+  }
+
+  // Ver comentario en el puerto — PATCH separado porque recién se conoce la
+  // zona/chofer real una vez creada la Visit (con la coordenada
+  // geocodificada). `driver`/`vehicle` confirmados en la documentación
+  // oficial (Visit Object, campos Integer).
+  async asignarChoferVehiculo(idExterno: string, choferIdExterno: number, vehiculoIdExterno: number): Promise<void> {
+    await this.solicitar<void>("PATCH", `/v1/routes/visits/${encodeURIComponent(idExterno)}/`, {
+      driver: choferIdExterno,
+      vehicle: vehiculoIdExterno,
+    });
   }
 
   // §19 funcional — devuelve el estado crudo tal cual lo informa SimpliRoute;

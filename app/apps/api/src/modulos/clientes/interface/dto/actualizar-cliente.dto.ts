@@ -22,4 +22,8 @@ export class ActualizarClienteDto {
   @IsOptional()
   @IsEnum(FormatoRemito)
   formatoRemito?: FormatoRemito | null;
+
+  @IsOptional()
+  @IsBoolean()
+  usaCarga3?: boolean;
 }

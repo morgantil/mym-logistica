@@ -53,6 +53,7 @@ export function ClienteFormSheet({
   const [tipoServicio, setTipoServicio] = useState<TipoServicioCliente>(TipoServicioCliente.PANAL);
   const [facturaPorCordon, setFacturaPorCordon] = useState(false);
   const [formatoRemito, setFormatoRemito] = useState<string>(SIN_REMITO);
+  const [usaCarga3, setUsaCarga3] = useState(false);
 
   useEffect(() => {
     if (editando) {
@@ -60,11 +61,13 @@ export function ClienteFormSheet({
       setTipoServicio(cliente.tipoServicio);
       setFacturaPorCordon(cliente.facturaPorCordon);
       setFormatoRemito(cliente.formatoRemito ?? SIN_REMITO);
+      setUsaCarga3(cliente.usaCarga3);
     } else {
       setNombre("");
       setTipoServicio(TipoServicioCliente.PANAL);
       setFacturaPorCordon(false);
       setFormatoRemito(SIN_REMITO);
+      setUsaCarga3(false);
     }
   }, [cliente, editando]);
 
@@ -77,6 +80,7 @@ export function ClienteFormSheet({
           tipoServicio,
           facturaPorCordon,
           formatoRemito: formatoRemito === SIN_REMITO ? null : (formatoRemito as FormatoRemito),
+          usaCarga3,
         });
       }
       return crearCliente({ nombre, tipoServicio, facturaPorCordon });
@@ -175,6 +179,22 @@ export function ClienteFormSheet({
                     ))}
                   </SelectContent>
                 </Select>
+              </FilaFormulario>
+            )}
+
+            {editando && (
+              <FilaFormulario
+                label="Usa Carga 3 en SimpliRoute"
+                htmlFor="usa-carga3-cliente"
+                anchoEtiqueta="140px"
+                descripcion="Marca la Visit con Carga 3 (load_3) al enviarla a SimpliRoute — hoy solo lo necesita SACEIP SOLIS. La mayoría de los clientes no debería tocar esto."
+              >
+                <Checkbox
+                  id="usa-carga3-cliente"
+                  checked={usaCarga3}
+                  onCheckedChange={(valor) => setUsaCarga3(valor === true)}
+                  disabled={mutacion.isPending}
+                />
               </FilaFormulario>
             )}
           </TablaFormulario>

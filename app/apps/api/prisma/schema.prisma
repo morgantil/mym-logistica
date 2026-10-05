@@ -224,6 +224,14 @@ model Cliente {
   // Ver comentario en el enum FormatoRemito. Null = sin remito preimpreso
   // configurado (el botón de imprimir remito queda deshabilitado).
   formatoRemito     FormatoRemito?
+  // Decisión 2026-10-04 (reunión con el cliente): al mandar la Visit a
+  // SimpliRoute, "Carga 3" (campo `load_3`, una de las tres unidades de
+  // capacidad que soporta la Visit) se usa solo para pedidos de este
+  // cliente — hoy el caso real es SACEIP SOLIS, pero es una bandera por
+  // cliente, no un nombre hardcodeado (arquitectura genérica: un cliente
+  // nuevo con la misma necesidad solo activa el flag, no toca código). Ver
+  // PedidosService.enviarASimpliRoute.
+  usaCarga3         Boolean             @default(false)
 
   creadoEn         DateTime  @default(now())
   actualizadoEn    DateTime  @updatedAt

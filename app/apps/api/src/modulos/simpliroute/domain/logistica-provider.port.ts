@@ -22,6 +22,14 @@ export interface PedidoParaEnviar {
   fechaProgramada: Date;
   bultos: number | null;
   observaciones: string | null;
+  // Decisión 2026-10-04 (reunión con el cliente): "Carga 1" (campo `load` de
+  // la Visit) marca pañales — true para pedidos PANAL, false/omitido para
+  // medicamentos (sin instrucción confirmada para esos todavía). Reemplaza
+  // el uso anterior de `load` para mandar la cantidad de bultos.
+  cargaPanal: boolean;
+  // "Carga 3" (campo `load_3`) — true solo si el Cliente del pedido tiene
+  // Cliente.usaCarga3 activado (hoy: SACEIP SOLIS, ver schema.prisma).
+  cargaEspecial: boolean;
 }
 
 export interface ResultadoEnvio {
@@ -126,6 +134,14 @@ export interface LogisticaProviderPort {
 
   // §18 funcional.
   enviarPedido(pedido: PedidoParaEnviar): Promise<ResultadoEnvio>;
+
+  // Decisión 2026-10-04: asigna la Visit ya creada a un Conductor/Vehículo
+  // puntual — campos `driver`/`vehicle` de la Visit (confirmados en la
+  // documentación oficial de SimpliRoute, Visit Object). Se llama SEPARADO
+  // de enviarPedido porque la zona/chofer recién se resuelve con la
+  // coordenada real que devuelve la creación de la Visit (ver
+  // PedidosService.enviarASimpliRoute) — no se puede saber antes.
+  asignarChoferVehiculo(idExterno: string, choferIdExterno: number, vehiculoIdExterno: number): Promise<void>;
 
   // §19 funcional — el mapeo a EstadoPedido propio se hace en el módulo de pedidos,
   // no acá: este puerto solo devuelve el estado crudo tal cual lo informa el proveedor.
