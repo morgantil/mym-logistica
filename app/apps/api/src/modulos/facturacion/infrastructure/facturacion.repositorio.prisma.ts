@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
-import { CabaProvincia, TipoEnvase, TipoServicio } from "@mym/shared-types";
+import { CabaProvincia, PrioridadPedido, TipoEnvase, TipoServicio } from "@mym/shared-types";
 import { PrismaService } from "../../../common/prisma/prisma.service";
 import {
   DatosActualizarMontoUnificadoMedicamento,
@@ -94,6 +94,7 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
     zonaTarifariaId: string,
     tipoServicio: TipoServicio,
     tipoEnvase: TipoEnvase | null,
+    prioridad: PrioridadPedido,
   ): Promise<TarifaCliente | null> {
     const fila = await this.prisma.tarifaCliente.findFirst({
       where: {
@@ -101,6 +102,7 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
         zonaTarifariaId,
         tipoServicio: tipoServicio as unknown as Prisma.TarifaClienteWhereInput["tipoServicio"],
         tipoEnvase: tipoEnvase as unknown as Prisma.TarifaClienteWhereInput["tipoEnvase"],
+        prioridad: prioridad as unknown as Prisma.TarifaClienteWhereInput["prioridad"],
         activa: true,
       },
       include: { zonaTarifaria: { select: { nombre: true } } },
@@ -110,19 +112,21 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
 
   async crearTarifa(datos: DatosCrearTarifa): Promise<TarifaCliente> {
     // Decisión 2026-09-11: sin historial por vigencia — una sola fila por
-    // combinación clienteId+zonaTarifariaId+tipoServicio+tipoEnvase. Si ya
-    // existe, no se crea otra (usar actualizarTarifa para editarla).
+    // combinación clienteId+zonaTarifariaId+tipoServicio+tipoEnvase+prioridad
+    // (prioridad sumada 2026-10-04). Si ya existe, no se crea otra (usar
+    // actualizarTarifa para editarla).
     const existente = await this.prisma.tarifaCliente.findFirst({
       where: {
         clienteId: datos.clienteId,
         zonaTarifariaId: datos.zonaTarifariaId,
         tipoServicio: datos.tipoServicio as unknown as Prisma.TarifaClienteWhereInput["tipoServicio"],
         tipoEnvase: datos.tipoEnvase as unknown as Prisma.TarifaClienteWhereInput["tipoEnvase"],
+        prioridad: datos.prioridad as unknown as Prisma.TarifaClienteWhereInput["prioridad"],
       },
     });
     if (existente) {
       throw new BadRequestException(
-        "Ya existe una tarifa para esa zona y tipo — editá la que ya está en vez de crear otra.",
+        "Ya existe una tarifa para esa zona, tipo y prioridad — editá la que ya está en vez de crear otra.",
       );
     }
     const creada = await this.prisma.tarifaCliente.create({
@@ -131,6 +135,7 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
         zonaTarifariaId: datos.zonaTarifariaId,
         tipoServicio: datos.tipoServicio as unknown as Prisma.TarifaClienteCreateInput["tipoServicio"],
         tipoEnvase: datos.tipoEnvase as unknown as Prisma.TarifaClienteCreateInput["tipoEnvase"],
+        prioridad: datos.prioridad as unknown as Prisma.TarifaClienteCreateInput["prioridad"],
         monto: datos.monto,
       },
       include: { zonaTarifaria: { select: { nombre: true } } },
@@ -203,6 +208,7 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
     clienteId: string,
     zonaTarifariaId: string,
     tipoEnvase: TipoEnvase | null,
+    prioridad: PrioridadPedido,
   ): Promise<MontoUnificadoMedicamento | null> {
     if (tipoEnvase !== null) {
       const filaEspecifica = await this.prisma.montoUnificadoMedicamento.findFirst({
@@ -210,6 +216,7 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
           clienteId,
           zonaTarifariaId,
           tipoEnvase: tipoEnvase as unknown as Prisma.MontoUnificadoMedicamentoWhereInput["tipoEnvase"],
+          prioridad: prioridad as unknown as Prisma.MontoUnificadoMedicamentoWhereInput["prioridad"],
           activa: true,
         },
         include: { zonaTarifaria: { select: { nombre: true } } },
@@ -217,9 +224,17 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
       if (filaEspecifica) return mapearMontoUnificadoMedicamento(filaEspecifica);
     }
     // Sin fila específica para ese envase (o no aplica) — cae a la fila que
-    // cubre los dos (tipoEnvase null).
+    // cubre los dos (tipoEnvase null). La prioridad SÍ se exige exacta — no
+    // hay fallback a NORMAL, mismo criterio que tarifaActiva (nunca asumir
+    // un monto sobre plata real).
     const filaGeneral = await this.prisma.montoUnificadoMedicamento.findFirst({
-      where: { clienteId, zonaTarifariaId, tipoEnvase: null, activa: true },
+      where: {
+        clienteId,
+        zonaTarifariaId,
+        tipoEnvase: null,
+        prioridad: prioridad as unknown as Prisma.MontoUnificadoMedicamentoWhereInput["prioridad"],
+        activa: true,
+      },
       include: { zonaTarifaria: { select: { nombre: true } } },
     });
     return filaGeneral ? mapearMontoUnificadoMedicamento(filaGeneral) : null;
@@ -233,11 +248,12 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
         clienteId: datos.clienteId,
         zonaTarifariaId: datos.zonaTarifariaId,
         tipoEnvase: datos.tipoEnvase as unknown as Prisma.MontoUnificadoMedicamentoWhereInput["tipoEnvase"],
+        prioridad: datos.prioridad as unknown as Prisma.MontoUnificadoMedicamentoWhereInput["prioridad"],
       },
     });
     if (existente) {
       throw new BadRequestException(
-        "Ya existe un monto para esa zona (y envase) — editá el que ya está en vez de crear otro.",
+        "Ya existe un monto para esa zona, envase y prioridad — editá el que ya está en vez de crear otro.",
       );
     }
     const creado = await this.prisma.montoUnificadoMedicamento.create({
@@ -245,6 +261,7 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
         clienteId: datos.clienteId,
         zonaTarifariaId: datos.zonaTarifariaId,
         tipoEnvase: datos.tipoEnvase as unknown as Prisma.MontoUnificadoMedicamentoCreateInput["tipoEnvase"],
+        prioridad: datos.prioridad as unknown as Prisma.MontoUnificadoMedicamentoCreateInput["prioridad"],
         monto: datos.monto,
       },
       include: { zonaTarifaria: { select: { nombre: true } } },
@@ -676,6 +693,7 @@ function mapearTarifa(fila: {
   zonaTarifaria?: { nombre: string };
   tipoServicio: unknown;
   tipoEnvase: unknown;
+  prioridad: unknown;
   monto: Prisma.Decimal;
   activa: boolean;
 }): TarifaCliente {
@@ -686,6 +704,7 @@ function mapearTarifa(fila: {
     zonaTarifariaNombre: fila.zonaTarifaria?.nombre,
     tipoServicio: fila.tipoServicio as TarifaCliente["tipoServicio"],
     tipoEnvase: fila.tipoEnvase as TarifaCliente["tipoEnvase"],
+    prioridad: fila.prioridad as TarifaCliente["prioridad"],
     monto: Number(fila.monto),
     activa: fila.activa,
   };
@@ -711,6 +730,7 @@ function mapearMontoUnificadoMedicamento(fila: {
   zonaTarifariaId: string;
   zonaTarifaria?: { nombre: string };
   tipoEnvase: unknown;
+  prioridad: unknown;
   monto: Prisma.Decimal;
   activa: boolean;
 }): MontoUnificadoMedicamento {
@@ -720,6 +740,7 @@ function mapearMontoUnificadoMedicamento(fila: {
     zonaTarifariaId: fila.zonaTarifariaId,
     zonaTarifariaNombre: fila.zonaTarifaria?.nombre,
     tipoEnvase: fila.tipoEnvase as MontoUnificadoMedicamento["tipoEnvase"],
+    prioridad: fila.prioridad as MontoUnificadoMedicamento["prioridad"],
     monto: Number(fila.monto),
     activa: fila.activa,
   };

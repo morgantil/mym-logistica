@@ -1,5 +1,5 @@
-import { IsEnum, IsNumber, IsUUID, Min, ValidateIf } from "class-validator";
-import { TipoEnvase, TipoServicio } from "@mym/shared-types";
+import { IsEnum, IsNumber, IsOptional, IsUUID, Min, ValidateIf } from "class-validator";
+import { PrioridadPedido, TipoEnvase, TipoServicio } from "@mym/shared-types";
 
 export class CrearTarifaDto {
   @IsUUID()
@@ -16,6 +16,12 @@ export class CrearTarifaDto {
   @ValidateIf((dto: CrearTarifaDto) => dto.tipoServicio === TipoServicio.MEDICAMENTO)
   @IsEnum(TipoEnvase)
   tipoEnvase?: TipoEnvase;
+
+  // Decisión 2026-10-04: la Prioridad también puede cambiar la tarifa —
+  // omitido = NORMAL (mismo criterio que las tarifas ya cargadas).
+  @IsOptional()
+  @IsEnum(PrioridadPedido)
+  prioridad?: PrioridadPedido;
 
   @IsNumber()
   @Min(0)

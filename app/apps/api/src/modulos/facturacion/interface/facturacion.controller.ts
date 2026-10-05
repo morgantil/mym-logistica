@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, Header, Param, Patch, Post, Query, StreamableFile } from "@nestjs/common";
 import { Rol } from "@prisma/client";
+import { PrioridadPedido } from "@mym/shared-types";
 import { Roles } from "../../../common/decorators/roles.decorator";
 import { UsuarioActual, UsuarioAutenticado } from "../../../common/decorators/usuario-actual.decorator";
 import { FacturacionService } from "../application/facturacion.service";
@@ -36,6 +37,7 @@ export class FacturacionController {
       dto.zonaTarifariaId,
       dto.tipoServicio,
       dto.tipoEnvase ?? null,
+      dto.prioridad ?? PrioridadPedido.NORMAL,
       dto.monto,
     );
   }
@@ -73,6 +75,7 @@ export class FacturacionController {
       dto.clienteId,
       dto.zonaTarifariaId,
       dto.tipoEnvase ?? null,
+      dto.prioridad ?? PrioridadPedido.NORMAL,
       dto.monto,
     );
   }

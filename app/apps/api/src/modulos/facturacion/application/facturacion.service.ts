@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
-import { CabaProvincia, TipoEnvase, TipoServicio, TipoServicioCliente } from "@mym/shared-types";
+import { CabaProvincia, PrioridadPedido, TipoEnvase, TipoServicio, TipoServicioCliente } from "@mym/shared-types";
 import { ClientesService } from "../../clientes/application/clientes.service";
 import { PedidoFacturable } from "../../pedidos/domain/pedido";
 import { PedidosService } from "../../pedidos/application/pedidos.service";
@@ -102,10 +102,11 @@ export class FacturacionService {
     zonaTarifariaId: string,
     tipoServicio: TipoServicio,
     tipoEnvase: TipoEnvase | null,
+    prioridad: PrioridadPedido,
     monto: number,
   ) {
     await this.validarTipoServicioDeCliente(clienteId, tipoServicio, "una tarifa");
-    return this.repositorio.crearTarifa({ clienteId, zonaTarifariaId, tipoServicio, tipoEnvase, monto });
+    return this.repositorio.crearTarifa({ clienteId, zonaTarifariaId, tipoServicio, tipoEnvase, prioridad, monto });
   }
 
   actualizarTarifa(id: string, datos: { monto?: number; activa?: boolean }) {
@@ -136,6 +137,7 @@ export class FacturacionService {
     clienteId: string,
     zonaTarifariaId: string,
     tipoEnvase: TipoEnvase | null,
+    prioridad: PrioridadPedido,
     monto: number,
   ) {
     const cliente = await this.clientesService.buscarPorId(clienteId);
@@ -145,7 +147,7 @@ export class FacturacionService {
         `"${cliente.nombre}" está configurado como Pañales — el monto de medicamento en unificado solo aplica a un cliente de Medicamentos o Ambos.`,
       );
     }
-    return this.repositorio.crearMontoUnificadoMedicamento({ clienteId, zonaTarifariaId, tipoEnvase, monto });
+    return this.repositorio.crearMontoUnificadoMedicamento({ clienteId, zonaTarifariaId, tipoEnvase, prioridad, monto });
   }
 
   actualizarMontoUnificadoMedicamento(id: string, datos: { monto?: number; activa?: boolean }) {
@@ -308,6 +310,7 @@ export class FacturacionService {
         clienteId: pedido.clienteId,
         tipoServicio: pedido.tipoServicio,
         tipoEnvase,
+        prioridad: pedido.prioridad,
         cantidadPedidoOriginal: pedido.cantidadPedidoOriginal,
         fechaProgramada: pedido.fechaProgramada.toISOString().slice(0, 10),
         direccionUsada: pedido.direccionUsada,
@@ -421,6 +424,7 @@ export class FacturacionService {
         pedido.zonaTarifariaId,
         pedido.tipoServicio,
         pedido.tipoEnvase,
+        pedido.prioridad,
       );
       if (!tarifa) {
         const descripcionTipo =
@@ -428,7 +432,7 @@ export class FacturacionService {
             ? "Pañales"
             : `Medicamentos / ${pedido.tipoEnvase === TipoEnvase.BULTO ? "Bulto" : "Bolsa"}`;
         throw new BadRequestException(
-          `Falta una tarifa activa de "${nombreDeZona(pedido.zonaTarifariaId)}" (${descripcionTipo}) para este cliente — cargala antes de generar la facturación.`,
+          `Falta una tarifa activa de "${nombreDeZona(pedido.zonaTarifariaId)}" (${descripcionTipo}, prioridad ${pedido.prioridad}) para este cliente — cargala antes de generar la facturación.`,
         );
       }
       tarifas[clave] = tarifa.monto;
@@ -469,6 +473,7 @@ export class FacturacionService {
         clienteId,
         pedido.zonaTarifariaId,
         pedido.tipoEnvase,
+        pedido.prioridad,
       );
       if (monto) montosUnificadoMedicamento[clave] = monto.monto;
     }

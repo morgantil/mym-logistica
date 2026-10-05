@@ -1,4 +1,4 @@
-import { TipoEnvase, TipoServicio } from "@mym/shared-types";
+import { PrioridadPedido, TipoEnvase, TipoServicio } from "@mym/shared-types";
 import { PedidoParaFacturar, TarifasPorTipo, construirClaveTarifa } from "./motor-facturacion";
 import {
   buscarUnificacionesEntreClientes,
@@ -12,6 +12,7 @@ function pedido(overrides: Partial<PedidoParaFacturar> & { id: string; clienteId
   return {
     tipoServicio: TipoServicio.PANAL,
     tipoEnvase: null,
+    prioridad: PrioridadPedido.NORMAL,
     cantidadPedidoOriginal: 1,
     fechaProgramada: "2026-09-01",
     direccionUsada: "Av. Siempre Viva 123",
@@ -222,7 +223,12 @@ describe("buscarUnificacionesEntreClientes", () => {
 describe("construirViajeUnificacionCruzadaPanal", () => {
   it("factura solo la porción propia (tarifa × %) y deja trazabilidad del socio", () => {
     const tarifas: TarifasPorTipo = {
-      [construirClaveTarifa({ zonaTarifariaId: ZONA_CABA, tipoServicio: TipoServicio.PANAL, tipoEnvase: null })]: 1000,
+      [construirClaveTarifa({
+        zonaTarifariaId: ZONA_CABA,
+        tipoServicio: TipoServicio.PANAL,
+        tipoEnvase: null,
+        prioridad: PrioridadPedido.NORMAL,
+      })]: 1000,
     };
     const propio = pedido({ id: "farmapal-1", clienteId: "farmapal" });
     const socio = pedido({
@@ -248,6 +254,7 @@ describe("construirViajeUnificacionCruzadaMedicamento", () => {
         zonaTarifariaId: ZONA_CABA,
         tipoServicio: TipoServicio.MEDICAMENTO,
         tipoEnvase: TipoEnvase.BOLSA,
+        prioridad: PrioridadPedido.NORMAL,
       })]: 100,
     };
     const propio = pedido({

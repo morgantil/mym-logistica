@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { AxiosError } from "axios";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { TipoEnvase } from "@mym/shared-types";
+import { PrioridadPedido, TipoEnvase } from "@mym/shared-types";
 import { Button } from "@/components/ui/button";
 import { FilaFormulario, TablaFormulario } from "@/components/shell/fila-formulario";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,13 @@ const ETIQUETAS_TIPO_ENVASE: Record<TipoEnvase, string> = {
 // monto aplica igual a Bolsa y Bulto. Se puede diferenciar más adelante
 // cargando una fila puntual para cada envase, sin otra migración.
 const VALOR_AMBOS = "AMBOS";
+
+const ETIQUETAS_PRIORIDAD: Record<PrioridadPedido, string> = {
+  [PrioridadPedido.NORMAL]: "Normal",
+  [PrioridadPedido.FIN_DE_SEMANA]: "Fin de semana",
+  [PrioridadPedido.URGENTE]: "Urgente",
+  [PrioridadPedido.CRITICA]: "Crítica",
+};
 
 function mensajeError(error: unknown): string {
   if (error instanceof AxiosError && error.response?.data?.message) {
@@ -56,6 +63,7 @@ export function MontoUnificadoMedicamentoFormSheet({
 
   const [zonaTarifariaId, setZonaTarifariaId] = useState("");
   const [tipoEnvase, setTipoEnvase] = useState<TipoEnvase | typeof VALOR_AMBOS>(VALOR_AMBOS);
+  const [prioridad, setPrioridad] = useState<PrioridadPedido>(PrioridadPedido.NORMAL);
   const [monto, setMonto] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -63,10 +71,12 @@ export function MontoUnificadoMedicamentoFormSheet({
     if (editando) {
       setZonaTarifariaId(montoExistente.zonaTarifariaId);
       setTipoEnvase(montoExistente.tipoEnvase ?? VALOR_AMBOS);
+      setPrioridad(montoExistente.prioridad);
       setMonto(String(montoExistente.monto));
     } else {
       setZonaTarifariaId("");
       setTipoEnvase(VALOR_AMBOS);
+      setPrioridad(PrioridadPedido.NORMAL);
       setMonto("");
     }
     setError(null);
@@ -82,6 +92,7 @@ export function MontoUnificadoMedicamentoFormSheet({
         clienteId,
         zonaTarifariaId,
         tipoEnvase: tipoEnvase === VALOR_AMBOS ? undefined : tipoEnvase,
+        prioridad,
         monto: Number(monto),
       });
     },
@@ -106,8 +117,8 @@ export function MontoUnificadoMedicamentoFormSheet({
           <SheetTitle>{editando ? "Editar monto" : "Nuevo monto"} de medicamento en unificado</SheetTitle>
           <SheetDescription>
             {editando
-              ? "La zona y el envase de un monto no se pueden cambiar — si hace falta otra combinación, cargalo como un monto nuevo."
-              : "Un monto fijo por zona (y opcionalmente por Bolsa/Bulto) — se suma al 100% de la tarifa del pañal en una entrega unificada."}
+              ? "La zona, el envase y la prioridad de un monto no se pueden cambiar — si hace falta otra combinación, cargalo como un monto nuevo."
+              : "Un monto fijo por zona (y opcionalmente por Bolsa/Bulto y prioridad) — se suma al 100% de la tarifa del pañal en una entrega unificada."}
           </SheetDescription>
         </SheetHeader>
 
@@ -156,6 +167,25 @@ export function MontoUnificadoMedicamentoFormSheet({
                     {Object.values(TipoEnvase).map((valor) => (
                       <SelectItem key={valor} value={valor}>
                         {ETIQUETAS_TIPO_ENVASE[valor]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </FilaFormulario>
+
+            <FilaFormulario label="Prioridad" htmlFor="prioridad-monto-unificado" anchoEtiqueta="140px">
+              {editando ? (
+                <p className="text-sm">{ETIQUETAS_PRIORIDAD[prioridad]}</p>
+              ) : (
+                <Select value={prioridad} onValueChange={(valor) => setPrioridad(valor as PrioridadPedido)}>
+                  <SelectTrigger id="prioridad-monto-unificado">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.values(PrioridadPedido).map((valor) => (
+                      <SelectItem key={valor} value={valor}>
+                        {ETIQUETAS_PRIORIDAD[valor]}
                       </SelectItem>
                     ))}
                   </SelectContent>

@@ -1,4 +1,4 @@
-import { CabaProvincia, TipoEnvase, TipoServicio } from "@mym/shared-types";
+import { CabaProvincia, PrioridadPedido, TipoEnvase, TipoServicio } from "@mym/shared-types";
 import { GrupoFacturacion, PedidoFacturado } from "./grupo-facturacion";
 import { PedidoParaLiquidarTransportista } from "./motor-liquidacion-transportistas";
 import {
@@ -14,6 +14,7 @@ export interface DatosCrearTarifa {
   zonaTarifariaId: string;
   tipoServicio: TipoServicio;
   tipoEnvase: TipoEnvase | null;
+  prioridad: PrioridadPedido;
   monto: number;
 }
 
@@ -36,6 +37,7 @@ export interface DatosCrearMontoUnificadoMedicamento {
   clienteId: string;
   zonaTarifariaId: string;
   tipoEnvase: TipoEnvase | null;
+  prioridad: PrioridadPedido;
   monto: number;
 }
 
@@ -93,10 +95,11 @@ export interface FacturacionRepositorio {
     zonaTarifariaId: string,
     tipoServicio: TipoServicio,
     tipoEnvase: TipoEnvase | null,
+    prioridad: PrioridadPedido,
   ): Promise<TarifaCliente | null>;
   // Rechaza si ya existe una fila para esa combinación exacta (clienteId +
-  // zonaTarifariaId + tipoServicio + tipoEnvase) — para esa hay que usar
-  // actualizarTarifa, no crear una nueva.
+  // zonaTarifariaId + tipoServicio + tipoEnvase + prioridad) — para esa hay
+  // que usar actualizarTarifa, no crear una nueva.
   crearTarifa(datos: DatosCrearTarifa): Promise<TarifaCliente>;
   actualizarTarifa(id: string, datos: DatosActualizarTarifa): Promise<TarifaCliente>;
 
@@ -119,6 +122,7 @@ export interface FacturacionRepositorio {
     clienteId: string,
     zonaTarifariaId: string,
     tipoEnvase: TipoEnvase | null,
+    prioridad: PrioridadPedido,
   ): Promise<MontoUnificadoMedicamento | null>;
   crearMontoUnificadoMedicamento(
     datos: DatosCrearMontoUnificadoMedicamento,

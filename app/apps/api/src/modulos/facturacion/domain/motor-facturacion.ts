@@ -1,4 +1,4 @@
-import { TipoEnvase, TipoServicio } from "@mym/shared-types";
+import { PrioridadPedido, TipoEnvase, TipoServicio } from "@mym/shared-types";
 import { determinarClasificacionMedicamento } from "./clasificacion-medicamento";
 
 // DOCUMENTO FUNCIONAL.md §21-§29 + Guia_Desarrollo_Logica_Facturacion_Arbet.docx:
@@ -19,6 +19,9 @@ export interface PedidoParaFacturar {
   // para pañales, o para un pedido de medicamentos sin líneas clasificadas
   // todavía — ver determinarClasificacionMedicamento.
   tipoEnvase: TipoEnvase | null;
+  // Decisión 2026-10-04: la tarifa puede variar según la Prioridad del
+  // pedido (ej. Urgente o Fin de semana), ver ClaveTarifa.
+  prioridad: PrioridadPedido;
   fechaProgramada: string; // YYYY-MM-DD
   direccionUsada: string;
   zonaTarifariaId: string;
@@ -91,10 +94,11 @@ export interface ClaveTarifa {
   zonaTarifariaId: string;
   tipoServicio: TipoServicio;
   tipoEnvase: TipoEnvase | null;
+  prioridad: PrioridadPedido;
 }
 
 export function construirClaveTarifa(clave: ClaveTarifa): string {
-  return [clave.zonaTarifariaId, clave.tipoServicio, clave.tipoEnvase ?? ""].join("|");
+  return [clave.zonaTarifariaId, clave.tipoServicio, clave.tipoEnvase ?? "", clave.prioridad].join("|");
 }
 
 export function claveTarifaDePedido(pedido: PedidoParaFacturar): string {
@@ -102,7 +106,31 @@ export function claveTarifaDePedido(pedido: PedidoParaFacturar): string {
     zonaTarifariaId: pedido.zonaTarifariaId,
     tipoServicio: pedido.tipoServicio,
     tipoEnvase: pedido.tipoEnvase,
+    prioridad: pedido.prioridad,
   });
+}
+
+// Mismo orden de severidad que pedido.ts (módulo de Pedidos) — duplicado a
+// propósito: este archivo es función pura sin dependencias de otros módulos
+// (ver comentario al inicio del archivo), y es la misma regla de negocio
+// (Normal < Fin de semana < Urgente < Crítica), no una coincidencia.
+const SEVERIDAD_PRIORIDAD: Record<PrioridadPedido, number> = {
+  [PrioridadPedido.NORMAL]: 0,
+  [PrioridadPedido.FIN_DE_SEMANA]: 1,
+  [PrioridadPedido.URGENTE]: 2,
+  [PrioridadPedido.CRITICA]: 3,
+};
+
+// Cuando varios pedidos de medicamentos con prioridad distinta caen en el
+// mismo viaje (misma fecha+dirección) y hay que facturarlos juntos como un
+// solo Bolsa/Bulto (ver facturarMedicamentosDelGrupo), se cobra a la
+// prioridad más alta del grupo — nunca se le cobra "Normal" a un viaje que
+// incluye un pedido Urgente.
+function prioridadMasAlta(pedidos: PedidoParaFacturar[]): PrioridadPedido {
+  return pedidos.reduce<PrioridadPedido>(
+    (maxima, pedido) => (SEVERIDAD_PRIORIDAD[pedido.prioridad] > SEVERIDAD_PRIORIDAD[maxima] ? pedido.prioridad : maxima),
+    PrioridadPedido.NORMAL,
+  );
 }
 
 export const normalizarDireccion = (direccion: string) => direccion.trim().toUpperCase().replace(/\s+/g, " ");
@@ -336,15 +364,17 @@ export function calcularFacturacionCliente(
       const clasificacionGrupo = determinarClasificacionMedicamento(
         medicamentosRestantes.map((pedido) => pedido.tipoEnvase),
       );
+      const prioridadGrupo = prioridadMasAlta(medicamentosRestantes);
       const clave = construirClaveTarifa({
         zonaTarifariaId: grupo.zonaTarifariaId,
         tipoServicio: TipoServicio.MEDICAMENTO,
         tipoEnvase: clasificacionGrupo,
+        prioridad: prioridadGrupo,
       });
       const tarifa = tarifas[clave];
       if (tarifa === undefined) {
         throw new Error(
-          `Falta tarifa vigente para zona=${grupo.zonaTarifariaId} tipoServicio=${TipoServicio.MEDICAMENTO} tipoEnvase=${clasificacionGrupo ?? "-"}.`,
+          `Falta tarifa vigente para zona=${grupo.zonaTarifariaId} tipoServicio=${TipoServicio.MEDICAMENTO} tipoEnvase=${clasificacionGrupo ?? "-"} prioridad=${prioridadGrupo}.`,
         );
       }
       const { pedidoIds, reglaAplicada, cantidadViajes } = calcularViajesPorPeso(medicamentosRestantes);

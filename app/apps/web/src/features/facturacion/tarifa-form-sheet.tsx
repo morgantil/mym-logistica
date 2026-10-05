@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { AxiosError } from "axios";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { TipoEnvase, TipoServicio, TipoServicioCliente } from "@mym/shared-types";
+import { PrioridadPedido, TipoEnvase, TipoServicio, TipoServicioCliente } from "@mym/shared-types";
 import { Button } from "@/components/ui/button";
 import { FilaFormulario, TablaFormulario } from "@/components/shell/fila-formulario";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,13 @@ const ETIQUETAS_TIPO_SERVICIO: Record<TipoServicio, string> = {
 const ETIQUETAS_TIPO_ENVASE: Record<TipoEnvase, string> = {
   [TipoEnvase.BOLSA]: "Bolsa",
   [TipoEnvase.BULTO]: "Bulto",
+};
+
+const ETIQUETAS_PRIORIDAD: Record<PrioridadPedido, string> = {
+  [PrioridadPedido.NORMAL]: "Normal",
+  [PrioridadPedido.FIN_DE_SEMANA]: "Fin de semana",
+  [PrioridadPedido.URGENTE]: "Urgente",
+  [PrioridadPedido.CRITICA]: "Crítica",
 };
 
 function mensajeError(error: unknown): string {
@@ -67,6 +74,7 @@ export function TarifaFormSheet({
   const [zonaTarifariaId, setZonaTarifariaId] = useState("");
   const [tipoServicio, setTipoServicio] = useState<TipoServicio>(TipoServicio.PANAL);
   const [tipoEnvase, setTipoEnvase] = useState<TipoEnvase | "">("");
+  const [prioridad, setPrioridad] = useState<PrioridadPedido>(PrioridadPedido.NORMAL);
   const [monto, setMonto] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -75,11 +83,13 @@ export function TarifaFormSheet({
       setZonaTarifariaId(tarifa.zonaTarifariaId);
       setTipoServicio(tarifa.tipoServicio);
       setTipoEnvase(tarifa.tipoEnvase ?? "");
+      setPrioridad(tarifa.prioridad);
       setMonto(String(tarifa.monto));
     } else {
       setZonaTarifariaId("");
       setTipoServicio(tipoServicioFijo ?? TipoServicio.PANAL);
       setTipoEnvase("");
+      setPrioridad(PrioridadPedido.NORMAL);
       setMonto("");
     }
     setError(null);
@@ -98,6 +108,7 @@ export function TarifaFormSheet({
         zonaTarifariaId,
         tipoServicio,
         tipoEnvase: esMedicamento && tipoEnvase ? tipoEnvase : undefined,
+        prioridad,
         monto: Number(monto),
       });
     },
@@ -122,8 +133,8 @@ export function TarifaFormSheet({
           <SheetTitle>{editando ? "Editar tarifa" : "Nueva tarifa"}</SheetTitle>
           <SheetDescription>
             {editando
-              ? "La zona y el tipo de servicio de una tarifa no se pueden cambiar — si hace falta otra combinación, cargala como una tarifa nueva."
-              : "Una tarifa por zona y tipo de servicio — para editarla después, entrá de nuevo a esta pantalla."}
+              ? "La zona, el tipo de servicio y la prioridad de una tarifa no se pueden cambiar — si hace falta otra combinación, cargala como una tarifa nueva."
+              : "Una tarifa por zona, tipo de servicio y prioridad — para editarla después, entrá de nuevo a esta pantalla."}
           </SheetDescription>
         </SheetHeader>
 
@@ -203,6 +214,25 @@ export function TarifaFormSheet({
                   </Select>
                 </FilaFormulario>
               ))}
+
+            <FilaFormulario label="Prioridad" htmlFor="prioridad-tarifa" anchoEtiqueta="140px">
+              {editando ? (
+                <p className="text-sm">{ETIQUETAS_PRIORIDAD[prioridad]}</p>
+              ) : (
+                <Select value={prioridad} onValueChange={(valor) => setPrioridad(valor as PrioridadPedido)}>
+                  <SelectTrigger id="prioridad-tarifa">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.values(PrioridadPedido).map((valor) => (
+                      <SelectItem key={valor} value={valor}>
+                        {ETIQUETAS_PRIORIDAD[valor]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </FilaFormulario>
 
             <FilaFormulario label="Monto" htmlFor="monto-tarifa" anchoEtiqueta="140px">
               <Input

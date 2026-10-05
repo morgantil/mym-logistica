@@ -1,4 +1,4 @@
-import { CabaProvincia, TipoEnvase, TipoServicio } from "@mym/shared-types";
+import { CabaProvincia, PrioridadPedido, TipoEnvase, TipoServicio } from "@mym/shared-types";
 
 // Tarifas por cliente y zona tarifaria (CABA/Cordón 1/2/3, configurable —
 // ver ZonaTarifaria). DOCUMENTO FUNCIONAL.md §23, actualizado por el
@@ -17,6 +17,9 @@ export interface TarifaCliente {
   zonaTarifariaNombre?: string;
   tipoServicio: TipoServicio;
   tipoEnvase: TipoEnvase | null;
+  // Decisión 2026-10-04: la Prioridad del pedido también puede cambiar la
+  // tarifa (ej. Urgente o Fin de semana más caro que Normal, misma zona).
+  prioridad: PrioridadPedido;
   monto: number;
   activa: boolean;
 }
@@ -53,6 +56,8 @@ export interface MontoUnificadoMedicamento {
   zonaTarifariaId: string;
   zonaTarifariaNombre?: string;
   tipoEnvase: TipoEnvase | null;
+  // Ver comentario en TarifaCliente.prioridad — mismo criterio acá.
+  prioridad: PrioridadPedido;
   monto: number;
   activa: boolean;
 }

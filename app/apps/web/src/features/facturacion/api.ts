@@ -1,4 +1,4 @@
-import { CabaProvincia, TipoEnvase, TipoServicio } from "@mym/shared-types";
+import { CabaProvincia, PrioridadPedido, TipoEnvase, TipoServicio } from "@mym/shared-types";
 import { apiClient } from "@/lib/api-client";
 import type {
   CombinacionUnificacionClientes,
@@ -22,6 +22,7 @@ export async function crearTarifa(datos: {
   zonaTarifariaId: string;
   tipoServicio: TipoServicio;
   tipoEnvase?: TipoEnvase;
+  prioridad?: PrioridadPedido;
   monto: number;
 }): Promise<TarifaCliente> {
   const { data } = await apiClient.post<TarifaCliente>("/facturacion/tarifas", datos);
@@ -76,6 +77,7 @@ export async function crearMontoUnificadoMedicamento(datos: {
   clienteId: string;
   zonaTarifariaId: string;
   tipoEnvase?: TipoEnvase;
+  prioridad?: PrioridadPedido;
   monto: number;
 }): Promise<MontoUnificadoMedicamento> {
   const { data } = await apiClient.post<MontoUnificadoMedicamento>(

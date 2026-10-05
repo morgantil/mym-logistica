@@ -1,4 +1,4 @@
-import { TipoEnvase, TipoServicio } from "@mym/shared-types";
+import { PrioridadPedido, TipoEnvase, TipoServicio } from "@mym/shared-types";
 import {
   ConfigUnificacionInterna,
   PedidoParaFacturar,
@@ -17,21 +17,29 @@ const ZONA_CABA = "zona-caba";
 const ZONA_PROVINCIA = "zona-provincia";
 
 const TARIFAS: TarifasPorTipo = {
-  [construirClaveTarifa({ zonaTarifariaId: ZONA_CABA, tipoServicio: TipoServicio.PANAL, tipoEnvase: null })]: 1000,
+  [construirClaveTarifa({
+    zonaTarifariaId: ZONA_CABA,
+    tipoServicio: TipoServicio.PANAL,
+    tipoEnvase: null,
+    prioridad: PrioridadPedido.NORMAL,
+  })]: 1000,
   [construirClaveTarifa({
     zonaTarifariaId: ZONA_PROVINCIA,
     tipoServicio: TipoServicio.PANAL,
     tipoEnvase: null,
+    prioridad: PrioridadPedido.NORMAL,
   })]: 1500,
   [construirClaveTarifa({
     zonaTarifariaId: ZONA_CABA,
     tipoServicio: TipoServicio.MEDICAMENTO,
     tipoEnvase: TipoEnvase.BOLSA,
+    prioridad: PrioridadPedido.NORMAL,
   })]: 800,
   [construirClaveTarifa({
     zonaTarifariaId: ZONA_CABA,
     tipoServicio: TipoServicio.MEDICAMENTO,
     tipoEnvase: TipoEnvase.BULTO,
+    prioridad: PrioridadPedido.NORMAL,
   })]: 1200,
 };
 
@@ -44,11 +52,13 @@ const MONTOS_UNIFICADO: TarifasPorTipo = {
     zonaTarifariaId: ZONA_CABA,
     tipoServicio: TipoServicio.MEDICAMENTO,
     tipoEnvase: TipoEnvase.BOLSA,
+    prioridad: PrioridadPedido.NORMAL,
   })]: 400,
   [construirClaveTarifa({
     zonaTarifariaId: ZONA_CABA,
     tipoServicio: TipoServicio.MEDICAMENTO,
     tipoEnvase: TipoEnvase.BULTO,
+    prioridad: PrioridadPedido.NORMAL,
   })]: 600,
 };
 
@@ -64,6 +74,7 @@ function pedido(overrides: Partial<PedidoParaFacturar> & { id: string }): Pedido
     clienteId: "cliente-1",
     tipoServicio: TipoServicio.PANAL,
     tipoEnvase: null,
+    prioridad: PrioridadPedido.NORMAL,
     cantidadPedidoOriginal: 1,
     fechaProgramada: "2026-08-01",
     direccionUsada: "Av. Siempre Viva 123",
@@ -429,5 +440,74 @@ describe("calcularFacturacionCliente — tarifa por zona tarifaria", () => {
     const viajeProvincia = viajes.find((v) => v.pedidoIds.includes("provincia"));
     expect(viajeCaba?.tarifaUtilizada).toBe(1000);
     expect(viajeProvincia?.tarifaUtilizada).toBe(1500);
+  });
+});
+
+// Decisión 2026-10-04 (reunión con el cliente): la Prioridad (incluida Fin
+// de semana) también puede cambiar la tarifa — ej. un envío Urgente más caro
+// que uno Normal en la misma zona.
+describe("motor-facturacion — Prioridad como variable de tarifa (decisión 2026-10-04)", () => {
+  const TARIFAS_CON_PRIORIDAD: TarifasPorTipo = {
+    ...TARIFAS,
+    [construirClaveTarifa({
+      zonaTarifariaId: ZONA_CABA,
+      tipoServicio: TipoServicio.PANAL,
+      tipoEnvase: null,
+      prioridad: PrioridadPedido.URGENTE,
+    })]: 2000,
+  };
+
+  it("un pedido Urgente usa la tarifa Urgente, distinta de la Normal de la misma zona", () => {
+    const viajes = calcularFacturacionCliente(
+      [pedido({ id: "p1", prioridad: PrioridadPedido.URGENTE })],
+      TARIFAS_CON_PRIORIDAD,
+      CONFIG_UNIFICACION_ARBET,
+    );
+
+    expect(viajes[0].tarifaUtilizada).toBe(2000);
+  });
+
+  it("sin tarifa cargada para esa prioridad puntual, no cae a la tarifa Normal — tira error", () => {
+    expect(() =>
+      calcularFacturacionCliente(
+        [pedido({ id: "p1", prioridad: PrioridadPedido.CRITICA })],
+        TARIFAS_CON_PRIORIDAD,
+        CONFIG_UNIFICACION_ARBET,
+      ),
+    ).toThrow(/Falta tarifa vigente/);
+  });
+
+  it("medicamentos agrupados (2x1) con prioridad mixta facturan a la más alta del grupo", () => {
+    const tarifasMedicamento: TarifasPorTipo = {
+      ...TARIFAS,
+      [construirClaveTarifa({
+        zonaTarifariaId: ZONA_CABA,
+        tipoServicio: TipoServicio.MEDICAMENTO,
+        tipoEnvase: TipoEnvase.BOLSA,
+        prioridad: PrioridadPedido.URGENTE,
+      })]: 1500,
+    };
+
+    const viajes = calcularFacturacionCliente(
+      [
+        pedido({
+          id: "m1",
+          tipoServicio: TipoServicio.MEDICAMENTO,
+          tipoEnvase: TipoEnvase.BOLSA,
+          prioridad: PrioridadPedido.NORMAL,
+        }),
+        pedido({
+          id: "m2",
+          tipoServicio: TipoServicio.MEDICAMENTO,
+          tipoEnvase: TipoEnvase.BOLSA,
+          prioridad: PrioridadPedido.URGENTE,
+        }),
+      ],
+      tarifasMedicamento,
+      CONFIG_UNIFICACION_ARBET,
+    );
+
+    expect(viajes).toHaveLength(1);
+    expect(viajes[0].tarifaUtilizada).toBe(1500); // la tarifa Urgente, no la Normal (800)
   });
 });

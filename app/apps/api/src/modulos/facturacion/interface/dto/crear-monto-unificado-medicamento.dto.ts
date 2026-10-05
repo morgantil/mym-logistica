@@ -1,5 +1,5 @@
 import { IsEnum, IsNumber, IsOptional, IsUUID, Min } from "class-validator";
-import { TipoEnvase } from "@mym/shared-types";
+import { PrioridadPedido, TipoEnvase } from "@mym/shared-types";
 
 // Monto fijo del lado medicamento en una entrega unificada — decisión
 // 2026-09-12, ver tarifa.ts. `tipoEnvase` es opcional a propósito: si se
@@ -15,6 +15,11 @@ export class CrearMontoUnificadoMedicamentoDto {
   @IsOptional()
   @IsEnum(TipoEnvase)
   tipoEnvase?: TipoEnvase;
+
+  // Decisión 2026-10-04: omitido = NORMAL, mismo criterio que CrearTarifaDto.
+  @IsOptional()
+  @IsEnum(PrioridadPedido)
+  prioridad?: PrioridadPedido;
 
   @IsNumber()
   @Min(0)

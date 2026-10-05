@@ -385,6 +385,14 @@ model TarifaCliente {
   // ahora). tipoEnvase solo aplica cuando tipoServicio = MEDICAMENTO.
   tipoServicio    TipoServicio @default(PANAL)
   tipoEnvase      TipoEnvase?
+  // Decisión 2026-10-04 (reunión con el cliente): la Prioridad del pedido
+  // (incluido Fin de semana) también puede cambiar la tarifa — ej. un envío
+  // Urgente o de Fin de semana puede costar más que uno Normal en la misma
+  // zona. Default NORMAL para las tarifas ya cargadas (representan
+  // exactamente lo que eran: tarifas sin distinguir prioridad, que es lo
+  // mismo que decir "para Normal" ya que antes todos los pedidos facturaban
+  // igual sin importar la prioridad).
+  prioridad       PrioridadPedido @default(NORMAL)
   monto           Decimal      @db.Decimal(12, 2)
   // Decisión 2026-09-11: se sacó el historial automático por vigencia
   // (vigenciaDesde/vigenciaHasta) — Leonardo lo pidió más simple, una tarifa
@@ -798,6 +806,8 @@ model MontoUnificadoMedicamento {
   clienteId       String
   zonaTarifariaId String
   tipoEnvase      TipoEnvase?
+  // Ver comentario en TarifaCliente.prioridad — mismo criterio acá.
+  prioridad       PrioridadPedido @default(NORMAL)
   monto           Decimal     @db.Decimal(10, 2)
   activa          Boolean     @default(true)
 
@@ -808,7 +818,7 @@ model MontoUnificadoMedicamento {
   cliente       Cliente       @relation(fields: [clienteId], references: [id], onDelete: Cascade)
   zonaTarifaria ZonaTarifaria @relation(fields: [zonaTarifariaId], references: [id])
 
-  @@unique([clienteId, zonaTarifariaId, tipoEnvase])
+  @@unique([clienteId, zonaTarifariaId, tipoEnvase, prioridad])
   @@map("montos_unificado_medicamento")
 }
 

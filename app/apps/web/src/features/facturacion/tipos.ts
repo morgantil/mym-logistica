@@ -1,4 +1,4 @@
-import { CabaProvincia, EstadoGrupoFacturacion, TipoEnvase, TipoServicio } from "@mym/shared-types";
+import { CabaProvincia, EstadoGrupoFacturacion, PrioridadPedido, TipoEnvase, TipoServicio } from "@mym/shared-types";
 
 export interface TarifaCliente {
   id: string;
@@ -7,6 +7,9 @@ export interface TarifaCliente {
   zonaTarifariaNombre?: string;
   tipoServicio: TipoServicio;
   tipoEnvase: TipoEnvase | null;
+  // Decisión 2026-10-04: la Prioridad del pedido también puede cambiar la
+  // tarifa (ej. Urgente o Fin de semana más caro que Normal).
+  prioridad: PrioridadPedido;
   monto: number;
   activa: boolean;
 }
@@ -27,6 +30,8 @@ export interface MontoUnificadoMedicamento {
   zonaTarifariaId: string;
   zonaTarifariaNombre?: string;
   tipoEnvase: TipoEnvase | null;
+  // Ver comentario en TarifaCliente.prioridad — mismo criterio acá.
+  prioridad: PrioridadPedido;
   monto: number;
   activa: boolean;
 }

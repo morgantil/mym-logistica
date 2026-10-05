@@ -2,7 +2,7 @@ import { useState } from "react";
 import { AxiosError } from "axios";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { TipoServicio, TipoServicioCliente } from "@mym/shared-types";
+import { PrioridadPedido, TipoServicio, TipoServicioCliente } from "@mym/shared-types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +29,13 @@ import type { MontoUnificadoMedicamento, TarifaCliente } from "./tipos";
 const ETIQUETA_TIPO: Record<TipoServicio, string> = {
   [TipoServicio.PANAL]: "Pañales",
   [TipoServicio.MEDICAMENTO]: "Medicamentos",
+};
+
+const ETIQUETA_PRIORIDAD: Record<PrioridadPedido, string> = {
+  [PrioridadPedido.NORMAL]: "Normal",
+  [PrioridadPedido.FIN_DE_SEMANA]: "Fin de semana",
+  [PrioridadPedido.URGENTE]: "Urgente",
+  [PrioridadPedido.CRITICA]: "Crítica",
 };
 
 function mensajeError(error: unknown): string {
@@ -162,6 +169,7 @@ export function TarifasTab({ clienteId }: { clienteId: string | null }) {
             <TableRow>
               <TableHead>Zona</TableHead>
               <TableHead>Tipo</TableHead>
+              <TableHead>Prioridad</TableHead>
               <TableHead>Monto</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Acciones</TableHead>
@@ -170,13 +178,13 @@ export function TarifasTab({ clienteId }: { clienteId: string | null }) {
           <TableBody>
             {cargandoTarifas ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-muted-foreground">
+                <TableCell colSpan={6} className="text-muted-foreground">
                   Cargando…
                 </TableCell>
               </TableRow>
             ) : tarifas?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-muted-foreground">
+                <TableCell colSpan={6} className="text-muted-foreground">
                   Todavía no hay tarifas cargadas para este cliente.
                 </TableCell>
               </TableRow>
@@ -185,6 +193,7 @@ export function TarifasTab({ clienteId }: { clienteId: string | null }) {
                 <TableRow key={tarifa.id}>
                   <TableCell>{tarifa.zonaTarifariaNombre ?? tarifa.zonaTarifariaId}</TableCell>
                   <TableCell>{descripcionTipoTarifa(tarifa)}</TableCell>
+                  <TableCell>{ETIQUETA_PRIORIDAD[tarifa.prioridad]}</TableCell>
                   <TableCell>{formatearMonto(tarifa.monto)}</TableCell>
                   <TableCell>
                     {tarifa.activa ? <Badge variant="secondary">Activa</Badge> : <Badge variant="outline">Inactiva</Badge>}
@@ -275,6 +284,7 @@ export function TarifasTab({ clienteId }: { clienteId: string | null }) {
             <TableRow>
               <TableHead>Zona</TableHead>
               <TableHead>Bolsa / Bulto</TableHead>
+              <TableHead>Prioridad</TableHead>
               <TableHead>Monto</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Acciones</TableHead>
@@ -283,13 +293,13 @@ export function TarifasTab({ clienteId }: { clienteId: string | null }) {
           <TableBody>
             {cargandoMontosUnificado ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-muted-foreground">
+                <TableCell colSpan={6} className="text-muted-foreground">
                   Cargando…
                 </TableCell>
               </TableRow>
             ) : montosUnificado?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-muted-foreground">
+                <TableCell colSpan={6} className="text-muted-foreground">
                   Todavía no hay montos cargados — solo hacen falta si este cliente tiene entregas unificadas de
                   pañales y medicamentos.
                 </TableCell>
@@ -299,6 +309,7 @@ export function TarifasTab({ clienteId }: { clienteId: string | null }) {
                 <TableRow key={monto.id}>
                   <TableCell>{monto.zonaTarifariaNombre ?? monto.zonaTarifariaId}</TableCell>
                   <TableCell>{monto.tipoEnvase === "BULTO" ? "Bulto" : monto.tipoEnvase === "BOLSA" ? "Bolsa" : "Ambos"}</TableCell>
+                  <TableCell>{ETIQUETA_PRIORIDAD[monto.prioridad]}</TableCell>
                   <TableCell>{formatearMonto(monto.monto)}</TableCell>
                   <TableCell>
                     {monto.activa ? <Badge variant="secondary">Activo</Badge> : <Badge variant="outline">Inactivo</Badge>}
