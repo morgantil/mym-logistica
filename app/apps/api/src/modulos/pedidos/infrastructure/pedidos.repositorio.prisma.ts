@@ -453,20 +453,36 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
         estado: { in: ["COORDINADO", "EN_TRANSITO"] },
         simplirouteId: { not: null },
       },
-      select: { id: true, simplirouteId: true, version: true },
+      select: { id: true, simplirouteId: true, choferId: true, version: true },
     });
-    return pedidos.map((p) => ({ id: p.id, simplirouteId: p.simplirouteId as string, version: p.version }));
+    return pedidos.map((p) => ({
+      id: p.id,
+      simplirouteId: p.simplirouteId as string,
+      choferId: p.choferId,
+      version: p.version,
+    }));
   }
 
   async actualizarEstadoDesdeProveedor(
     id: string,
-    datos: { estado: EstadoPedido; fechaEntregaEfectiva: Date | null; version: number },
+    datos: {
+      estado: EstadoPedido;
+      fechaEntregaEfectiva: Date | null;
+      version: number;
+      actualizacionChofer?: {
+        zonaId: string | null;
+        zonaNombre: string | null;
+        choferId: string | null;
+        choferNombre: string | null;
+      };
+    },
   ): Promise<Pedido> {
     const resultado = await this.prisma.pedido.updateMany({
       where: { id, version: datos.version },
       data: {
         estado: datos.estado,
         fechaEntregaEfectiva: datos.fechaEntregaEfectiva,
+        ...(datos.actualizacionChofer ?? {}),
         version: { increment: 1 },
       },
     });

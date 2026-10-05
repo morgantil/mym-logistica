@@ -48,6 +48,14 @@ export interface EstadoVisita {
   // la entrega desde su app. Null si todavía no se registró (incluye el caso
   // de una Visit marcada completed/failed manualmente, sin checkout real).
   fechaEntrega: Date | null;
+  // Campo `driver` de la Visit (Integer ID) — confirmado en la documentación
+  // oficial (Documentacion simpliroute/02, tabla de campos del Visit Object).
+  // Decisión 2026-10-04: un despachante puede reasignar la Visit a otro
+  // chofer directo en SimpliRoute después de enviada — esto es lo que
+  // permite a PedidosService.sincronizarEstados detectarlo y actualizar la
+  // grilla sola, sin tener que borrar el pedido. Null si la Visit todavía no
+  // tiene chofer asignado.
+  choferIdExterno: number | null;
 }
 
 // §12 funcional (Zona): "deberá poder consultarse desde la información

@@ -360,13 +360,19 @@ export class PedidosService {
   // (mismo criterio que enviarASimpliRoute). Se llama antes de calcular
   // cualquier facturación (ver FacturacionService) además de estar disponible
   // como acción manual.
+  //
+  // Decisión 2026-10-04: de paso, si el `driver` real de la Visit ya no
+  // coincide con el choferId guardado (un despachante reasignó la Visit a
+  // mano en SimpliRoute después de enviada), recalcula zona/chofer y los
+  // actualiza acá mismo — hoy la única forma de reflejar eso era borrar el
+  // pedido, esto lo hace solo en cada sincronización.
   async sincronizarEstados(): Promise<ResultadoSincronizacion> {
     const pendientes = await this.repositorio.listarPendientesDeSincronizar();
     const resultado: ResultadoSincronizacion = { actualizados: 0, sinCambios: 0, errores: [] };
 
     for (const pedido of pendientes) {
       try {
-        const { estado: estadoCrudo, fechaEntrega } = await this.logisticaProvider.consultarEstado(
+        const { estado: estadoCrudo, fechaEntrega, choferIdExterno } = await this.logisticaProvider.consultarEstado(
           pedido.simplirouteId,
         );
         const estadoMapeado = mapearEstadoSimpliRoute(estadoCrudo);
@@ -374,10 +380,17 @@ export class PedidosService {
           resultado.sinCambios++;
           continue;
         }
+
+        const actualizacionChofer =
+          choferIdExterno !== null && String(choferIdExterno) !== pedido.choferId
+            ? await this.zonasChoferesService.resolverZonaPorChofer(choferIdExterno)
+            : undefined;
+
         await this.repositorio.actualizarEstadoDesdeProveedor(pedido.id, {
           estado: estadoMapeado,
           fechaEntregaEfectiva: fechaEntrega,
           version: pedido.version,
+          actualizacionChofer,
         });
         resultado.actualizados++;
       } catch (error) {

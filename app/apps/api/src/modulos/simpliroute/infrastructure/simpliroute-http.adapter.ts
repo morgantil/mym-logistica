@@ -65,6 +65,9 @@ interface VisitaSimpliRoute {
   latitude?: string | number | null;
   longitude?: string | number | null;
   geocode_alert?: string | null;
+  // ID del conductor asignado — confirmado en la tabla de campos del Visit
+  // Object (Documentacion simpliroute/02).
+  driver?: number | null;
 }
 
 // GET /v1/zones/ — Documentacion simpliroute/04 §65-71. Solo lectura pública
@@ -277,6 +280,7 @@ export class SimplirouteHttpAdapter implements LogisticaProviderPort {
     return {
       estado: visita.status,
       fechaEntrega: visita.checkout_time ? new Date(visita.checkout_time) : null,
+      choferIdExterno: visita.driver ?? null,
     };
   }
 

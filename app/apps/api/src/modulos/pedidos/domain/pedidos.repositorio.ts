@@ -135,6 +135,7 @@ export interface PaginaPedidos {
 export interface PedidoParaSincronizar {
   id: string;
   simplirouteId: string;
+  choferId: string | null;
   version: number;
 }
 
@@ -235,10 +236,25 @@ export interface PedidosRepositorio {
 
   // §19 funcional — sincronización de estados reales con SimpliRoute.
   listarPendientesDeSincronizar(): Promise<PedidoParaSincronizar[]>;
-  // Con bloqueo optimista, igual que arriba.
+  // Con bloqueo optimista, igual que arriba. `actualizacionChofer` solo viaja
+  // cuando el chofer real de la Visit (campo `driver`) ya no coincide con el
+  // choferId guardado — ej. un despachante reasignó la Visit a mano en
+  // SimpliRoute después de enviada. Decisión 2026-10-04: así la grilla se
+  // actualiza sola en el próximo sincronizar-estados, sin tener que borrar el
+  // pedido para forzarlo (ver PedidosService.sincronizarEstados).
   actualizarEstadoDesdeProveedor(
     id: string,
-    datos: { estado: EstadoPedido; fechaEntregaEfectiva: Date | null; version: number },
+    datos: {
+      estado: EstadoPedido;
+      fechaEntregaEfectiva: Date | null;
+      version: number;
+      actualizacionChofer?: {
+        zonaId: string | null;
+        zonaNombre: string | null;
+        choferId: string | null;
+        choferNombre: string | null;
+      };
+    },
   ): Promise<Pedido>;
 
   // Sin bloqueo optimista a propósito: es solo informativo ("¿ya se imprimió

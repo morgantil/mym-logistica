@@ -259,4 +259,39 @@ export class ZonasChoferesService {
       choferNombre,
     };
   }
+
+  // Camino inverso a resolverZonaChofer: a partir de un chofer (ej. el
+  // `driver` real de la Visit en SimpliRoute, que puede haber cambiado
+  // después de enviada) encuentra su zona — el vehículo que lo tiene como
+  // predeterminado, y la zona a la que está asignado ese vehículo. Decisión
+  // 2026-10-04: así la grilla de Pedidos puede reflejar sola una
+  // reasignación hecha a mano en SimpliRoute (ver
+  // PedidosService.sincronizarEstados), sin tener que volver a geocodificar
+  // la dirección del pedido.
+  async resolverZonaPorChofer(choferIdExterno: number): Promise<ResultadoZonaChofer> {
+    await this.asegurarCacheFresca();
+
+    const chofer = await this.prisma.choferSimpliRouteCache.findUnique({ where: { id: choferIdExterno } });
+    if (!chofer) {
+      return { zonaId: null, zonaNombre: null, choferId: String(choferIdExterno), choferNombre: null };
+    }
+
+    const vehiculo = await this.prisma.vehiculoSimpliRouteCache.findFirst({
+      where: { choferPredeterminadoId: choferIdExterno },
+    });
+    if (!vehiculo) {
+      return { zonaId: null, zonaNombre: null, choferId: String(chofer.id), choferNombre: chofer.nombre };
+    }
+
+    const zona = await this.prisma.zonaSimpliRouteCache.findFirst({
+      where: { vehiculosIds: { has: vehiculo.id } },
+    });
+
+    return {
+      zonaId: zona ? String(zona.id) : null,
+      zonaNombre: zona?.nombre ?? null,
+      choferId: String(chofer.id),
+      choferNombre: chofer.nombre,
+    };
+  }
 }
