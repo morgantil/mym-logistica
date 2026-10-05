@@ -601,9 +601,29 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
     });
   }
 
-  async listarPedidosFacturados(clienteId: string, mes: number, anio: number): Promise<PedidoFacturado[]> {
+  async listarPedidosFacturados(
+    clienteId: string,
+    mes: number,
+    anio: number,
+    fechaDesde?: string,
+    fechaHasta?: string,
+  ): Promise<PedidoFacturado[]> {
+    // `fechaHasta` inclusive tal como lo elige el usuario — se lleva al día
+    // siguiente para el `lt` de siempre (ver rangoElegido en el service).
+    const rango =
+      fechaDesde && fechaHasta
+        ? {
+            gte: new Date(`${fechaDesde}T00:00:00.000Z`),
+            lt: new Date(new Date(`${fechaHasta}T00:00:00.000Z`).getTime() + 24 * 60 * 60 * 1000),
+          }
+        : undefined;
+
     const pedidos = await this.prisma.pedido.findMany({
-      where: { clienteId, grupoFacturacion: { mes, anio } },
+      where: {
+        clienteId,
+        grupoFacturacion: { mes, anio },
+        ...(rango ? { fechaProgramada: rango } : {}),
+      },
       include: {
         destinatario: { select: { nombre: true, numeroAfiliado: true } },
         zonaTarifaria: { select: { id: true, nombre: true } },

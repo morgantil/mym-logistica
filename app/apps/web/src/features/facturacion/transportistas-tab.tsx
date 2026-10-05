@@ -5,7 +5,12 @@ import { CabaProvincia } from "@mym/shared-types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { actualizarTarifaTransportista, liquidacionTransportistas, listarTarifasTransportista } from "./api";
+import {
+  actualizarTarifaTransportista,
+  liquidacionTransportistas,
+  listarTarifasTransportista,
+  type RangoFechas,
+} from "./api";
 import { formatearMonto, NOMBRES_MES } from "./formato";
 import { TarifaTransportistaFormSheet } from "./tarifa-transportista-form-sheet";
 import type { TarifaTransportista } from "./tipos";
@@ -22,7 +27,15 @@ const ETIQUETA_ZONA: Record<CabaProvincia, string> = {
 // cálculo de cuántos viajes hizo cada chofer (§4.2 TEMAS_PENDIENTES.md,
 // construido 2026-08-28) sincroniza los estados reales desde SimpliRoute
 // antes de traer el resumen — ver FacturacionService.liquidacionTransportistas.
-export function TransportistasTab({ mes, anio }: { mes: number; anio: number }) {
+export function TransportistasTab({
+  mes,
+  anio,
+  rango,
+}: {
+  mes: number;
+  anio: number;
+  rango?: RangoFechas;
+}) {
   const [zonaDelSheet, setZonaDelSheet] = useState<CabaProvincia | null>(null);
   const queryClient = useQueryClient();
 
@@ -45,8 +58,8 @@ export function TransportistasTab({ mes, anio }: { mes: number; anio: number }) 
     isFetching: sincronizando,
     refetch,
   } = useQuery({
-    queryKey: ["facturacion", "liquidacion-transportistas", mes, anio],
-    queryFn: () => liquidacionTransportistas(mes, anio),
+    queryKey: ["facturacion", "liquidacion-transportistas", mes, anio, rango],
+    queryFn: () => liquidacionTransportistas(mes, anio, rango),
   });
 
   const totalViajes = resumen?.reduce((total, r) => total + r.viajesCaba + r.viajesProvincia, 0) ?? 0;

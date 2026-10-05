@@ -1,9 +1,12 @@
 import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { listarClientesActivos } from "@/features/clientes/api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ZonasTarifariasTab } from "@/features/zonas-tarifarias/zonas-tarifarias-tab";
+import type { RangoFechas } from "./api";
 import { LiquidacionTab } from "./liquidacion-tab";
 import { TarifasTab } from "./tarifas-tab";
 import { TransportistasTab } from "./transportistas-tab";
@@ -24,6 +27,15 @@ export function FacturacionPage() {
   const mes = Number(searchParams.get("mes")) || HOY.getMonth() + 1;
   const anio = Number(searchParams.get("anio")) || HOY.getFullYear();
   const vista = (searchParams.get("vista") as Vista | null) ?? "liquidacion";
+  const fechaDesde = searchParams.get("fechaDesde");
+  const fechaHasta = searchParams.get("fechaHasta");
+  // Decisión 2026-10-04 (reunión con el cliente): datepicker libre, el
+  // usuario elige cualquier rango dentro del mes — no son presets fijos de
+  // semana/día. Solo acota qué se MUESTRA/exporta (detalle y Excel); el
+  // cierre mensual de vista previa/confirmar no se toca.
+  const rango: RangoFechas | undefined = fechaDesde && fechaHasta ? { fechaDesde, fechaHasta } : undefined;
+  const primerDiaDelMes = `${anio}-${String(mes).padStart(2, "0")}-01`;
+  const ultimoDiaDelMes = new Date(Date.UTC(anio, mes, 0)).toISOString().slice(0, 10);
 
   const { data: clientes } = useQuery({ queryKey: ["clientes"], queryFn: listarClientesActivos });
 
@@ -31,6 +43,15 @@ export function FacturacionPage() {
     setSearchParams((actual) => {
       const nuevo = new URLSearchParams(actual);
       nuevo.set(clave, valor);
+      return nuevo;
+    });
+  }
+
+  function limpiarRango() {
+    setSearchParams((actual) => {
+      const nuevo = new URLSearchParams(actual);
+      nuevo.delete("fechaDesde");
+      nuevo.delete("fechaHasta");
       return nuevo;
     });
   }
@@ -93,7 +114,45 @@ export function FacturacionPage() {
             </SelectContent>
           </Select>
         </div>
+
+        <div className="flex flex-col gap-1">
+          <label htmlFor="fecha-desde-facturacion" className="text-sm text-muted-foreground">
+            Rango dentro del mes (opcional)
+          </label>
+          <div className="flex items-center gap-2">
+            <Input
+              id="fecha-desde-facturacion"
+              type="date"
+              min={primerDiaDelMes}
+              max={fechaHasta || ultimoDiaDelMes}
+              value={fechaDesde ?? ""}
+              onChange={(e) => actualizarParam("fechaDesde", e.target.value)}
+              className="w-full sm:w-40"
+            />
+            <span className="text-sm text-muted-foreground">a</span>
+            <Input
+              id="fecha-hasta-facturacion"
+              type="date"
+              min={fechaDesde || primerDiaDelMes}
+              max={ultimoDiaDelMes}
+              value={fechaHasta ?? ""}
+              onChange={(e) => actualizarParam("fechaHasta", e.target.value)}
+              className="w-full sm:w-40"
+            />
+            {rango && (
+              <Button type="button" variant="ghost" size="sm" onClick={limpiarRango}>
+                Limpiar
+              </Button>
+            )}
+          </div>
+        </div>
       </div>
+      {rango && (
+        <p className="text-sm text-muted-foreground -mt-2">
+          Mostrando solo del {fechaDesde} al {fechaHasta} — la vista previa y la confirmación siguen siendo del mes
+          completo.
+        </p>
+      )}
 
       <Tabs value={vista} onValueChange={(valor) => actualizarParam("vista", valor)}>
         <TabsList>
@@ -103,7 +162,7 @@ export function FacturacionPage() {
           <TabsTrigger value="transportistas">Transportistas</TabsTrigger>
         </TabsList>
         <TabsContent value="liquidacion" className="pt-4">
-          <LiquidacionTab clienteId={clienteId} mes={mes} anio={anio} />
+          <LiquidacionTab clienteId={clienteId} mes={mes} anio={anio} rango={rango} />
         </TabsContent>
         <TabsContent value="tarifas" className="pt-4">
           <TarifasTab clienteId={clienteId} />
@@ -112,7 +171,7 @@ export function FacturacionPage() {
           <ZonasTarifariasTab />
         </TabsContent>
         <TabsContent value="transportistas" className="pt-4">
-          <TransportistasTab mes={mes} anio={anio} />
+          <TransportistasTab mes={mes} anio={anio} rango={rango} />
         </TabsContent>
       </Tabs>
     </div>

@@ -149,9 +149,21 @@ export async function actualizarTarifaTransportista(
   return data;
 }
 
-export async function liquidacionTransportistas(mes: number, anio: number): Promise<ResumenChofer[]> {
+// `rango` opcional (decisión 2026-10-04, datepicker libre en la pantalla):
+// acota a un sub-período dentro del mes elegido. Nunca lo usan
+// generarVistaPrevia/confirmar — el cierre sigue siendo el mes completo.
+export interface RangoFechas {
+  fechaDesde: string;
+  fechaHasta: string;
+}
+
+export async function liquidacionTransportistas(
+  mes: number,
+  anio: number,
+  rango?: RangoFechas,
+): Promise<ResumenChofer[]> {
   const { data } = await apiClient.get<ResumenChofer[]>("/facturacion/liquidacion-transportistas", {
-    params: { mes, anio },
+    params: { mes, anio, ...rango },
   });
   return data;
 }
@@ -167,9 +179,10 @@ export async function listarPedidosFacturados(
   clienteId: string,
   mes: number,
   anio: number,
+  rango?: RangoFechas,
 ): Promise<PedidoFacturado[]> {
   const { data } = await apiClient.get<PedidoFacturado[]>("/facturacion/pedidos-facturados", {
-    params: { clienteId, mes, anio },
+    params: { clienteId, mes, anio, ...rango },
   });
   return data;
 }
@@ -192,9 +205,14 @@ export async function confirmar(clienteId: string, mes: number, anio: number): P
   return data;
 }
 
-export async function descargarReporteMensual(clienteId: string, mes: number, anio: number): Promise<Blob> {
+export async function descargarReporteMensual(
+  clienteId: string,
+  mes: number,
+  anio: number,
+  rango?: RangoFechas,
+): Promise<Blob> {
   const { data } = await apiClient.get<Blob>("/facturacion/reporte-mensual", {
-    params: { clienteId, mes, anio },
+    params: { clienteId, mes, anio, ...rango },
     responseType: "blob",
   });
   return data;

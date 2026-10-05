@@ -132,7 +132,12 @@ export class FacturacionController {
   // de calcular (ver FacturacionService.liquidacionTransportistas).
   @Get("liquidacion-transportistas")
   liquidacionTransportistas(@Query() query: MesAnioDto) {
-    return this.facturacionService.liquidacionTransportistas(query.mes, query.anio);
+    return this.facturacionService.liquidacionTransportistas(
+      query.mes,
+      query.anio,
+      query.fechaDesde,
+      query.fechaHasta,
+    );
   }
 
   // §21 funcional ("al cierre de cada mes, por cliente"): trae los grupos ya
@@ -146,7 +151,13 @@ export class FacturacionController {
   // mostrar en la pantalla de Liquidación — mismo dato que ya arma el Excel.
   @Get("pedidos-facturados")
   listarPedidosFacturados(@Query() query: PeriodoDto) {
-    return this.facturacionService.listarPedidosFacturados(query.clienteId, query.mes, query.anio);
+    return this.facturacionService.listarPedidosFacturados(
+      query.clienteId,
+      query.mes,
+      query.anio,
+      query.fechaDesde,
+      query.fechaHasta,
+    );
   }
 
   // Corre el motor de reglas y deja el resultado en BORRADOR — se puede
@@ -169,7 +180,13 @@ export class FacturacionController {
   @Get("reporte-mensual")
   @Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
   async descargarReporteMensual(@Query() query: PeriodoDto): Promise<StreamableFile> {
-    const buffer = await this.facturacionService.generarReporteMensual(query.clienteId, query.mes, query.anio);
+    const buffer = await this.facturacionService.generarReporteMensual(
+      query.clienteId,
+      query.mes,
+      query.anio,
+      query.fechaDesde,
+      query.fechaHasta,
+    );
     const nombreArchivo = `facturacion-${query.anio}-${String(query.mes).padStart(2, "0")}.xlsx`;
     return new StreamableFile(buffer, { disposition: `attachment; filename="${nombreArchivo}"` });
   }

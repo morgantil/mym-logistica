@@ -8,7 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { CLASES_TONO } from "@/features/pedidos/estado-labels";
-import { confirmar, descargarReporteMensual, generarVistaPrevia, listarGrupos, listarPedidosFacturados } from "./api";
+import {
+  confirmar,
+  descargarReporteMensual,
+  generarVistaPrevia,
+  listarGrupos,
+  listarPedidosFacturados,
+  type RangoFechas,
+} from "./api";
 import { formatearMonto, NOMBRES_MES } from "./formato";
 import type { GrupoFacturacion, PedidoFacturado, ReglaAplicada } from "./tipos";
 
@@ -104,10 +111,12 @@ export function LiquidacionTab({
   clienteId,
   mes,
   anio,
+  rango,
 }: {
   clienteId: string | null;
   mes: number;
   anio: number;
+  rango?: RangoFechas;
 }) {
   const queryClient = useQueryClient();
 
@@ -120,9 +129,12 @@ export function LiquidacionTab({
   // Decisión 2026-09-11: detalle por pedido visible en pantalla (antes solo
   // estaba en el Excel descargable) — Leonardo pidió más información para
   // quien hace la liquidación (Nº de pedido, Nº de afiliado, destinatario…).
+  // Decisión 2026-10-04: `rango` acota el detalle a un sub-período del mes
+  // (datepicker libre) — los grupos/totales de arriba siguen siendo del mes
+  // completo, es el cierre real.
   const { data: pedidosFacturados, isLoading: cargandoDetalle } = useQuery({
-    queryKey: ["facturacion", "pedidos-facturados", clienteId, mes, anio],
-    queryFn: () => listarPedidosFacturados(clienteId!, mes, anio),
+    queryKey: ["facturacion", "pedidos-facturados", clienteId, mes, anio, rango],
+    queryFn: () => listarPedidosFacturados(clienteId!, mes, anio, rango),
     enabled: clienteId !== null,
   });
 
@@ -151,7 +163,7 @@ export function LiquidacionTab({
   });
 
   const mutacionDescargar = useMutation({
-    mutationFn: () => descargarReporteMensual(clienteId!, mes, anio),
+    mutationFn: () => descargarReporteMensual(clienteId!, mes, anio, rango),
     onSuccess: (blob) => {
       const url = URL.createObjectURL(blob);
       const enlace = document.createElement("a");

@@ -210,8 +210,15 @@ export interface FacturacionRepositorio {
   confirmar(clienteId: string, mes: number, anio: number, usuarioId: string): Promise<GrupoFacturacion[]>;
 
   // §31 funcional ("Reporte mensual"): detalle por pedido con el resumen del
-  // viaje al que pertenece, para exportar a Excel.
-  listarPedidosFacturados(clienteId: string, mes: number, anio: number): Promise<PedidoFacturado[]>;
+  // viaje al que pertenece, para exportar a Excel. `fechaDesde`/`fechaHasta`
+  // (ISO, ambas o ninguna) opcionales — ver comentario en PeriodoDto.
+  listarPedidosFacturados(
+    clienteId: string,
+    mes: number,
+    anio: number,
+    fechaDesde?: string,
+    fechaHasta?: string,
+  ): Promise<PedidoFacturado[]>;
 }
 
 export const FACTURACION_REPOSITORIO = Symbol("FACTURACION_REPOSITORIO");

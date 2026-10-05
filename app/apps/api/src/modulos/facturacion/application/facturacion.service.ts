@@ -45,6 +45,23 @@ function rangoDelMes(mes: number, anio: number): { fechaDesde: Date; fechaHasta:
   };
 }
 
+// Decisión 2026-10-04: rango de fechas elegido libremente por el usuario
+// (datepicker), ambos extremos inclusive tal como los elige — `fechaHasta`
+// se lleva al día siguiente para que la comparación `lt` de siempre incluya
+// ese día completo. Si no vienen los dos, se usa el mes completo (default
+// actual, sin cambios de comportamiento).
+function rangoElegido(
+  mes: number,
+  anio: number,
+  fechaDesde?: string,
+  fechaHasta?: string,
+): { fechaDesde: Date; fechaHasta: Date } {
+  if (!fechaDesde || !fechaHasta) return rangoDelMes(mes, anio);
+  const hasta = new Date(`${fechaHasta}T00:00:00.000Z`);
+  hasta.setUTCDate(hasta.getUTCDate() + 1);
+  return { fechaDesde: new Date(`${fechaDesde}T00:00:00.000Z`), fechaHasta: hasta };
+}
+
 @Injectable()
 export class FacturacionService {
   private readonly logger = new Logger(FacturacionService.name);
@@ -247,8 +264,11 @@ export class FacturacionService {
   // Excel (§31), pero expuesto como JSON para mostrarlo directo en la
   // pantalla de Liquidación — Leonardo pidió más información visible para
   // quien hace la liquidación (Nº de pedido, Nº de afiliado, destinatario…).
-  listarPedidosFacturados(clienteId: string, mes: number, anio: number) {
-    return this.repositorio.listarPedidosFacturados(clienteId, mes, anio);
+  // `fechaDesde`/`fechaHasta` opcionales (decisión 2026-10-04): acotan a un
+  // rango dentro del mes — ver comentario en PeriodoDto. No afecta qué
+  // pedidos están facturados, solo cuáles de ellos se muestran acá.
+  listarPedidosFacturados(clienteId: string, mes: number, anio: number, fechaDesde?: string, fechaHasta?: string) {
+    return this.repositorio.listarPedidosFacturados(clienteId, mes, anio, fechaDesde, fechaHasta);
   }
 
   // Convierte los PedidoFacturable de un cliente (§30 funcional) en
@@ -598,14 +618,23 @@ export class FacturacionService {
   // §31 funcional: reporte mensual por cliente, exportable a Excel. Sirve
   // tanto para BORRADOR (simulación) como CONFIRMADO — cada fila del resumen
   // trae su propio estado, así que no hace falta separar el endpoint.
-  async generarReporteMensual(clienteId: string, mes: number, anio: number): Promise<Buffer> {
+  // `fechaDesde`/`fechaHasta` opcionales (decisión 2026-10-04): el detalle
+  // por pedido se acota al rango, los grupos (resumen por regla) siguen
+  // siendo del mes completo — son el cierre real, no tiene sentido partirlos.
+  async generarReporteMensual(
+    clienteId: string,
+    mes: number,
+    anio: number,
+    fechaDesde?: string,
+    fechaHasta?: string,
+  ): Promise<Buffer> {
     const cliente = await this.clientesService.buscarPorId(clienteId);
     if (!cliente) {
       throw new NotFoundException(`Cliente ${clienteId} no encontrado.`);
     }
 
     const [pedidos, gruposSinOrdenar] = await Promise.all([
-      this.repositorio.listarPedidosFacturados(clienteId, mes, anio),
+      this.repositorio.listarPedidosFacturados(clienteId, mes, anio, fechaDesde, fechaHasta),
       this.repositorio.listarGrupos(clienteId, mes, anio),
     ]);
     const grupos = await this.ordenarYNombrarGrupos(gruposSinOrdenar);
@@ -621,11 +650,20 @@ export class FacturacionService {
   // solo se exige configurada la de las zonas que de verdad tienen viajes en
   // el período, para no bloquear la liquidación de un mes sin viajes, por
   // ejemplo, a Provincia.
-  async liquidacionTransportistas(mes: number, anio: number): Promise<ResumenChofer[]> {
+  // `fechaDesde`/`fechaHasta` opcionales (decisión 2026-10-04): reemplazan el
+  // mes completo por un rango elegido libremente — acá no hay invariante de
+  // "cierre" que proteger, la liquidación a transportistas nunca se
+  // confirma/persiste, se recalcula en vivo cada vez que se pide.
+  async liquidacionTransportistas(
+    mes: number,
+    anio: number,
+    fechaDesde?: string,
+    fechaHasta?: string,
+  ): Promise<ResumenChofer[]> {
     await this.pedidosService.sincronizarEstados();
 
-    const { fechaDesde, fechaHasta } = rangoDelMes(mes, anio);
-    const pedidos = await this.repositorio.listarEntregadosPorChoferEnPeriodo(fechaDesde, fechaHasta);
+    const rango = rangoElegido(mes, anio, fechaDesde, fechaHasta);
+    const pedidos = await this.repositorio.listarEntregadosPorChoferEnPeriodo(rango.fechaDesde, rango.fechaHasta);
     if (pedidos.length === 0) return [];
 
     const zonasConViajes = Array.from(new Set(pedidos.map((p) => p.zona)));
