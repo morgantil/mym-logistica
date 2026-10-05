@@ -44,6 +44,7 @@ function pedidoListado(overrides: Partial<PedidoListado> = {}): PedidoListado {
     bultos: 2,
     observaciones: null,
     comentario: null,
+    ruta: null,
     alertaDireccionPendiente: false,
     etiquetaImpresaEn: null,
     cantidadPedidoOriginal: 1,

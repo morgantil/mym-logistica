@@ -166,6 +166,12 @@ export class PedidosService {
     return this.repositorio.actualizarComentario(pedidoId, comentario?.trim() || null, version);
   }
 
+  // Decisión 2026-10-04: qué ruta de SimpliRoute (ej. "Ruta 1") le
+  // corresponde — campo libre cargado a mano, ver comentario en pedido.ts.
+  async actualizarRuta(pedidoId: string, ruta: string | null, version: number) {
+    return this.repositorio.actualizarRuta(pedidoId, ruta?.trim() || null, version);
+  }
+
   // Decisión 2026-09-16 (Leonardo, QA): la "Etapa 2" del §11 funcional que
   // había quedado pendiente — resolver una dirección distinta a la
   // registrada en el padrón ya no es solo una nota en observaciones, ahora

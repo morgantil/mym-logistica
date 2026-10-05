@@ -18,6 +18,7 @@ import { PedidosService } from "../application/pedidos.service";
 import { ActualizarPrioridadDto } from "./dto/actualizar-prioridad.dto";
 import { ActualizarBultosDto } from "./dto/actualizar-bultos.dto";
 import { ActualizarComentarioDto } from "./dto/actualizar-comentario.dto";
+import { ActualizarRutaDto } from "./dto/actualizar-ruta.dto";
 import { EliminarPedidosDto } from "./dto/eliminar-pedidos.dto";
 import { EnviarSimpliRouteDto } from "./dto/enviar-simpliroute.dto";
 import { ListarPedidosDto } from "./dto/listar-pedidos.dto";
@@ -120,6 +121,14 @@ export class PedidosController {
   @Patch(":id/comentario")
   actualizarComentario(@Param("id") id: string, @Body() dto: ActualizarComentarioDto) {
     return this.pedidosService.actualizarComentario(id, dto.comentario ?? null, dto.version);
+  }
+
+  // Decisión 2026-10-04: qué ruta de SimpliRoute (ej. "Ruta 1") le
+  // corresponde — campo libre cargado a mano, mismos roles que comentario.
+  @Roles(Rol.OPERACIONES, Rol.LOGISTICA, Rol.ADMINISTRACION)
+  @Patch(":id/ruta")
+  actualizarRuta(@Param("id") id: string, @Body() dto: ActualizarRutaDto) {
+    return this.pedidosService.actualizarRuta(id, dto.ruta ?? null, dto.version);
   }
 
   // Decisión 2026-09-16: resuelve una "dirección distinta a la registrada en

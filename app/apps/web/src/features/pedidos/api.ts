@@ -101,6 +101,13 @@ export async function actualizarComentario(
   return data;
 }
 
+// Decisión 2026-10-04: qué ruta de SimpliRoute le corresponde (ej. "Ruta 1"),
+// cargada a mano — ver comentario en RutaCelda.
+export async function actualizarRuta(pedidoId: string, ruta: string, version: number): Promise<PedidoListado> {
+  const { data } = await apiClient.patch<PedidoListado>(`/pedidos/${pedidoId}/ruta`, { ruta, version });
+  return data;
+}
+
 // Decisión 2026-09-16: resuelve una "dirección distinta a la registrada en
 // el padrón" y desbloquea el envío del pedido (ver validar-envio.ts).
 export async function resolverAlertaDireccion(

@@ -46,6 +46,9 @@ export interface PedidoListado {
   // Campo libre editable por el operador en cualquier momento — decisión
   // 2026-10-04, separado de `observaciones` (que viene del Excel).
   comentario: string | null;
+  // Qué ruta de SimpliRoute le corresponde (ej. "Ruta 1") — decisión
+  // 2026-10-04, cargada a mano, ver RutaCelda.
+  ruta: string | null;
   // Decisión 2026-09-16: true bloquea el envío hasta resolverse (ver
   // ResolverDireccionDialog).
   alertaDireccionPendiente: boolean;

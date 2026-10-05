@@ -82,6 +82,7 @@ export async function generarPedidosExcel(pedidos: PedidoListado[]): Promise<Buf
     { header: "SimpliRoute", key: "simpliroute", width: 14 },
     { header: "Observaciones", key: "observaciones", width: 28 },
     { header: "Comentarios", key: "comentario", width: 28 },
+    { header: "Ruta", key: "ruta", width: 14 },
   ];
   hoja.getRow(1).font = { bold: true };
 
@@ -114,6 +115,7 @@ export async function generarPedidosExcel(pedidos: PedidoListado[]): Promise<Buf
       simpliroute: TEXTO_SIMPLIROUTE[pedido.estadoSimpliroute],
       observaciones: pedido.observaciones ?? "",
       comentario: pedido.comentario ?? "",
+      ruta: pedido.ruta ?? "",
     });
   }
 

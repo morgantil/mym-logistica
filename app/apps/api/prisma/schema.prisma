@@ -629,6 +629,16 @@ model Pedido {
   // entrega fallida, "no había nadie en el domicilio") — a propósito
   // separado de `observaciones`, que viene del Excel y no se edita a mano.
   comentario           String?
+  // Decisión 2026-10-04 (reunión con el cliente): qué ruta de SimpliRoute le
+  // corresponde a este pedido (ej. "Ruta 1", "Ruta 2") — un mismo chofer
+  // puede tener más de una ruta el mismo día (confirmado real, caso LUCIA
+  // 2026-10-03). SimpliRoute no publica un número de ruta legible por API
+  // (el Route Object es un UUID sin campo de orden/nombre, ver Documentacion
+  // simpliroute/03) y el criterio con el que su propia pantalla arma "Ruta
+  // 1"/"Ruta 2" no está documentado — por eso es un campo libre que carga el
+  // operador a mano, mismo criterio que Prioridad, no un auto-sync que
+  // adivinaría ese orden.
+  ruta                 String?
   // Decisión 2026-09-16 (Leonardo, QA): antes, una dirección distinta a la
   // registrada en el padrón solo quedaba anotada como texto libre en
   // `observaciones` y el pedido se podía enviar igual — esta es la "Etapa 2"

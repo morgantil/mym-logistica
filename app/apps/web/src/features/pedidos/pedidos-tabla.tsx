@@ -41,6 +41,7 @@ import {
 } from "./api";
 import { BultosCelda } from "./bultos-celda";
 import { ComentarioCelda } from "./comentario-celda";
+import { RutaCelda } from "./ruta-celda";
 import { DetallePedidoSheet } from "./detalle-pedido-sheet";
 import { ordenarColumnas } from "./orden-columnas";
 import {
@@ -123,6 +124,7 @@ const IDS_COLUMNAS_DEFAULT = [
   "simpliroute",
   "observaciones",
   "comentario",
+  "ruta",
 ] as const;
 
 const LABEL_COLUMNA: Record<(typeof IDS_COLUMNAS_DEFAULT)[number], string> = {
@@ -151,6 +153,7 @@ const LABEL_COLUMNA: Record<(typeof IDS_COLUMNAS_DEFAULT)[number], string> = {
   simpliroute: "SimpliRoute",
   observaciones: "Observaciones",
   comentario: "Comentarios",
+  ruta: "Ruta",
 };
 
 // "productos" es un cálculo agregado (suma de varios renglones), no una
@@ -167,6 +170,10 @@ export function PedidosTabla() {
   // Comentario: cualquiera de los roles que opera pedidos día a día, no solo
   // Logística — decisión 2026-10-04.
   const puedeEditarComentario = Boolean(
+    usuario?.roles.some((rol) => rol === "OPERACIONES" || rol === "LOGISTICA" || rol === "ADMINISTRACION"),
+  );
+  // Ruta: mismos roles que comentario — decisión 2026-10-04.
+  const puedeEditarRuta = Boolean(
     usuario?.roles.some((rol) => rol === "OPERACIONES" || rol === "LOGISTICA" || rol === "ADMINISTRACION"),
   );
   // Borrado lógico — decisión 2026-09-11, ver validar-eliminacion.ts (solo
@@ -527,8 +534,13 @@ export function PedidosTabla() {
         header: "Comentarios",
         cell: ({ row }) => <ComentarioCelda pedido={row.original} puedeEditar={puedeEditarComentario} />,
       },
+      ruta: {
+        id: "ruta",
+        header: "Ruta",
+        cell: ({ row }) => <RutaCelda pedido={row.original} puedeEditar={puedeEditarRuta} />,
+      },
     }),
-    [puedeEditarBultos, puedeEditarComentario, puedeEliminar, mutacionPrioridad],
+    [puedeEditarBultos, puedeEditarComentario, puedeEditarRuta, puedeEliminar, mutacionPrioridad],
   );
 
   const columnas = useMemo<LegacyColumnDef<PedidoListado>[]>(() => {

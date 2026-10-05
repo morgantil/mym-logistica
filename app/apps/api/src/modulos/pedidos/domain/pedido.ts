@@ -44,6 +44,9 @@ export interface Pedido {
   // Campo libre editable por el operador en cualquier momento (ej. motivo de
   // una entrega fallida) — decisión 2026-10-04, separado de `observaciones`.
   comentario: string | null;
+  // Qué ruta de SimpliRoute le corresponde (ej. "Ruta 1", "Ruta 2") — campo
+  // libre cargado a mano, ver comentario en schema.prisma.
+  ruta: string | null;
   // Decisión 2026-09-16: bloquea el envío hasta que se resuelva — ver
   // validar-envio.ts y PedidosService.resolverAlertaDireccion.
   alertaDireccionPendiente: boolean;

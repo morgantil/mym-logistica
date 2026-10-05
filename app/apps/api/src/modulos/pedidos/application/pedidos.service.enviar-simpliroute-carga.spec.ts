@@ -43,6 +43,7 @@ function pedidoBase(overrides: Partial<Pedido> = {}): Pedido {
     bultos: 2,
     observaciones: null,
     comentario: null,
+    ruta: null,
     alertaDireccionPendiente: false,
     etiquetaImpresaEn: null,
     cantidadPedidoOriginal: 1,
