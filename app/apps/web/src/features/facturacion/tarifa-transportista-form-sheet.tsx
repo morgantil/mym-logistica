@@ -2,12 +2,18 @@ import { useEffect, useState, type FormEvent } from "react";
 import { AxiosError } from "axios";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { CabaProvincia } from "@mym/shared-types";
 import { Button } from "@/components/ui/button";
 import { FilaFormulario, TablaFormulario } from "@/components/shell/fila-formulario";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { actualizarTarifaTransportista, crearTarifaTransportista } from "./api";
 import type { TarifaTransportista } from "./tipos";
+
+const ETIQUETA_ZONA: Record<CabaProvincia, string> = {
+  [CabaProvincia.CABA]: "CABA",
+  [CabaProvincia.PROVINCIA]: "Provincia",
+};
 
 function mensajeError(error: unknown): string {
   if (error instanceof AxiosError && error.response?.data?.message) {
@@ -18,13 +24,18 @@ function mensajeError(error: unknown): string {
 }
 
 // Decisión 2026-09-11: sin historial por vigencia — si ya hay una tarifa
-// cargada, este mismo formulario la edita en vez de crear otra.
+// cargada para esa zona, este mismo formulario la edita en vez de crear
+// otra. Decisión 2026-10-04: una tarifa por zona (CABA/Provincia), la zona
+// se elige en la pantalla de origen (qué botón "Nueva tarifa" se tocó) y acá
+// solo se muestra, no se puede cambiar una vez creada.
 export function TarifaTransportistaFormSheet({
   tarifa,
+  zona,
   abierto,
   onOpenChange,
 }: {
   tarifa: TarifaTransportista | null;
+  zona: CabaProvincia;
   abierto: boolean;
   onOpenChange: (abierto: boolean) => void;
 }) {
@@ -44,7 +55,7 @@ export function TarifaTransportistaFormSheet({
       if (editando) {
         return actualizarTarifaTransportista(tarifa.id, { monto: Number(monto) });
       }
-      return crearTarifaTransportista({ monto: Number(monto) });
+      return crearTarifaTransportista({ zona, monto: Number(monto) });
     },
     onSuccess: () => {
       toast.success("Tarifa por viaje actualizada.");
@@ -65,10 +76,12 @@ export function TarifaTransportistaFormSheet({
     <Sheet open={abierto} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-md">
         <SheetHeader>
-          <SheetTitle>{editando ? "Editar tarifa por viaje" : "Nueva tarifa por viaje"}</SheetTitle>
+          <SheetTitle>
+            {editando ? "Editar tarifa por viaje" : "Nueva tarifa por viaje"} — {ETIQUETA_ZONA[zona]}
+          </SheetTitle>
           <SheetDescription>
-            Monto fijo que se le paga al transportista por cada viaje realizado, sin distinguir 2×1 ni
-            entrega unificada.
+            Monto fijo que se le paga al transportista por cada viaje realizado en esta zona, sin distinguir
+            2×1 ni entrega unificada.
           </SheetDescription>
         </SheetHeader>
 

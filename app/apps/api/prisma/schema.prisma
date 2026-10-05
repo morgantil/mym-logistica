@@ -116,6 +116,18 @@ enum EstadoGrupoFacturacion {
   CONFIRMADO
 }
 
+// Clasificación geográfica simple para la liquidación a transportistas —
+// decisión 2026-10-04 (reunión con el cliente): el pago por viaje difiere
+// entre CABA y Provincia. A propósito NO es la misma tabla configurable
+// ZonaTarifaria que usa la facturación a clientes (que sí distingue Cordón
+// 1/2/3 para algunos clientes) — acá alcanza con el binario simple, no hace
+// falta esa granularidad para pagarle a un chofer. Mismos dos valores que el
+// enum TS CabaProvincia (@mym/shared-types), que resuelve GeorefArAdapter.
+enum CabaProvincia {
+  CABA
+  PROVINCIA
+}
+
 enum AccionAuditoria {
   CREAR
   ACTUALIZAR
@@ -831,15 +843,18 @@ model UnificacionCruzadaPar {
 // decisión 2026-08-26: en vez de un valor fijo en código, es un monto
 // configurable con historial de vigencia (mismo patrón que
 // PorcentajeSegundoServicio/TarifaCliente), editable por el rol Facturación.
-// No tiene clienteId: es un monto único por viaje realizado, sin distinguir
+// No tiene clienteId: es un monto por viaje realizado, sin distinguir
 // cliente ni tipo de entrega (regla simple confirmada por Leonardo: "se paga
-// por viaje realizado, sin 2×1 ni entrega unificada"). El *cálculo* de
-// cuántos viajes hizo cada chofer (para multiplicar por este monto) todavía
-// no está construido — depende de sincronizar datos de Rutas/Viajes desde
-// SimpliRoute, que hoy no se sincronizan (ver TEMAS_PENDIENTES.md sección 2).
+// por viaje realizado, sin 2×1 ni entrega unificada") — desde el 2026-10-04
+// sí distingue zona (CABA/Provincia, ver enum CabaProvincia), una fila activa
+// por zona.
 model TarifaTransportista {
-  id     String  @id @default(uuid())
-  monto  Decimal @db.Decimal(12, 2)
+  id    String        @id @default(uuid())
+  // Decisión 2026-10-04 (reunión con el cliente): una tarifa por zona
+  // geográfica (CABA paga distinto que Provincia), no un único monto global
+  // — ver comentario en el enum CabaProvincia.
+  zona  CabaProvincia
+  monto Decimal       @db.Decimal(12, 2)
   // Decisión 2026-09-11: sin historial por vigencia — ver comentario en
   // TarifaCliente, mismo criterio.
   activa Boolean @default(true)

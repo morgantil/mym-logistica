@@ -119,7 +119,7 @@ export class FacturacionController {
 
   @Post("tarifa-transportista")
   crearTarifaTransportista(@Body() dto: CrearTarifaTransportistaDto) {
-    return this.facturacionService.crearTarifaTransportista(dto.monto);
+    return this.facturacionService.crearTarifaTransportista(dto.zona, dto.monto);
   }
 
   @Patch("tarifa-transportista/:id")

@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
-import { TipoEnvase, TipoServicio, TipoServicioCliente } from "@mym/shared-types";
+import { CabaProvincia, TipoEnvase, TipoServicio, TipoServicioCliente } from "@mym/shared-types";
 import { ClientesService } from "../../clientes/application/clientes.service";
 import { PedidoFacturable } from "../../pedidos/domain/pedido";
 import { PedidosService } from "../../pedidos/application/pedidos.service";
@@ -205,8 +205,8 @@ export class FacturacionService {
     return this.repositorio.listarTarifasTransportista();
   }
 
-  crearTarifaTransportista(monto: number) {
-    return this.repositorio.crearTarifaTransportista({ monto });
+  crearTarifaTransportista(zona: CabaProvincia, monto: number) {
+    return this.repositorio.crearTarifaTransportista({ zona, monto });
   }
 
   actualizarTarifaTransportista(id: string, datos: { monto?: number; activa?: boolean }) {
@@ -617,23 +617,33 @@ export class FacturacionService {
   // cuánto se le debe pagar. Sincroniza estados primero (mismo motivo que
   // generarVistaPrevia) para no calcular sobre datos viejos. Distinto de la
   // facturación a clientes: acá no hay clienteId (un chofer reparte para
-  // todos) y la tarifa es un único monto global, no por zona.
+  // todos). Desde el 2026-10-04 la tarifa distingue zona (CABA/Provincia) —
+  // solo se exige configurada la de las zonas que de verdad tienen viajes en
+  // el período, para no bloquear la liquidación de un mes sin viajes, por
+  // ejemplo, a Provincia.
   async liquidacionTransportistas(mes: number, anio: number): Promise<ResumenChofer[]> {
     await this.pedidosService.sincronizarEstados();
 
     const { fechaDesde, fechaHasta } = rangoDelMes(mes, anio);
-    const [pedidos, tarifa] = await Promise.all([
-      this.repositorio.listarEntregadosPorChoferEnPeriodo(fechaDesde, fechaHasta),
-      this.repositorio.tarifaTransportistaActiva(),
-    ]);
-
+    const pedidos = await this.repositorio.listarEntregadosPorChoferEnPeriodo(fechaDesde, fechaHasta);
     if (pedidos.length === 0) return [];
-    if (!tarifa) {
-      throw new BadRequestException(
-        "No hay una tarifa por viaje configurada — cargala en Facturación → Transportistas antes de calcular la liquidación.",
-      );
-    }
 
-    return calcularLiquidacionTransportistas(pedidos, tarifa.monto);
+    const zonasConViajes = Array.from(new Set(pedidos.map((p) => p.zona)));
+    const tarifasPorZona = await Promise.all(
+      zonasConViajes.map((zona) => this.repositorio.tarifaTransportistaActiva(zona)),
+    );
+
+    const tarifaPorZona = {} as Record<CabaProvincia, number>;
+    zonasConViajes.forEach((zona, indice) => {
+      const tarifa = tarifasPorZona[indice];
+      if (!tarifa) {
+        throw new BadRequestException(
+          `No hay una tarifa por viaje configurada para ${zona} — cargala en Facturación → Transportistas antes de calcular la liquidación.`,
+        );
+      }
+      tarifaPorZona[zona] = tarifa.monto;
+    });
+
+    return calcularLiquidacionTransportistas(pedidos, tarifaPorZona);
   }
 }

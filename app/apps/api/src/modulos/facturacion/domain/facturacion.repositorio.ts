@@ -1,4 +1,4 @@
-import { TipoEnvase, TipoServicio } from "@mym/shared-types";
+import { CabaProvincia, TipoEnvase, TipoServicio } from "@mym/shared-types";
 import { GrupoFacturacion, PedidoFacturado } from "./grupo-facturacion";
 import { PedidoParaLiquidarTransportista } from "./motor-liquidacion-transportistas";
 import {
@@ -45,6 +45,7 @@ export interface DatosActualizarMontoUnificadoMedicamento {
 }
 
 export interface DatosCrearTarifaTransportista {
+  zona: CabaProvincia;
   monto: number;
 }
 
@@ -166,7 +167,7 @@ export interface FacturacionRepositorio {
   // Liquidación a transportistas — monto por viaje. Sin clienteId: un único
   // valor global. Sin vigencia desde 2026-09-11, mismo criterio que las tarifas.
   listarTarifasTransportista(): Promise<TarifaTransportista[]>;
-  tarifaTransportistaActiva(): Promise<TarifaTransportista | null>;
+  tarifaTransportistaActiva(zona: CabaProvincia): Promise<TarifaTransportista | null>;
   crearTarifaTransportista(datos: DatosCrearTarifaTransportista): Promise<TarifaTransportista>;
   actualizarTarifaTransportista(
     id: string,

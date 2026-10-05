@@ -1,4 +1,4 @@
-import { TipoEnvase, TipoServicio } from "@mym/shared-types";
+import { CabaProvincia, TipoEnvase, TipoServicio } from "@mym/shared-types";
 
 // Tarifas por cliente y zona tarifaria (CABA/Cordón 1/2/3, configurable —
 // ver ZonaTarifaria). DOCUMENTO FUNCIONAL.md §23, actualizado por el
@@ -73,9 +73,11 @@ export interface CombinacionUnificacionClientes {
 // Liquidación a transportistas — monto fijo por viaje (decisión 2026-08-26,
 // ver DOCUMENTO TECNICO.md historial). Sin clienteId: es un valor único, no
 // depende del cliente. Sin vigencia desde 2026-09-11, mismo criterio que
-// TarifaCliente.
+// TarifaCliente. Desde el 2026-10-04 distingue zona (CabaProvincia): una
+// fila activa por zona, CABA paga distinto que Provincia.
 export interface TarifaTransportista {
   id: string;
+  zona: CabaProvincia;
   monto: number;
   activa: boolean;
 }

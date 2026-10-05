@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
-import { TipoEnvase, TipoServicio } from "@mym/shared-types";
+import { CabaProvincia, TipoEnvase, TipoServicio } from "@mym/shared-types";
 import { PrismaService } from "../../../common/prisma/prisma.service";
 import {
   DatosActualizarMontoUnificadoMedicamento,
@@ -408,19 +408,27 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
       .then((filas) => filas.map(mapearTarifaTransportista));
   }
 
-  async tarifaTransportistaActiva(): Promise<TarifaTransportista | null> {
-    const fila = await this.prisma.tarifaTransportista.findFirst({ where: { activa: true } });
+  async tarifaTransportistaActiva(zona: CabaProvincia): Promise<TarifaTransportista | null> {
+    const fila = await this.prisma.tarifaTransportista.findFirst({
+      where: { activa: true, zona: zona as unknown as Prisma.EnumCabaProvinciaFilter },
+    });
     return fila ? mapearTarifaTransportista(fila) : null;
   }
 
   async crearTarifaTransportista(datos: DatosCrearTarifaTransportista): Promise<TarifaTransportista> {
-    // Sin historial por vigencia — es un valor único global, si ya existe
-    // alguna fila hay que editarla (actualizarTarifaTransportista).
-    const existente = await this.prisma.tarifaTransportista.findFirst();
+    // Sin historial por vigencia — es un valor único por zona, si ya existe
+    // una fila para esa zona hay que editarla (actualizarTarifaTransportista).
+    const existente = await this.prisma.tarifaTransportista.findFirst({
+      where: { zona: datos.zona as unknown as Prisma.EnumCabaProvinciaFilter },
+    });
     if (existente) {
-      throw new BadRequestException("Ya hay una tarifa de transportista cargada — editala en vez de crear otra.");
+      throw new BadRequestException(
+        `Ya hay una tarifa de transportista cargada para ${datos.zona} — editala en vez de crear otra.`,
+      );
     }
-    const creada = await this.prisma.tarifaTransportista.create({ data: { monto: datos.monto } });
+    const creada = await this.prisma.tarifaTransportista.create({
+      data: { zona: datos.zona as unknown as Prisma.TarifaTransportistaCreateInput["zona"], monto: datos.monto },
+    });
     return mapearTarifaTransportista(creada);
   }
 
@@ -446,12 +454,26 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
         choferId: { not: null },
         fechaEntregaEfectiva: { gte: fechaDesde, lt: fechaHasta },
       },
-      select: { id: true, choferId: true, choferNombre: true },
+      select: {
+        id: true,
+        choferId: true,
+        choferNombre: true,
+        zonaTarifaria: { select: { nombre: true } },
+      },
     });
     return pedidos.map((p) => ({
       id: p.id,
       choferId: p.choferId as string,
       choferNombre: p.choferNombre ?? "(sin nombre)",
+      // La zona de pago es CABA/Provincia (geográfico), NO la Zona de
+      // chofer de SimpliRoute (operativa, ej. "caba - noroeste 2") ni el
+      // Cordón de facturación a clientes — se deriva de la ZonaTarifaria ya
+      // resuelta: "CABA" es la única con ese nombre exacto, cualquier otra
+      // (Provincia o un Cordón) es geográficamente Provincia. Sin
+      // ZonaTarifaria resuelta (localidad todavía sin mapear) se asume
+      // Provincia — CABA siempre resuelve directo, nunca necesita mapeo.
+      zona:
+        p.zonaTarifaria?.nombre === "CABA" ? CabaProvincia.CABA : CabaProvincia.PROVINCIA,
     }));
   }
 
@@ -683,9 +705,15 @@ function mapearMontoUnificadoMedicamento(fila: {
   };
 }
 
-function mapearTarifaTransportista(fila: { id: string; monto: Prisma.Decimal; activa: boolean }): TarifaTransportista {
+function mapearTarifaTransportista(fila: {
+  id: string;
+  zona: string;
+  monto: Prisma.Decimal;
+  activa: boolean;
+}): TarifaTransportista {
   return {
     id: fila.id,
+    zona: fila.zona as TarifaTransportista["zona"],
     monto: Number(fila.monto),
     activa: fila.activa,
   };

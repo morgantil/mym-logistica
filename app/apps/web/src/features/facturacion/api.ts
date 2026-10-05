@@ -1,4 +1,4 @@
-import { TipoEnvase, TipoServicio } from "@mym/shared-types";
+import { CabaProvincia, TipoEnvase, TipoServicio } from "@mym/shared-types";
 import { apiClient } from "@/lib/api-client";
 import type {
   CombinacionUnificacionClientes,
@@ -133,7 +133,10 @@ export async function listarTarifasTransportista(): Promise<TarifaTransportista[
   return data;
 }
 
-export async function crearTarifaTransportista(datos: { monto: number }): Promise<TarifaTransportista> {
+export async function crearTarifaTransportista(datos: {
+  zona: CabaProvincia;
+  monto: number;
+}): Promise<TarifaTransportista> {
   const { data } = await apiClient.post<TarifaTransportista>("/facturacion/tarifa-transportista", datos);
   return data;
 }

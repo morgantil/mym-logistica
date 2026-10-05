@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { CabaProvincia } from "@mym/shared-types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -9,22 +10,28 @@ import { formatearMonto, NOMBRES_MES } from "./formato";
 import { TarifaTransportistaFormSheet } from "./tarifa-transportista-form-sheet";
 import type { TarifaTransportista } from "./tipos";
 
+const ETIQUETA_ZONA: Record<CabaProvincia, string> = {
+  [CabaProvincia.CABA]: "CABA",
+  [CabaProvincia.PROVINCIA]: "Provincia",
+};
+
 // Liquidación a transportistas — decisión 2026-08-26 (ver DOCUMENTO
 // TECNICO.md historial): monto por viaje configurable. Decisión 2026-09-11:
-// sin historial de vigencia — un único registro, editable, con toggle
-// activa/inactiva. El cálculo de cuántos viajes hizo cada chofer (§4.2
-// TEMAS_PENDIENTES.md, construido 2026-08-28) sincroniza los estados reales
-// desde SimpliRoute antes de traer el resumen — ver
-// FacturacionService.liquidacionTransportistas.
+// sin historial de vigencia. Decisión 2026-10-04 (reunión con el cliente):
+// una tarifa por zona (CABA/Provincia), no un único monto global — el
+// cálculo de cuántos viajes hizo cada chofer (§4.2 TEMAS_PENDIENTES.md,
+// construido 2026-08-28) sincroniza los estados reales desde SimpliRoute
+// antes de traer el resumen — ver FacturacionService.liquidacionTransportistas.
 export function TransportistasTab({ mes, anio }: { mes: number; anio: number }) {
-  const [sheetAbierto, setSheetAbierto] = useState(false);
+  const [zonaDelSheet, setZonaDelSheet] = useState<CabaProvincia | null>(null);
   const queryClient = useQueryClient();
 
   const { data: tarifas, isLoading } = useQuery({
     queryKey: ["facturacion", "tarifa-transportista"],
     queryFn: listarTarifasTransportista,
   });
-  const tarifaActual: TarifaTransportista | null = tarifas?.[0] ?? null;
+  const tarifaPorZona = (zona: CabaProvincia): TarifaTransportista | null =>
+    tarifas?.find((t) => t.zona === zona) ?? null;
 
   const mutacionActiva = useMutation({
     mutationFn: ({ id, activa }: { id: string; activa: boolean }) => actualizarTarifaTransportista(id, { activa }),
@@ -42,26 +49,24 @@ export function TransportistasTab({ mes, anio }: { mes: number; anio: number }) 
     queryFn: () => liquidacionTransportistas(mes, anio),
   });
 
-  const totalViajes = resumen?.reduce((total, r) => total + r.cantidadViajes, 0) ?? 0;
+  const totalViajes = resumen?.reduce((total, r) => total + r.viajesCaba + r.viajesProvincia, 0) ?? 0;
   const totalAPagar = resumen?.reduce((total, r) => total + r.totalAPagar, 0) ?? 0;
 
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-muted-foreground">
         Monto que se le paga a un transportista por cada viaje realizado (regla simple: sin 2×1 ni entrega
-        unificada).
+        unificada) — distinto para CABA y para Provincia.
       </p>
 
       <div className="flex items-center justify-between">
-        <h2 className="font-medium">Tarifa por viaje</h2>
-        <Button type="button" variant="outline" size="sm" onClick={() => setSheetAbierto(true)}>
-          {tarifaActual ? "Editar tarifa" : "Nueva tarifa"}
-        </Button>
+        <h2 className="font-medium">Tarifa por viaje, por zona</h2>
       </div>
 
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead>Zona</TableHead>
             <TableHead>Monto por viaje</TableHead>
             <TableHead>Estado</TableHead>
             <TableHead>Acciones</TableHead>
@@ -70,36 +75,49 @@ export function TransportistasTab({ mes, anio }: { mes: number; anio: number }) 
         <TableBody>
           {isLoading ? (
             <TableRow>
-              <TableCell colSpan={3} className="text-muted-foreground">
+              <TableCell colSpan={4} className="text-muted-foreground">
                 Cargando…
               </TableCell>
             </TableRow>
-          ) : tarifas?.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={3} className="text-muted-foreground">
-                Todavía no hay ninguna tarifa cargada.
-              </TableCell>
-            </TableRow>
           ) : (
-            tarifas?.map((tarifa) => (
-              <TableRow key={tarifa.id}>
-                <TableCell>{formatearMonto(tarifa.monto)}</TableCell>
-                <TableCell>
-                  {tarifa.activa ? <Badge variant="secondary">Activa</Badge> : <Badge variant="outline">Inactiva</Badge>}
-                </TableCell>
-                <TableCell>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    disabled={mutacionActiva.isPending}
-                    onClick={() => mutacionActiva.mutate({ id: tarifa.id, activa: !tarifa.activa })}
-                  >
-                    {tarifa.activa ? "Desactivar" : "Activar"}
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))
+            Object.values(CabaProvincia).map((zona) => {
+              const tarifa = tarifaPorZona(zona);
+              return (
+                <TableRow key={zona}>
+                  <TableCell>{ETIQUETA_ZONA[zona]}</TableCell>
+                  <TableCell>
+                    {tarifa ? formatearMonto(tarifa.monto) : <span className="text-muted-foreground">Sin cargar</span>}
+                  </TableCell>
+                  <TableCell>
+                    {tarifa ? (
+                      tarifa.activa ? (
+                        <Badge variant="secondary">Activa</Badge>
+                      ) : (
+                        <Badge variant="outline">Inactiva</Badge>
+                      )
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
+                  <TableCell className="flex gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => setZonaDelSheet(zona)}>
+                      {tarifa ? "Editar tarifa" : "Nueva tarifa"}
+                    </Button>
+                    {tarifa && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={mutacionActiva.isPending}
+                        onClick={() => mutacionActiva.mutate({ id: tarifa.id, activa: !tarifa.activa })}
+                      >
+                        {tarifa.activa ? "Desactivar" : "Activar"}
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            })
           )}
         </TableBody>
       </Table>
@@ -127,8 +145,8 @@ export function TransportistasTab({ mes, anio }: { mes: number; anio: number }) 
         <TableHeader>
           <TableRow>
             <TableHead>Chofer</TableHead>
-            <TableHead>Viajes</TableHead>
-            <TableHead>Tarifa por viaje</TableHead>
+            <TableHead>Viajes CABA</TableHead>
+            <TableHead>Viajes Provincia</TableHead>
             <TableHead>Total a pagar</TableHead>
           </TableRow>
         </TableHeader>
@@ -149,8 +167,8 @@ export function TransportistasTab({ mes, anio }: { mes: number; anio: number }) 
             resumen?.map((r) => (
               <TableRow key={r.choferId}>
                 <TableCell>{r.choferNombre}</TableCell>
-                <TableCell>{r.cantidadViajes}</TableCell>
-                <TableCell>{formatearMonto(r.tarifaPorViaje)}</TableCell>
+                <TableCell>{r.viajesCaba}</TableCell>
+                <TableCell>{r.viajesProvincia}</TableCell>
                 <TableCell>{formatearMonto(r.totalAPagar)}</TableCell>
               </TableRow>
             ))
@@ -160,8 +178,9 @@ export function TransportistasTab({ mes, anio }: { mes: number; anio: number }) 
           <TableFooter>
             <TableRow>
               <TableCell className="font-medium">Total</TableCell>
-              <TableCell className="font-medium">{totalViajes}</TableCell>
-              <TableCell />
+              <TableCell className="font-medium" colSpan={2}>
+                {totalViajes} viajes
+              </TableCell>
               <TableCell className="font-medium">{formatearMonto(totalAPagar)}</TableCell>
             </TableRow>
           </TableFooter>
@@ -169,9 +188,10 @@ export function TransportistasTab({ mes, anio }: { mes: number; anio: number }) 
       </Table>
 
       <TarifaTransportistaFormSheet
-        tarifa={sheetAbierto ? tarifaActual : null}
-        abierto={sheetAbierto}
-        onOpenChange={setSheetAbierto}
+        tarifa={zonaDelSheet ? tarifaPorZona(zonaDelSheet) : null}
+        zona={zonaDelSheet ?? CabaProvincia.CABA}
+        abierto={zonaDelSheet !== null}
+        onOpenChange={(abierto) => !abierto && setZonaDelSheet(null)}
       />
     </div>
   );

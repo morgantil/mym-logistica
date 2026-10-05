@@ -1,4 +1,4 @@
-import { EstadoGrupoFacturacion, TipoEnvase, TipoServicio } from "@mym/shared-types";
+import { CabaProvincia, EstadoGrupoFacturacion, TipoEnvase, TipoServicio } from "@mym/shared-types";
 
 export interface TarifaCliente {
   id: string;
@@ -45,8 +45,10 @@ export interface CombinacionUnificacionClientes {
 
 // Liquidación a transportistas — monto por viaje, configurable con vigencia,
 // sin clienteId (decisión 2026-08-26, ver DOCUMENTO TECNICO.md historial).
+// Desde el 2026-10-04 distingue zona (CABA paga distinto que Provincia).
 export interface TarifaTransportista {
   id: string;
+  zona: CabaProvincia;
   monto: number;
   activa: boolean;
 }
@@ -105,12 +107,13 @@ export interface PedidoFacturado {
 }
 
 // §4.2 TEMAS_PENDIENTES.md: resumen de cuántos viajes hizo cada chofer en un
-// mes y cuánto se le debe pagar (tarifaPorViaje × cantidadViajes).
+// mes y cuánto se le debe pagar. Desde el 2026-10-04 separa viajes de
+// CABA/Provincia (tarifas distintas) en vez de un único cantidadViajes.
 export interface ResumenChofer {
   choferId: string;
   choferNombre: string;
-  cantidadViajes: number;
-  tarifaPorViaje: number;
+  viajesCaba: number;
+  viajesProvincia: number;
   totalAPagar: number;
 }
 
