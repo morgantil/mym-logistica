@@ -12,6 +12,7 @@ export const MODELOS_CON_BORRADO_LOGICO = new Set([
   "Chofer",
   "Pedido",
   "Producto",
+  "GastoChofer",
 ]);
 
 const ACCIONES_LECTURA_UNICA = ["findUnique", "findUniqueOrThrow", "findFirst", "findFirstOrThrow"];

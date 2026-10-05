@@ -122,3 +122,10 @@ export enum ResolucionDireccion {
   ACTUALIZAR_PADRON = "ACTUALIZAR_PADRON",
   MANTENER_EXISTENTE = "MANTENER_EXISTENTE",
 }
+
+// ABM de combustible y peajes por chofer (ítem desbloqueado 2026-10-05) — ver
+// comentario en schema.prisma, modelo GastoChofer.
+export enum TipoGastoChofer {
+  COMBUSTIBLE = "COMBUSTIBLE",
+  PEAJE = "PEAJE",
+}

@@ -135,6 +135,50 @@ enum AccionAuditoria {
   RESTAURAR
 }
 
+// ABM de combustible y peajes por chofer (ítem desbloqueado 2026-10-05,
+// Leonardo mandó el formato real: "COMBUSTIBLE CAMIONETA SEPTIEMBRE 2026.xlsx",
+// dos hojas: HWCompra-modelo = gastos de combustible fila por fila, con
+// columna CHOFER; PEAJES = total de peajes por chofer en el mes, sin fecha
+// por fila. Se importa el Excel tal cual — ver GastosChoferesService.
+enum TipoGastoChofer {
+  COMBUSTIBLE
+  PEAJE
+}
+
+model GastoChofer {
+  id    String          @id @default(uuid())
+  tipo  TipoGastoChofer
+  fecha DateTime
+  monto Decimal         @db.Decimal(12, 2)
+
+  // Resueltos contra el cache de choferes de SimpliRoute al importar (ver
+  // domain/matchear-chofer.ts) — null si no matcheó ninguno (texto raro,
+  // patente sin vehículo cargado, o un par de choferes tipo "LUCIA-MATIAS",
+  // nunca se inventa a cuál de los dos asignarlo). Snapshot, no una
+  // relación — mismo criterio que Pedido.choferId/choferNombre.
+  choferId     String?
+  choferNombre String?
+  // Tal cual vino en la columna CHOFER del archivo — nunca se pisa, es lo
+  // único que permite resolver a mano un gasto sin matchear (ver
+  // GastosChoferesService.asignarChofer).
+  choferNombreOriginal String
+
+  // Solo combustible — null en peajes (esa hoja no trae esto).
+  proveedor   String?
+  comprobante String?
+
+  archivoOrigen String // nombre del archivo importado, trazabilidad
+
+  creadoEn       DateTime  @default(now())
+  creadoPorId    String?
+  eliminadoEn    DateTime?
+  eliminadoPorId String?
+
+  @@index([tipo, fecha])
+  @@index([choferId])
+  @@map("gastos_chofer")
+}
+
 // ---------------------------------------------------------------------------
 // Usuarios, roles y permisos por cliente
 // ---------------------------------------------------------------------------

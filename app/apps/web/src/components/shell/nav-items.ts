@@ -18,5 +18,6 @@ export const navItems: NavItem[] = [
   { to: "/zonas-choferes", label: "Zonas y choferes", roles: ["LOGISTICA", "ADMINISTRACION"] },
   { to: "/embalaje-despacho", label: "Embalaje y Despacho", roles: ["LOGISTICA", "ADMINISTRACION"] },
   { to: "/facturacion", label: "Facturación", roles: ["FACTURACION", "ADMINISTRACION"] },
+  { to: "/gastos-choferes", label: "Combustible y Peajes", roles: ["FACTURACION", "ADMINISTRACION"] },
   { to: "/usuarios", label: "Usuarios", roles: ["ADMINISTRACION"] },
 ];

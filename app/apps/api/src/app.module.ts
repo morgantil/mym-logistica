@@ -19,6 +19,7 @@ import { SimplirouteModule } from "./modulos/simpliroute/simpliroute.module";
 import { DashboardModule } from "./modulos/dashboard/dashboard.module";
 import { ImportadoresModule } from "./modulos/importadores/importadores.module";
 import { FacturacionModule } from "./modulos/facturacion/facturacion.module";
+import { GastosChoferesModule } from "./modulos/gastos-choferes/gastos-choferes.module";
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { FacturacionModule } from "./modulos/facturacion/facturacion.module";
     DashboardModule,
     ImportadoresModule,
     FacturacionModule,
+    GastosChoferesModule,
   ],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: ContextoInterceptor },
