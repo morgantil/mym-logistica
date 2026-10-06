@@ -170,6 +170,21 @@ export async function liquidacionTransportistas(
   return data;
 }
 
+// Pedido en reunión 2026-10-06: bajar a Excel la liquidación a
+// transportistas con un rango libre de hasta 31 días (el backend valida el
+// tope) — independiente del mes/año elegido arriba en la página.
+export async function descargarReporteTransportistas(
+  mes: number,
+  anio: number,
+  rango?: RangoFechas,
+): Promise<Blob> {
+  const { data } = await apiClient.get<Blob>("/facturacion/liquidacion-transportistas/reporte-excel", {
+    params: { mes, anio, ...rango },
+    responseType: "blob",
+  });
+  return data;
+}
+
 export async function listarGrupos(clienteId: string, mes: number, anio: number): Promise<GrupoFacturacion[]> {
   const { data } = await apiClient.get<GrupoFacturacion[]>("/facturacion/grupos", {
     params: { clienteId, mes, anio },
@@ -205,6 +220,12 @@ export async function generarVistaPrevia(
 export async function confirmar(clienteId: string, mes: number, anio: number): Promise<GrupoFacturacion[]> {
   const { data } = await apiClient.post<GrupoFacturacion[]>("/facturacion/confirmar", { clienteId, mes, anio });
   return data;
+}
+
+// Decisión 2026-10-06: acción separada y deliberada de "Volver a calcular"
+// (restringida a Administración) — vuelve un mes CONFIRMADO a BORRADOR.
+export async function reabrir(clienteId: string, mes: number, anio: number): Promise<void> {
+  await apiClient.post("/facturacion/reabrir", { clienteId, mes, anio });
 }
 
 export async function descargarReporteMensual(

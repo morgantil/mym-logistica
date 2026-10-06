@@ -27,6 +27,8 @@ import {
   construirViajeUnificacionCruzadaPanal,
 } from "../domain/unificacion-cruzada";
 import { generarReporteMensualExcel } from "../infrastructure/reporte-mensual-excel.generador";
+import { generarLiquidacionTransportistasExcel } from "../infrastructure/transportistas-excel.generador";
+import { NOMBRES_MES } from "../infrastructure/nombres-mes";
 
 export interface PedidoExcluido {
   pedidoId: string;
@@ -45,11 +47,17 @@ function rangoDelMes(mes: number, anio: number): { fechaDesde: Date; fechaHasta:
   };
 }
 
+const MAX_DIAS_RANGO = 31;
+
 // Decisión 2026-10-04: rango de fechas elegido libremente por el usuario
 // (datepicker), ambos extremos inclusive tal como los elige — `fechaHasta`
 // se lleva al día siguiente para que la comparación `lt` de siempre incluya
 // ese día completo. Si no vienen los dos, se usa el mes completo (default
 // actual, sin cambios de comportamiento).
+// Decisión 2026-10-06 (reunión con Pablo Renzo): tope de 31 días cuando el
+// rango viene explícito — sin este tope, la pantalla de Transportistas
+// (único lugar donde el rango no está acotado por un selector de mes en el
+// front) podría pedir un período arbitrariamente largo.
 function rangoElegido(
   mes: number,
   anio: number,
@@ -57,9 +65,15 @@ function rangoElegido(
   fechaHasta?: string,
 ): { fechaDesde: Date; fechaHasta: Date } {
   if (!fechaDesde || !fechaHasta) return rangoDelMes(mes, anio);
-  const hasta = new Date(`${fechaHasta}T00:00:00.000Z`);
+  const desde = new Date(`${fechaDesde}T00:00:00.000Z`);
+  const hastaElegida = new Date(`${fechaHasta}T00:00:00.000Z`);
+  const cantidadDias = Math.round((hastaElegida.getTime() - desde.getTime()) / 86_400_000) + 1;
+  if (cantidadDias > MAX_DIAS_RANGO) {
+    throw new BadRequestException(`El rango no puede superar los ${MAX_DIAS_RANGO} días.`);
+  }
+  const hasta = new Date(hastaElegida);
   hasta.setUTCDate(hasta.getUTCDate() + 1);
-  return { fechaDesde: new Date(`${fechaDesde}T00:00:00.000Z`), fechaHasta: hasta };
+  return { fechaDesde: desde, fechaHasta: hasta };
 }
 
 @Injectable()
@@ -581,6 +595,20 @@ export class FacturacionService {
     return confirmados;
   }
 
+  // Decisión 2026-10-06 (reunión con Pablo Renzo): "Volver a calcular" sigue
+  // bloqueado para un mes CONFIRMADO (ver generarVistaPrevia más arriba) —
+  // esto es la acción separada y deliberada para destrabarlo cuando hace
+  // falta corregir algo después de confirmar. Vuelve los grupos a BORRADOR;
+  // de ahí en más es el flujo normal (recalcular, revisar, confirmar de
+  // nuevo). Quién reabrió y cuándo queda en RegistroAuditoria (automático,
+  // ver comentario en el puerto).
+  async reabrir(clienteId: string, mes: number, anio: number): Promise<void> {
+    if (!(await this.repositorio.existeGrupoConfirmado(clienteId, mes, anio))) {
+      throw new BadRequestException("Este mes no está confirmado, no hay nada que reabrir.");
+    }
+    await this.repositorio.reabrir(clienteId, mes, anio);
+  }
+
   // Guia Arbet paso 4, riesgo #2 (ver UnificacionCruzadaPar en schema.prisma):
   // la primera vez que una unificación cruzada queda CONFIRMADA, se graba el
   // par pañal/medicamento para siempre. Cuando el otro cliente de la
@@ -688,5 +716,20 @@ export class FacturacionService {
     });
 
     return calcularLiquidacionTransportistas(pedidos, tarifaPorZona);
+  }
+
+  // Pedido en reunión 2026-10-06 (Pablo Renzo): bajar a Excel la liquidación
+  // a transportistas, con el mismo rango libre de hasta 31 días que ya
+  // soporta liquidacionTransportistas (el tope lo valida rangoElegido).
+  async generarReporteTransportistasExcel(
+    mes: number,
+    anio: number,
+    fechaDesde?: string,
+    fechaHasta?: string,
+  ): Promise<Buffer> {
+    const resumen = await this.liquidacionTransportistas(mes, anio, fechaDesde, fechaHasta);
+    const periodo =
+      fechaDesde && fechaHasta ? `${fechaDesde} al ${fechaHasta}` : `${NOMBRES_MES[mes - 1]} ${anio}`;
+    return generarLiquidacionTransportistasExcel({ periodo, resumen });
   }
 }

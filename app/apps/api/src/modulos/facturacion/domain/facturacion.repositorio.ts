@@ -212,6 +212,15 @@ export interface FacturacionRepositorio {
   ): Promise<GrupoFacturacion[]>;
   listarGrupos(clienteId: string, mes: number, anio: number): Promise<GrupoFacturacion[]>;
   confirmar(clienteId: string, mes: number, anio: number, usuarioId: string): Promise<GrupoFacturacion[]>;
+  // Decisión 2026-10-06 (reunión con Pablo Renzo): acción separada y
+  // deliberada para volver un mes CONFIRMADO a BORRADOR (así se puede
+  // recalcular de nuevo) — no el mismo botón de "Volver a calcular", que
+  // sigue bloqueado para un mes confirmado. Quién reabrió y cuándo queda
+  // igual registrado, sin campos nuevos: el middleware de auditoría
+  // universal (ver auditoria.middleware.ts) ya escribe un RegistroAuditoria
+  // por cada GrupoFacturacion actualizado acá, con usuarioId/timestamp y el
+  // valorAnterior (CONFIRMADO) → valorNuevo (BORRADOR).
+  reabrir(clienteId: string, mes: number, anio: number): Promise<void>;
 
   // §31 funcional ("Reporte mensual"): detalle por pedido con el resumen del
   // viaje al que pertenece, para exportar a Excel. `fechaDesde`/`fechaHasta`

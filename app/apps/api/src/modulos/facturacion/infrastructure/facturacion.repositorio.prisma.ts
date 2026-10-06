@@ -618,6 +618,13 @@ export class FacturacionRepositorioPrisma implements FacturacionRepositorio {
     });
   }
 
+  async reabrir(clienteId: string, mes: number, anio: number): Promise<void> {
+    await this.prisma.grupoFacturacion.updateMany({
+      where: { clienteId, mes, anio, estado: "CONFIRMADO" },
+      data: { estado: "BORRADOR", confirmadoEn: null, confirmadoPorId: null },
+    });
+  }
+
   async listarPedidosFacturados(
     clienteId: string,
     mes: number,

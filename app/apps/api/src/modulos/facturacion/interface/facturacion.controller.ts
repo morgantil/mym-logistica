@@ -143,6 +143,23 @@ export class FacturacionController {
     );
   }
 
+  // Pedido en reunión 2026-10-06 (Pablo Renzo): bajar a Excel la liquidación
+  // a transportistas, con rango libre de hasta 31 días (mismo tope que
+  // rangoElegido en el service).
+  @Get("liquidacion-transportistas/reporte-excel")
+  @Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+  async descargarReporteTransportistas(@Query() query: MesAnioDto): Promise<StreamableFile> {
+    const buffer = await this.facturacionService.generarReporteTransportistasExcel(
+      query.mes,
+      query.anio,
+      query.fechaDesde,
+      query.fechaHasta,
+    );
+    return new StreamableFile(buffer, {
+      disposition: `attachment; filename="liquidacion-transportistas-${query.anio}-${String(query.mes).padStart(2, "0")}.xlsx"`,
+    });
+  }
+
   // §21 funcional ("al cierre de cada mes, por cliente"): trae los grupos ya
   // generados (BORRADOR o CONFIRMADO) para ese cliente/mes/año.
   @Get("grupos")
@@ -173,6 +190,16 @@ export class FacturacionController {
   @Post("confirmar")
   confirmar(@Body() dto: PeriodoDto, @UsuarioActual() usuario: UsuarioAutenticado) {
     return this.facturacionService.confirmar(dto.clienteId, dto.mes, dto.anio, usuario.id);
+  }
+
+  // Acción deliberada y separada de "Volver a calcular" (ver
+  // FacturacionService.reabrir) — restringida a Administración, no a
+  // cualquiera con rol Facturación: reabrir un mes ya confirmado es más
+  // sensible que el trabajo de todos los días del módulo.
+  @Post("reabrir")
+  @Roles(Rol.ADMINISTRACION)
+  reabrir(@Body() dto: PeriodoDto) {
+    return this.facturacionService.reabrir(dto.clienteId, dto.mes, dto.anio);
   }
 
   // §31 funcional: descarga directa del reporte mensual en Excel. StreamableFile
