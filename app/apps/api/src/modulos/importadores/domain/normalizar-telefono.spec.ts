@@ -19,6 +19,12 @@ describe("normalizarTelefono", () => {
     expect(normalizarTelefono("11 5006 9332 // 11 3811-1141")).toBe("+5491150069332 / +5491138111141");
   });
 
+  it("bug real 2026-10-06: dos números con su propia anotación cada uno, sin '/' entre ellos", () => {
+    expect(normalizarTelefono("1138740052 (Madre) 1140387144 (Padre)")).toBe(
+      "+5491138740052 (Madre) / +5491140387144 (Padre)",
+    );
+  });
+
   it("8 dígitos sin área: asume CABA (único código de área del cliente hoy)", () => {
     expect(normalizarTelefono("51402322")).toBe("+5491151402322");
   });

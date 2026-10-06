@@ -5,9 +5,13 @@
 // lo que se ve en Pedidos ya sea el valor final.
 //
 // Un Excel real puede traer más de un teléfono en la misma celda, separados
-// por "/" o "//" ("1148053169 / 11555132005"), y una anotación de quién es
-// ("01151402322 (PADRE)") — eso no se descarta, se normaliza cada número por
-// separado y se vuelve a unir, conservando la anotación.
+// por "/" o "//" ("1148053169 / 11555132005"), por un simple espacio cuando
+// cada uno ya trae su propia anotación ("1138740052 (Madre) 1140387144
+// (Padre)" — bug real encontrado en reunión 2026-10-06, antes esto se perdía
+// entero sin normalizar porque el separador solo reconocía "/"), o solo una
+// anotación sin otro número ("01151402322 (PADRE)") — nada de esto se
+// descarta, se normaliza cada número por separado y se vuelve a unir,
+// conservando su anotación.
 const AREA_CODIGO_CABA = "11";
 
 function soloDigitos(texto: string): string {
@@ -50,7 +54,35 @@ function normalizarUnNumero(numero: string): string {
 }
 
 const SEPARADOR_VARIOS_TELEFONOS = /\s*\/{1,2}\s*/;
-const ANOTACION_AL_FINAL = /^(.*?)(\s*\([^)]*\))\s*$/;
+// Un número puede venir con espacios/guiones internos como mero formato
+// ("11 5006 9332"), así que no alcanza con cortar por cualquier espacio —
+// eso rompería ese caso real en dos números inventados ("11" + "5006" +
+// "9332"). El único punto donde SÍ hay que cortar dentro de una "parte" es
+// justo después de un paréntesis: ahí un número ya terminó y, si sigue algo
+// más, es el próximo número.
+const NUMERO_CON_ANOTACION = /([^()]*)\(([^)]*)\)/g;
+
+// Bug real 2026-10-06: con dos números y su propia anotación cada uno, sin
+// "/" entre ellos ("1138740052 (Madre) 1140387144 (Padre)"), antes se
+// perdía entero — la anotación al final "comía" todo el texto previo como
+// si fuera un solo número, que no matcheaba ningún formato reconocido y
+// quedaba sin normalizar. Ahora se separa en un número por cada paréntesis
+// encontrado (conservando su propia anotación), y si queda texto suelto
+// después del último paréntesis, se trata como un número más sin anotación.
+function normalizarParte(parte: string): string {
+  if (!parte.includes("(")) return normalizarUnNumero(parte);
+
+  const resultado: string[] = [];
+  let finDelUltimoMatch = 0;
+  for (const match of parte.matchAll(NUMERO_CON_ANOTACION)) {
+    const [textoCompleto, numero, anotacion] = match;
+    resultado.push(`${normalizarUnNumero(numero)} (${anotacion})`);
+    finDelUltimoMatch = (match.index ?? 0) + textoCompleto.length;
+  }
+  const restante = parte.slice(finDelUltimoMatch).trim();
+  if (restante !== "") resultado.push(normalizarUnNumero(restante));
+  return resultado.join(" / ");
+}
 
 export function normalizarTelefono(telefono: string | null): string | null {
   if (telefono === null) return null;
@@ -61,11 +93,6 @@ export function normalizarTelefono(telefono: string | null): string | null {
     .split(SEPARADOR_VARIOS_TELEFONOS)
     .map((parte) => parte.trim())
     .filter((parte) => parte !== "")
-    .map((parte) => {
-      const conAnotacion = parte.match(ANOTACION_AL_FINAL);
-      if (!conAnotacion) return normalizarUnNumero(parte);
-      const [, numero, anotacion] = conAnotacion;
-      return `${normalizarUnNumero(numero)}${anotacion}`;
-    })
+    .map(normalizarParte)
     .join(" / ");
 }
