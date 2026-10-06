@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/features/auth/auth-context";
 import { CLASES_TONO } from "@/features/pedidos/estado-labels";
 import {
   confirmar,
@@ -14,6 +15,7 @@ import {
   generarVistaPrevia,
   listarGrupos,
   listarPedidosFacturados,
+  reabrir,
   type RangoFechas,
 } from "./api";
 import { formatearMonto, NOMBRES_MES } from "./formato";
@@ -119,6 +121,8 @@ export function LiquidacionTab({
   rango?: RangoFechas;
 }) {
   const queryClient = useQueryClient();
+  const { usuario } = useAuth();
+  const puedeReabrir = usuario?.roles.some((rol) => rol === "ADMINISTRACION") ?? false;
 
   const { data: grupos, isLoading } = useQuery({
     queryKey: ["facturacion", "grupos", clienteId, mes, anio],
@@ -162,6 +166,16 @@ export function LiquidacionTab({
     onError: (error) => toast.error(mensajeError(error)),
   });
 
+  const mutacionReabrir = useMutation({
+    mutationFn: () => reabrir(clienteId!, mes, anio),
+    onSuccess: () => {
+      toast.success("Mes reabierto — ya se puede volver a calcular.");
+      queryClient.invalidateQueries({ queryKey: ["facturacion", "grupos", clienteId, mes, anio] });
+      queryClient.invalidateQueries({ queryKey: ["facturacion", "pedidos-facturados", clienteId, mes, anio] });
+    },
+    onError: (error) => toast.error(mensajeError(error)),
+  });
+
   const mutacionDescargar = useMutation({
     mutationFn: () => descargarReporteMensual(clienteId!, mes, anio, rango),
     onSuccess: (blob) => {
@@ -181,8 +195,6 @@ export function LiquidacionTab({
 
   const hayGrupos = (grupos?.length ?? 0) > 0;
   const confirmado = hayGrupos && grupos!.every((grupo) => grupo.estado === EstadoGrupoFacturacion.CONFIRMADO);
-  const totalViajes = grupos?.reduce((total, grupo) => total + grupo.cantidadViajes, 0) ?? 0;
-  const totalImporte = grupos?.reduce((total, grupo) => total + grupo.importeCalculado, 0) ?? 0;
 
   // Un grupo puede juntar más de un pedido (2×1 entre pedidos distintos, o
   // unificación pañal+medicamento) — se agrupan las filas de detalle debajo
@@ -194,6 +206,20 @@ export function LiquidacionTab({
     lista.push(pedido);
     pedidosPorGrupo.set(pedido.grupoId, lista);
   }
+
+  // Decisión 2026-10-06 (reunión con Pablo Renzo): los grupos/totales de la
+  // PANTALLA (no la confirmación, que sigue siendo del mes completo — ver
+  // comentario más abajo) tienen que coincidir con lo que de verdad se ve en
+  // el detalle. Con un rango activo, un grupo sin ninguna fila de detalle en
+  // ese rango no debe mostrar su cabecera ni sumar al total — antes mostraba
+  // igual el total del mes completo con cero filas abajo, dando la sensación
+  // de un número sin respaldo.
+  const gruposParaMostrar = (grupos ?? []).filter(
+    (grupo) => !rango || (pedidosPorGrupo.get(grupo.id)?.length ?? 0) > 0,
+  );
+  const hayGruposParaMostrar = gruposParaMostrar.length > 0;
+  const totalViajes = gruposParaMostrar.reduce((total, grupo) => total + grupo.cantidadViajes, 0);
+  const totalImporte = gruposParaMostrar.reduce((total, grupo) => total + grupo.importeCalculado, 0);
 
   const cargando = isLoading || cargandoDetalle;
 
@@ -222,6 +248,24 @@ export function LiquidacionTab({
               onClick={() => mutacionDescargar.mutate()}
             >
               {mutacionDescargar.isPending ? "Generando…" : "Descargar reporte"}
+            </Button>
+          )}
+          {confirmado && puedeReabrir && (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={mutacionReabrir.isPending}
+              onClick={() => {
+                if (
+                  window.confirm(
+                    `¿Reabrir ${NOMBRES_MES[mes - 1]} ${anio}? Vuelve a Borrador para poder recalcular — el cierre anterior queda igual en el historial.`,
+                  )
+                ) {
+                  mutacionReabrir.mutate();
+                }
+              }}
+            >
+              {mutacionReabrir.isPending ? "Reabriendo…" : "Reabrir"}
             </Button>
           )}
           <Button
@@ -273,8 +317,14 @@ export function LiquidacionTab({
                   Todavía no se generó una vista previa para este mes.
                 </TableCell>
               </TableRow>
+            ) : !hayGruposParaMostrar ? (
+              <TableRow>
+                <TableCell colSpan={8} className="text-muted-foreground">
+                  Ningún pedido facturado en el rango elegido.
+                </TableCell>
+              </TableRow>
             ) : (
-              agruparEnBloques(grupos!).map((bloque) => (
+              agruparEnBloques(gruposParaMostrar).map((bloque) => (
                 <Fragment key={bloque.regla}>
                   <EncabezadoBloque bloque={bloque} />
                   {bloque.grupos.map((grupo) => (
@@ -284,7 +334,7 @@ export function LiquidacionTab({
               ))
             )}
           </TableBody>
-          {hayGrupos && (
+          {hayGruposParaMostrar && (
             <TableFooter>
               <TableRow>
                 <TableCell colSpan={6} className="font-medium">
