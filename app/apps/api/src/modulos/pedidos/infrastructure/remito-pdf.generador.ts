@@ -46,20 +46,33 @@ function dibujarProductos(
   });
 }
 
-// El renglón de "Observaciones" del papel preimpreso trae el rótulo fijo
-// "Nº interno de pedido" — el dato puntual que pide el ítem 9. Si además hay
-// comentario cargado (ver Pedido.comentario), va debajo: info operativa del
-// día de reparto, útil para quien reparte.
+// Bug real encontrado en reunión 2026-10-06 (Pablo Renzo): este renglón
+// imprimía solo el rótulo fijo "Nº de pedido" — las Observaciones reales del
+// pedido (ahí vive "entre calles", fusionado al importar, ver
+// campo-canonico.ts) nunca salían en el papel. Ahora se imprimen las tres
+// cosas, apiladas: Nº de pedido (fijo, para rastrear el pedido en el
+// sistema), Observaciones (el dato real que pide el cliente) y Comentario
+// (info operativa del día de reparto) si están cargados.
 function dibujarObservaciones(
   doc: PDFKit.PDFDocument,
   pedido: PedidoListado,
   posicion: { x: number; y: number; ancho: number },
 ) {
-  doc.font("Helvetica-Bold").fontSize(9).text(`N.º de pedido: ${pedido.numero}`, cm(posicion.x), cm(posicion.y), {
+  let y = cm(posicion.y);
+  doc.font("Helvetica-Bold").fontSize(9).text(`N.º de pedido: ${pedido.numero}`, cm(posicion.x), y, {
     width: cm(posicion.ancho),
   });
+  y += cm(0.45);
+
+  if (pedido.observaciones) {
+    doc.font("Helvetica").fontSize(8).text(pedido.observaciones, cm(posicion.x), y, {
+      width: cm(posicion.ancho),
+    });
+    y += doc.heightOfString(pedido.observaciones, { width: cm(posicion.ancho) }) + cm(0.1);
+  }
+
   if (pedido.comentario) {
-    doc.font("Helvetica").fontSize(8).text(pedido.comentario, cm(posicion.x), cm(posicion.y) + cm(0.45), {
+    doc.font("Helvetica").fontSize(8).text(pedido.comentario, cm(posicion.x), y, {
       width: cm(posicion.ancho),
     });
   }

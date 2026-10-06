@@ -94,4 +94,21 @@ describe("PedidosService.generarRemito", () => {
     const servicio = armarServicio(pedidoListado({ clienteFormatoRemito: null }));
     await expect(servicio.generarRemito("p1")).rejects.toThrow(BadRequestException);
   });
+
+  // Bug real 2026-10-06: el renglón de Observaciones del PDF nunca imprimía
+  // pedido.observaciones — solo lo confirma que no explote con el campo
+  // cargado (verificar el texto en sí requeriría parsear el PDF generado).
+  it("no explota al generar con observaciones y comentario cargados, en los dos formatos", async () => {
+    for (const formato of [FormatoRemito.BELLA_VISTA, FormatoRemito.FARMAPAL]) {
+      const servicio = armarServicio(
+        pedidoListado({
+          clienteFormatoRemito: formato,
+          observaciones: "VF29 ENVIAR A FARMACIA - DIRECTORIO 698, CABA - CON DOS JUEGOS DE REMITOS",
+          comentario: "Tocar timbre 2 veces",
+        }),
+      );
+      const pdf = await servicio.generarRemito("p1");
+      expect(pdf.length).toBeGreaterThan(0);
+    }
+  });
 });
