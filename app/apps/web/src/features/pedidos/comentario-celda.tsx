@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { AxiosError } from "axios";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { EstadoPedido } from "@mym/shared-types";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import { actualizarComentario } from "./api";
 import type { PedidoListado } from "./tipos";
 
@@ -11,9 +13,18 @@ import type { PedidoListado } from "./tipos";
 // operador anote lo que haga falta (ej. motivo de una entrega fallida),
 // editable en cualquier momento — distinto de Observaciones, que viene del
 // Excel. Mismo patrón que BultosCelda: guardado explícito, no autosave.
+// Decisión 2026-10-06 (reunión con Pablo Renzo): cuando un pedido llega a
+// Entrega fallida, señalarlo visualmente hasta que alguien cargue el
+// comentario explicando qué pasó — se apaga solo en cuanto se guarda uno
+// (reusa este mismo campo, no hace falta uno nuevo).
+function faltaComentarioPorFallida(pedido: PedidoListado): boolean {
+  return pedido.estado === EstadoPedido.ENTREGA_FALLIDA && !pedido.comentario;
+}
+
 export function ComentarioCelda({ pedido, puedeEditar }: { pedido: PedidoListado; puedeEditar: boolean }) {
   const queryClient = useQueryClient();
   const [valor, setValor] = useState(pedido.comentario ?? "");
+  const faltaComentario = faltaComentarioPorFallida(pedido);
 
   const mutacion = useMutation({
     mutationFn: (comentario: string) => actualizarComentario(pedido.id, comentario, pedido.version),
@@ -31,7 +42,11 @@ export function ComentarioCelda({ pedido, puedeEditar }: { pedido: PedidoListado
   });
 
   if (!puedeEditar) {
-    return <span className="text-sm">{pedido.comentario ?? "—"}</span>;
+    return faltaComentario ? (
+      <span className="text-sm font-medium text-destructive">Falta comentario (entrega fallida)</span>
+    ) : (
+      <span className="text-sm">{pedido.comentario ?? "—"}</span>
+    );
   }
 
   const cambio = valor !== (pedido.comentario ?? "");
@@ -42,8 +57,8 @@ export function ComentarioCelda({ pedido, puedeEditar }: { pedido: PedidoListado
         value={valor}
         onChange={(e) => setValor(e.target.value)}
         disabled={mutacion.isPending}
-        className="w-48"
-        placeholder="Sin comentario"
+        className={cn("w-48", faltaComentario && "border-destructive focus-visible:ring-destructive")}
+        placeholder={faltaComentario ? "Entrega fallida: agregá un comentario" : "Sin comentario"}
         aria-label={`Comentario del pedido de ${pedido.destinatarioNombre}`}
       />
       <Button
