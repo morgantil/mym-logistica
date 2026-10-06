@@ -402,6 +402,15 @@ export class PedidosService {
   // mano en SimpliRoute después de enviada), recalcula zona/chofer y los
   // actualiza acá mismo — hoy la única forma de reflejar eso era borrar el
   // pedido, esto lo hace solo en cada sincronización.
+  //
+  // Bug real 2026-10-06 (reunión con Pablo Renzo): "actualizar los choferes"
+  // (renombrar uno en la pantalla Zonas y choferes, mismo ID) no se reflejaba
+  // acá — antes esto solo resolvía chofer/zona cuando el ID externo
+  // CAMBIABA (reasignación), así que un pedido con el mismo chofer de
+  // siempre se quedaba con el nombre viejo en `choferNombre` para siempre.
+  // Ahora también se refresca cuando el ID es el mismo pero el nombre en
+  // cache ya no coincide — `resolverZonaPorChofer` solo lee del cache local
+  // (barato, sin pegarle a la API de SimpliRoute por cada pedido).
   async sincronizarEstados(): Promise<ResultadoSincronizacion> {
     const pendientes = await this.repositorio.listarPendientesDeSincronizar();
     const resultado: ResultadoSincronizacion = { actualizados: 0, sinCambios: 0, errores: [] };
@@ -417,10 +426,14 @@ export class PedidosService {
           continue;
         }
 
-        const actualizacionChofer =
-          choferIdExterno !== null && String(choferIdExterno) !== pedido.choferId
-            ? await this.zonasChoferesService.resolverZonaPorChofer(choferIdExterno)
-            : undefined;
+        let actualizacionChofer: Awaited<ReturnType<typeof this.zonasChoferesService.resolverZonaPorChofer>> | undefined;
+        if (choferIdExterno !== null) {
+          const resuelto = await this.zonasChoferesService.resolverZonaPorChofer(choferIdExterno);
+          const mismoChofer = String(choferIdExterno) === pedido.choferId;
+          if (!mismoChofer || resuelto.choferNombre !== pedido.choferNombre) {
+            actualizacionChofer = resuelto;
+          }
+        }
 
         await this.repositorio.actualizarEstadoDesdeProveedor(pedido.id, {
           estado: estadoMapeado,

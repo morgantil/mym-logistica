@@ -464,12 +464,13 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
         estado: { in: ["COORDINADO", "EN_TRANSITO"] },
         simplirouteId: { not: null },
       },
-      select: { id: true, simplirouteId: true, choferId: true, version: true },
+      select: { id: true, simplirouteId: true, choferId: true, choferNombre: true, version: true },
     });
     return pedidos.map((p) => ({
       id: p.id,
       simplirouteId: p.simplirouteId as string,
       choferId: p.choferId,
+      choferNombre: p.choferNombre,
       version: p.version,
     }));
   }

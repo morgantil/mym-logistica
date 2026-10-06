@@ -136,6 +136,10 @@ export interface PedidoParaSincronizar {
   id: string;
   simplirouteId: string;
   choferId: string | null;
+  // Para detectar, además de la reasignación (choferId distinto), un simple
+  // cambio de nombre del mismo chofer (ver bug real 2026-10-06 en
+  // PedidosService.sincronizarEstados).
+  choferNombre: string | null;
   version: number;
 }
 
