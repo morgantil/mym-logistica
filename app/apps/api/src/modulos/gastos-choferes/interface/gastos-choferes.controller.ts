@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Header,
   Param,
@@ -16,7 +17,9 @@ import { FileInterceptor } from "@nestjs/platform-express";
 import { Rol } from "@prisma/client";
 import { Roles } from "../../../common/decorators/roles.decorator";
 import { GastosChoferesService } from "../application/gastos-choferes.service";
+import { ActualizarGastoDto } from "./dto/actualizar-gasto.dto";
 import { AsignarChoferDto } from "./dto/asignar-chofer.dto";
+import { CrearGastoDto } from "./dto/crear-gasto.dto";
 import { FiltroGastosDto } from "./dto/filtro-gastos.dto";
 
 // ABM de combustible y peajes por chofer (ítem desbloqueado 2026-10-05) —
@@ -72,6 +75,38 @@ export class GastosChoferesController {
   @Get()
   listar(@Query() query: FiltroGastosDto) {
     return this.gastosChoferesService.listar(this.extraerFiltro(query));
+  }
+
+  // ABM manual (item 14.1 TEMAS_PENDIENTES.md, reunión 2026-10-06) — además
+  // del import en bloque de arriba, un gasto suelto se puede cargar/editar/
+  // borrar a mano.
+  @Post()
+  crear(@Body() dto: CrearGastoDto) {
+    return this.gastosChoferesService.crear({
+      tipo: dto.tipo,
+      fecha: new Date(`${dto.fecha}T00:00:00.000Z`),
+      monto: dto.monto,
+      choferId: dto.choferId,
+      proveedor: dto.proveedor ?? null,
+      comprobante: dto.comprobante ?? null,
+    });
+  }
+
+  @Patch(":id")
+  actualizar(@Param("id") id: string, @Body() dto: ActualizarGastoDto) {
+    return this.gastosChoferesService.actualizar(id, {
+      tipo: dto.tipo,
+      fecha: dto.fecha ? new Date(`${dto.fecha}T00:00:00.000Z`) : undefined,
+      monto: dto.monto,
+      choferId: dto.choferId,
+      proveedor: dto.proveedor,
+      comprobante: dto.comprobante,
+    });
+  }
+
+  @Delete(":id")
+  eliminar(@Param("id") id: string) {
+    return this.gastosChoferesService.eliminar(id);
   }
 
   @Patch(":id/chofer")

@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../../common/prisma/prisma.service";
 import { GastoChofer } from "../domain/gasto-chofer";
 import {
+  DatosActualizarGastoChofer,
   DatosCrearGastoChofer,
   FiltroGastosChofer,
   GastosChoferesRepositorio,
@@ -49,6 +50,31 @@ export class GastosChoferesRepositorioPrisma implements GastosChoferesRepositori
       })),
     });
     return resultado.count;
+  }
+
+  async crear(datos: DatosCrearGastoChofer): Promise<GastoChofer> {
+    const creado = await this.prisma.gastoChofer.create({
+      data: { ...datos, tipo: datos.tipo as unknown as Prisma.GastoChoferCreateInput["tipo"] },
+    });
+    return mapear(creado);
+  }
+
+  async actualizar(id: string, datos: DatosActualizarGastoChofer): Promise<GastoChofer> {
+    const existente = await this.prisma.gastoChofer.findUnique({ where: { id } });
+    if (!existente) throw new NotFoundException(`Gasto ${id} no encontrado.`);
+    const actualizado = await this.prisma.gastoChofer.update({
+      where: { id },
+      data: { ...datos, tipo: datos.tipo as unknown as Prisma.GastoChoferUpdateInput["tipo"] },
+    });
+    return mapear(actualizado);
+  }
+
+  async eliminar(id: string): Promise<void> {
+    const existente = await this.prisma.gastoChofer.findUnique({ where: { id } });
+    if (!existente) throw new NotFoundException(`Gasto ${id} no encontrado.`);
+    // El middleware de borrado lógico reescribe esto como un update seteando
+    // eliminadoEn — nunca borra la fila físicamente.
+    await this.prisma.gastoChofer.delete({ where: { id } });
   }
 
   async listar(filtro: FiltroGastosChofer): Promise<GastoChofer[]> {

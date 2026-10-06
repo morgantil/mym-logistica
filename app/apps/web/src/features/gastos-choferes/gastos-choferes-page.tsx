@@ -12,7 +12,16 @@ import { SelectorArchivo } from "@/components/shell/selector-archivo";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { listarChoferes } from "@/features/zonas-choferes/api";
 import { formatearMonto, NOMBRES_MES } from "@/features/facturacion/formato";
-import { asignarChofer, descargarReporteGastos, importarGastos, listarGastos, type FiltroGastos } from "./api";
+import {
+  asignarChofer,
+  descargarReporteGastos,
+  eliminarGasto,
+  importarGastos,
+  listarGastos,
+  type FiltroGastos,
+} from "./api";
+import { GastoFormSheet } from "./gasto-form-sheet";
+import type { GastoChofer } from "./tipos";
 
 const HOY = new Date();
 const TODOS = "TODOS";
@@ -47,6 +56,7 @@ export function GastosChoferesPage() {
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
   const [soloSinAsignar, setSoloSinAsignar] = useState(false);
+  const [gastoEnEdicion, setGastoEnEdicion] = useState<GastoChofer | "nuevo" | null>(null);
 
   const { data: choferes } = useQuery({ queryKey: ["zonas-choferes", "choferes"], queryFn: listarChoferes });
 
@@ -90,6 +100,21 @@ export function GastosChoferesPage() {
     },
     onError: () => toast.error("No se pudo descargar el reporte."),
   });
+
+  const mutacionEliminar = useMutation({
+    mutationFn: (id: string) => eliminarGasto(id),
+    onSuccess: () => {
+      toast.success("Gasto eliminado.");
+      queryClient.invalidateQueries({ queryKey: ["gastos-choferes"] });
+    },
+    onError: (error) => toast.error(mensajeError(error)),
+  });
+
+  function confirmarEliminar(gasto: GastoChofer) {
+    if (window.confirm(`¿Eliminar este gasto de ${formatearMonto(gasto.monto)}? No se puede deshacer desde acá.`)) {
+      mutacionEliminar.mutate(gasto.id);
+    }
+  }
 
   const total = gastos?.reduce((suma, gasto) => suma + gasto.monto, 0) ?? 0;
 
@@ -198,6 +223,9 @@ export function GastosChoferesPage() {
         >
           {mutacionDescargar.isPending ? "Generando…" : "Descargar Excel"}
         </Button>
+        <Button type="button" onClick={() => setGastoEnEdicion("nuevo")}>
+          Nuevo gasto
+        </Button>
       </div>
 
       <Table>
@@ -209,18 +237,19 @@ export function GastosChoferesPage() {
             <TableHead>Proveedor</TableHead>
             <TableHead>Comprobante</TableHead>
             <TableHead className="text-right">Monto</TableHead>
+            <TableHead>Acciones</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {isLoading ? (
             <TableRow>
-              <TableCell colSpan={6} className="text-muted-foreground">
+              <TableCell colSpan={7} className="text-muted-foreground">
                 Cargando…
               </TableCell>
             </TableRow>
           ) : gastos?.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} className="text-muted-foreground">
+              <TableCell colSpan={7} className="text-muted-foreground">
                 No hay gastos para estos filtros.
               </TableCell>
             </TableRow>
@@ -239,6 +268,22 @@ export function GastosChoferesPage() {
                 <TableCell>{gasto.proveedor ?? "—"}</TableCell>
                 <TableCell>{gasto.comprobante ?? "—"}</TableCell>
                 <TableCell className="text-right">{formatearMonto(gasto.monto)}</TableCell>
+                <TableCell>
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => setGastoEnEdicion(gasto)}>
+                      Editar
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={mutacionEliminar.isPending}
+                      onClick={() => confirmarEliminar(gasto)}
+                    >
+                      Eliminar
+                    </Button>
+                  </div>
+                </TableCell>
               </TableRow>
             ))
           )}
@@ -250,10 +295,17 @@ export function GastosChoferesPage() {
                 Total
               </TableCell>
               <TableCell className="text-right font-medium">{formatearMonto(total)}</TableCell>
+              <TableCell />
             </TableRow>
           </TableFooter>
         )}
       </Table>
+
+      <GastoFormSheet
+        gasto={gastoEnEdicion !== "nuevo" ? gastoEnEdicion : null}
+        abierto={gastoEnEdicion !== null}
+        onOpenChange={(abierto) => !abierto && setGastoEnEdicion(null)}
+      />
     </div>
   );
 }

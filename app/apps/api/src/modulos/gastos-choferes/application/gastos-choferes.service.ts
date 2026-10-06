@@ -4,6 +4,7 @@ import { LECTOR_EXCEL, LectorExcelPort } from "../../importadores/domain/lector-
 import { ZonasChoferesService } from "../../zonas-choferes/application/zonas-choferes.service";
 import { GastoChofer, ResumenImportacionGastos } from "../domain/gasto-chofer";
 import {
+  DatosActualizarGastoChofer,
   FiltroGastosChofer,
   GASTOS_CHOFERES_REPOSITORIO,
   GastosChoferesRepositorio,
@@ -120,10 +121,75 @@ export class GastosChoferesService {
   // (texto raro, patente sin vehículo, un par de choferes tipo
   // "LUCIA-MATIAS") — mismo criterio que resolverAlertaDireccion en Pedidos.
   async asignarChofer(id: string, choferId: string): Promise<GastoChofer> {
+    const chofer = await this.resolverChoferOFallar(choferId);
+    return this.repositorio.asignarChofer(id, chofer.id, chofer.nombre);
+  }
+
+  private async resolverChoferOFallar(choferId: string): Promise<{ id: string; nombre: string }> {
     const choferes = await this.zonasChoferesService.listarChoferes();
     const chofer = choferes.find((candidato) => String(candidato.id) === choferId);
     if (!chofer) throw new NotFoundException(`Chofer ${choferId} no encontrado.`);
-    return this.repositorio.asignarChofer(id, String(chofer.id), chofer.nombre);
+    return { id: String(chofer.id), nombre: chofer.nombre };
+  }
+
+  // ABM manual (item 14.1 TEMAS_PENDIENTES.md, reunión 2026-10-06) — a
+  // diferencia de `importar`, acá el chofer siempre se elige de un
+  // desplegable (nunca texto libre), así que `choferNombreOriginal` no tiene
+  // un "texto original" distinto que preservar: se completa igual que
+  // `choferNombre`. `archivoOrigen` queda con un valor fijo que distingue
+  // estas filas de las importadas, sin necesitar una columna nueva.
+  private static readonly ORIGEN_MANUAL = "Carga manual";
+
+  async crear(datos: {
+    tipo: TipoGastoChofer;
+    fecha: Date;
+    monto: number;
+    choferId: string;
+    proveedor: string | null;
+    comprobante: string | null;
+  }): Promise<GastoChofer> {
+    const chofer = await this.resolverChoferOFallar(datos.choferId);
+    return this.repositorio.crear({
+      tipo: datos.tipo,
+      fecha: datos.fecha,
+      monto: datos.monto,
+      choferId: chofer.id,
+      choferNombre: chofer.nombre,
+      choferNombreOriginal: chofer.nombre,
+      proveedor: datos.proveedor,
+      comprobante: datos.comprobante,
+      archivoOrigen: GastosChoferesService.ORIGEN_MANUAL,
+    });
+  }
+
+  async actualizar(
+    id: string,
+    datos: {
+      tipo?: TipoGastoChofer;
+      fecha?: Date;
+      monto?: number;
+      choferId?: string;
+      proveedor?: string | null;
+      comprobante?: string | null;
+    },
+  ): Promise<GastoChofer> {
+    const cambios: DatosActualizarGastoChofer = {
+      tipo: datos.tipo,
+      fecha: datos.fecha,
+      monto: datos.monto,
+      proveedor: datos.proveedor,
+      comprobante: datos.comprobante,
+    };
+    if (datos.choferId !== undefined) {
+      const chofer = await this.resolverChoferOFallar(datos.choferId);
+      cambios.choferId = chofer.id;
+      cambios.choferNombre = chofer.nombre;
+    }
+    return this.repositorio.actualizar(id, cambios);
+  }
+
+  eliminar(id: string): Promise<void> {
+    return this.repositorio.eliminar(id);
   }
 
   async generarReporteExcel(filtro: FiltroGastosChofer): Promise<Buffer> {
