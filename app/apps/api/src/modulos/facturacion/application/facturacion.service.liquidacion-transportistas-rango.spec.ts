@@ -37,4 +37,25 @@ describe("FacturacionService.liquidacionTransportistas — rango de fechas", () 
       new Date("2026-10-11T00:00:00.000Z"),
     );
   });
+
+  // Decisión 2026-10-06 (reunión con Pablo Renzo): tope de 31 días cuando el
+  // rango viene explícito — único lugar sin un selector de mes que lo acote.
+  it("un rango de exactamente 31 días se acepta", async () => {
+    const { servicio, listarEntregadosPorChoferEnPeriodo } = armarServicio();
+
+    await servicio.liquidacionTransportistas(10, 2026, "2026-09-01", "2026-10-01");
+
+    expect(listarEntregadosPorChoferEnPeriodo).toHaveBeenCalledWith(
+      new Date("2026-09-01T00:00:00.000Z"),
+      new Date("2026-10-02T00:00:00.000Z"),
+    );
+  });
+
+  it("un rango de más de 31 días se rechaza", async () => {
+    const { servicio } = armarServicio();
+
+    await expect(servicio.liquidacionTransportistas(10, 2026, "2026-09-01", "2026-10-02")).rejects.toThrow(
+      "El rango no puede superar los 31 días.",
+    );
+  });
 });
