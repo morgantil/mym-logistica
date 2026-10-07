@@ -9,9 +9,10 @@
 // cada uno ya trae su propia anotación ("1138740052 (Madre) 1140387144
 // (Padre)" — bug real encontrado en reunión 2026-10-06, antes esto se perdía
 // entero sin normalizar porque el separador solo reconocía "/"), o solo una
-// anotación sin otro número ("01151402322 (PADRE)") — nada de esto se
-// descarta, se normaliza cada número por separado y se vuelve a unir,
-// conservando su anotación.
+// anotación sin otro número ("01151402322 (PADRE)") — se normaliza cada
+// número por separado y se vuelve a unir. Decisión 2026-10-07 (Leonardo,
+// en vivo): la anotación ("PADRE"/"Madre") se descarta — el resultado final
+// tiene que ser solo el número en formato +549..., nada más.
 const AREA_CODIGO_CABA = "11";
 
 function soloDigitos(texto: string): string {
@@ -67,16 +68,17 @@ const NUMERO_CON_ANOTACION = /([^()]*)\(([^)]*)\)/g;
 // perdía entero — la anotación al final "comía" todo el texto previo como
 // si fuera un solo número, que no matcheaba ningún formato reconocido y
 // quedaba sin normalizar. Ahora se separa en un número por cada paréntesis
-// encontrado (conservando su propia anotación), y si queda texto suelto
-// después del último paréntesis, se trata como un número más sin anotación.
+// encontrado, y si queda texto suelto después del último paréntesis, se
+// trata como un número más. La anotación en sí ("Madre"/"Padre") se
+// descarta — decisión 2026-10-07, ver comentario arriba.
 function normalizarParte(parte: string): string {
   if (!parte.includes("(")) return normalizarUnNumero(parte);
 
   const resultado: string[] = [];
   let finDelUltimoMatch = 0;
   for (const match of parte.matchAll(NUMERO_CON_ANOTACION)) {
-    const [textoCompleto, numero, anotacion] = match;
-    resultado.push(`${normalizarUnNumero(numero)} (${anotacion})`);
+    const [textoCompleto, numero] = match;
+    resultado.push(normalizarUnNumero(numero));
     finDelUltimoMatch = (match.index ?? 0) + textoCompleto.length;
   }
   const restante = parte.slice(finDelUltimoMatch).trim();

@@ -5,8 +5,8 @@ describe("normalizarTelefono", () => {
     expect(normalizarTelefono("01151402322")).toBe("+5491151402322");
   });
 
-  it("conserva la anotación de quién es el teléfono", () => {
-    expect(normalizarTelefono("01151402322 (PADRE)")).toBe("+5491151402322 (PADRE)");
+  it("decisión 2026-10-07: descarta la anotación de quién es el teléfono, deja solo el número", () => {
+    expect(normalizarTelefono("01151402322 (PADRE)")).toBe("+5491151402322");
   });
 
   it("normaliza cada teléfono por separado y los vuelve a unir con /", () => {
@@ -19,9 +19,9 @@ describe("normalizarTelefono", () => {
     expect(normalizarTelefono("11 5006 9332 // 11 3811-1141")).toBe("+5491150069332 / +5491138111141");
   });
 
-  it("bug real 2026-10-06: dos números con su propia anotación cada uno, sin '/' entre ellos", () => {
+  it("bug real 2026-10-06: dos números con su propia anotación cada uno, sin '/' entre ellos (la anotación se descarta)", () => {
     expect(normalizarTelefono("1138740052 (Madre) 1140387144 (Padre)")).toBe(
-      "+5491138740052 (Madre) / +5491140387144 (Padre)",
+      "+5491138740052 / +5491140387144",
     );
   });
 
