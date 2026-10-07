@@ -9,20 +9,17 @@ describe("normalizarTelefono", () => {
     expect(normalizarTelefono("01151402322 (PADRE)")).toBe("+5491151402322");
   });
 
-  it("normaliza cada teléfono por separado y los vuelve a unir con /", () => {
-    // El segundo (11 dígitos, no empieza con 0) no es un formato reconocido
-    // con confianza — queda tal cual, no se inventa nada.
-    expect(normalizarTelefono("1148053169 / 11555132005")).toBe("+5491148053169 / 11555132005");
+  it("decisión 2026-10-07: si hay más de un valor en la celda, se queda solo con el primero (el teléfono siempre viene primero)", () => {
+    // El segundo (11555132005) se descarta del todo, no se intenta normalizar ni conservar.
+    expect(normalizarTelefono("1148053169 / 11555132005")).toBe("+5491148053169");
   });
 
-  it("acepta // como separador (visto en un Excel real de Bella Vista)", () => {
-    expect(normalizarTelefono("11 5006 9332 // 11 3811-1141")).toBe("+5491150069332 / +5491138111141");
+  it("un solo número con espacios internos como mero formato no se corta a la mitad", () => {
+    expect(normalizarTelefono("11 5006 9332 // 11 3811-1141")).toBe("+5491150069332");
   });
 
-  it("bug real 2026-10-06: dos números con su propia anotación cada uno, sin '/' entre ellos (la anotación se descarta)", () => {
-    expect(normalizarTelefono("1138740052 (Madre) 1140387144 (Padre)")).toBe(
-      "+5491138740052 / +5491140387144",
-    );
+  it("bug real 2026-10-06: dos números con su propia anotación cada uno, sin '/' entre ellos — se queda con el primero", () => {
+    expect(normalizarTelefono("1138740052 (Madre) 1140387144 (Padre)")).toBe("+5491138740052");
   });
 
   it("8 dígitos sin área: asume CABA (único código de área del cliente hoy)", () => {
@@ -37,9 +34,12 @@ describe("normalizarTelefono", () => {
     expect(normalizarTelefono("541151402322")).toBe("+5491151402322");
   });
 
-  it("un número que no se reconoce (ni 8, 10 ni 11 dígitos) se deja tal cual, no se inventa nada", () => {
+  it("un número que no se reconoce (ni 8, 10 ni 11 dígitos) deja solo los dígitos, nunca letras", () => {
     expect(normalizarTelefono("123")).toBe("123");
-    expect(normalizarTelefono("Sin teléfono")).toBe("Sin teléfono");
+  });
+
+  it("decisión 2026-10-07: sin ningún dígito, nunca deja pasar letras — queda en null", () => {
+    expect(normalizarTelefono("Sin teléfono")).toBeNull();
   });
 
   it("null y vacío quedan en null", () => {

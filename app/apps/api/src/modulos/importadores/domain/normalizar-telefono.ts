@@ -4,28 +4,33 @@
 // mano en SimpliRoute). Acá se resuelve al importar (no al enviar) para que
 // lo que se ve en Pedidos ya sea el valor final.
 //
-// Un Excel real puede traer más de un teléfono en la misma celda, separados
-// por "/" o "//" ("1148053169 / 11555132005"), por un simple espacio cuando
-// cada uno ya trae su propia anotación ("1138740052 (Madre) 1140387144
-// (Padre)" — bug real encontrado en reunión 2026-10-06, antes esto se perdía
-// entero sin normalizar porque el separador solo reconocía "/"), o solo una
-// anotación sin otro número ("01151402322 (PADRE)") — se normaliza cada
-// número por separado y se vuelve a unir. Decisión 2026-10-07 (Leonardo,
-// en vivo): la anotación ("PADRE"/"Madre") se descarta — el resultado final
-// tiene que ser solo el número en formato +549..., nada más.
+// Decisión 2026-10-07 (Leonardo, en vivo, simplifica lo anterior): el
+// resultado SIEMPRE tiene que ser solo dígitos (y el "+" del código de
+// país) — nunca letras ni anotaciones entre paréntesis ("PADRE"/"Madre").
+// Un Excel real puede traer más de un valor en la misma celda ("1148053169 /
+// 11555132005", "1138740052 (Madre) 1140387144 (Padre)") pero el teléfono
+// siempre viene primero — se toma solo el primer número que aparece y se
+// descarta el resto, sin intentar separar ni conservar lo demás.
 const AREA_CODIGO_CABA = "11";
 
 function soloDigitos(texto: string): string {
   return texto.replace(/\D/g, "");
 }
 
-// Un solo número (sin la anotación entre paréntesis todavía separada). Si no
-// se puede reconocer con confianza como un numero argentino de 10 dígitos
-// (con o sin 0/15/54/9 de más), se devuelve tal cual vino — nunca se inventa
-// un número a partir de algo que no se entiende.
+// Primer número que aparece en el texto: un "+" opcional seguido de
+// dígitos, tolerando espacios/guiones internos como mero formato (ej.
+// "11 5006 9332"). Para en el primer carácter que no sea dígito/espacio/
+// guion (una "(", una "/", una letra) — ahí termina el teléfono y empieza
+// lo que sea que venga después, que se descarta.
+const PRIMER_NUMERO = /\+?\d[\d -]*\d|\+?\d/;
+
+// Si no se puede reconocer con confianza como un número argentino (8, 10 u
+// 11 dígitos, con o sin 0/15/54/9 de más), se devuelven solo los dígitos tal
+// cual vinieron — nunca letras, nunca se inventa un formato que no se puede
+// confirmar.
 function normalizarUnNumero(numero: string): string {
   let digitos = soloDigitos(numero);
-  if (digitos.length === 0) return numero.trim();
+  if (digitos.length === 0) return "";
 
   // Ya viene con código de país: +54 9 11 ######## (13) o +54 11 ######## (12,
   // sin el 9 de celular — se lo agrega).
@@ -33,7 +38,7 @@ function normalizarUnNumero(numero: string): string {
     const resto = digitos.slice(2);
     if (resto.length === 10 && !resto.startsWith("9")) return `+549${resto}`;
     if (resto.length === 11 && resto.startsWith("9")) return `+54${resto}`;
-    return numero.trim(); // No es ninguno de los dos formatos esperados — no se toca.
+    return digitos; // No es ninguno de los dos formatos esperados — se dejan los dígitos tal cual.
   }
 
   // Formato local típico: 0 (código de salida) + 11 (área) + 8 dígitos = 11.
@@ -51,39 +56,7 @@ function normalizarUnNumero(numero: string): string {
     return `+549${AREA_CODIGO_CABA}${digitos}`;
   }
 
-  return numero.trim(); // Ni 8, 10 ni 11 dígitos — no se reconoce, se deja como vino.
-}
-
-const SEPARADOR_VARIOS_TELEFONOS = /\s*\/{1,2}\s*/;
-// Un número puede venir con espacios/guiones internos como mero formato
-// ("11 5006 9332"), así que no alcanza con cortar por cualquier espacio —
-// eso rompería ese caso real en dos números inventados ("11" + "5006" +
-// "9332"). El único punto donde SÍ hay que cortar dentro de una "parte" es
-// justo después de un paréntesis: ahí un número ya terminó y, si sigue algo
-// más, es el próximo número.
-const NUMERO_CON_ANOTACION = /([^()]*)\(([^)]*)\)/g;
-
-// Bug real 2026-10-06: con dos números y su propia anotación cada uno, sin
-// "/" entre ellos ("1138740052 (Madre) 1140387144 (Padre)"), antes se
-// perdía entero — la anotación al final "comía" todo el texto previo como
-// si fuera un solo número, que no matcheaba ningún formato reconocido y
-// quedaba sin normalizar. Ahora se separa en un número por cada paréntesis
-// encontrado, y si queda texto suelto después del último paréntesis, se
-// trata como un número más. La anotación en sí ("Madre"/"Padre") se
-// descarta — decisión 2026-10-07, ver comentario arriba.
-function normalizarParte(parte: string): string {
-  if (!parte.includes("(")) return normalizarUnNumero(parte);
-
-  const resultado: string[] = [];
-  let finDelUltimoMatch = 0;
-  for (const match of parte.matchAll(NUMERO_CON_ANOTACION)) {
-    const [textoCompleto, numero] = match;
-    resultado.push(normalizarUnNumero(numero));
-    finDelUltimoMatch = (match.index ?? 0) + textoCompleto.length;
-  }
-  const restante = parte.slice(finDelUltimoMatch).trim();
-  if (restante !== "") resultado.push(normalizarUnNumero(restante));
-  return resultado.join(" / ");
+  return digitos; // Ni 8, 10 ni 11 dígitos — no se reconoce, quedan los dígitos tal cual.
 }
 
 export function normalizarTelefono(telefono: string | null): string | null {
@@ -91,10 +64,9 @@ export function normalizarTelefono(telefono: string | null): string | null {
   const texto = telefono.trim();
   if (texto === "") return null;
 
-  return texto
-    .split(SEPARADOR_VARIOS_TELEFONOS)
-    .map((parte) => parte.trim())
-    .filter((parte) => parte !== "")
-    .map(normalizarParte)
-    .join(" / ");
+  const match = texto.match(PRIMER_NUMERO);
+  if (!match) return null; // Sin ningún dígito — no hay teléfono que normalizar.
+
+  const normalizado = normalizarUnNumero(match[0]);
+  return normalizado === "" ? null : normalizado;
 }
