@@ -12,6 +12,14 @@ export default () => ({
     apiUrl: process.env.SIMPLIROUTE_API_URL,
     apiKey: process.env.SIMPLIROUTE_API_KEY,
     mock: process.env.SIMPLIROUTE_MOCK !== "false",
+    // Punto de partida/llegada dummy para crear una Route cuando hace falta
+    // (ver SimplirouteHttpAdapter.asignarChoferVehiculo) — SimpliRoute lo
+    // exige para crear una Route aunque no tengamos un depósito real
+    // configurado. Default: Obelisco, CABA — placeholder razonable hasta que
+    // Leonardo confirme la dirección real del depósito de MyM.
+    depositoDireccion: process.env.SIMPLIROUTE_DEPOSITO_DIRECCION ?? "CABA, Argentina",
+    depositoLatitud: Number(process.env.SIMPLIROUTE_DEPOSITO_LATITUD ?? "-34.6037"),
+    depositoLongitud: Number(process.env.SIMPLIROUTE_DEPOSITO_LONGITUD ?? "-58.3816"),
   },
   r2: {
     accountId: process.env.R2_ACCOUNT_ID,

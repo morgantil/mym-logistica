@@ -357,6 +357,7 @@ export class PedidosService {
                 envio.idExterno,
                 Number(resuelto.choferId),
                 Number(resuelto.vehiculoId),
+                pedido.fechaProgramada,
               );
             } catch (error) {
               this.logger.warn(

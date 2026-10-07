@@ -135,13 +135,26 @@ export interface LogisticaProviderPort {
   // §18 funcional.
   enviarPedido(pedido: PedidoParaEnviar): Promise<ResultadoEnvio>;
 
-  // Decisión 2026-10-04: asigna la Visit ya creada a un Conductor/Vehículo
-  // puntual — campos `driver`/`vehicle` de la Visit (confirmados en la
-  // documentación oficial de SimpliRoute, Visit Object). Se llama SEPARADO
-  // de enviarPedido porque la zona/chofer recién se resuelve con la
-  // coordenada real que devuelve la creación de la Visit (ver
+  // Decisión 2026-10-04, corregida 2026-10-07 (bug real encontrado en
+  // reunión, confirmado contra la cuenta real de SimpliRoute): asigna la
+  // Visit ya creada a un Conductor/Vehículo puntual. La primera versión
+  // mandaba `driver`/`vehicle` directo por PATCH a la Visit — la API
+  // responde 200 pero IGNORA esos dos campos en silencio, nunca quedan
+  // guardados (confirmado probando contra la cuenta real). El mecanismo real
+  // (confirmado contra la cuenta real, ver `obtenerOCrearRuta` en el
+  // adapter): la Visit se vincula a una Route (`PATCH visit.route`), y el
+  // conductor/vehículo salen de ESA Route, no de campos propios de la Visit
+  // — hace falta una Route (dentro de un Plan) para el chofer/vehículo/fecha,
+  // creándola si todavía no existe ese día. Se llama SEPARADO de
+  // enviarPedido porque la zona/chofer recién se resuelve con la coordenada
+  // real que devuelve la creación de la Visit (ver
   // PedidosService.enviarASimpliRoute) — no se puede saber antes.
-  asignarChoferVehiculo(idExterno: string, choferIdExterno: number, vehiculoIdExterno: number): Promise<void>;
+  asignarChoferVehiculo(
+    idExterno: string,
+    choferIdExterno: number,
+    vehiculoIdExterno: number,
+    fecha: Date,
+  ): Promise<void>;
 
   // §19 funcional — el mapeo a EstadoPedido propio se hace en el módulo de pedidos,
   // no acá: este puerto solo devuelve el estado crudo tal cual lo informa el proveedor.

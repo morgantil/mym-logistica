@@ -88,6 +88,14 @@ interface ZonaSimpliRoute {
   schedules: string[];
 }
 
+// GET /v1/plans/{fecha}/vehicles/ — confirmado contra la cuenta real
+// 2026-10-07 (ver obtenerOCrearRuta). Documentación oficial no detalla el
+// shape (`NOT_DOCUMENTED`), este es el observado.
+interface VehiculoConRutasSimpliRoute {
+  id: number;
+  routes: { id: string; plan_id: string }[];
+}
+
 // GET/PUT/PATCH /v1/accounts/drivers/ — Documentacion simpliroute/04 §44-59,
 // pero verificado y corregido contra la cuenta real 2026-08-28 (el doc
 // tenía varios puntos desactualizados/incorrectos):
@@ -167,6 +175,9 @@ export class SimplirouteHttpAdapter implements LogisticaProviderPort {
   private readonly logger = new Logger(SimplirouteHttpAdapter.name);
   private readonly apiUrl: string;
   private readonly apiKey: string;
+  private readonly depositoDireccion: string;
+  private readonly depositoLatitud: number;
+  private readonly depositoLongitud: number;
 
   // Nota: este provider se instancia siempre (Nest resuelve las dependencias
   // del factory de SimplirouteModule de forma eager), esté o no
@@ -176,6 +187,9 @@ export class SimplirouteHttpAdapter implements LogisticaProviderPort {
   constructor(config: ConfigService) {
     this.apiUrl = config.get<string>("simpliroute.apiUrl") || BASE_URL;
     this.apiKey = config.get<string>("simpliroute.apiKey") ?? "";
+    this.depositoDireccion = config.get<string>("simpliroute.depositoDireccion") ?? "CABA, Argentina";
+    this.depositoLatitud = config.get<number>("simpliroute.depositoLatitud") ?? -34.6037;
+    this.depositoLongitud = config.get<number>("simpliroute.depositoLongitud") ?? -58.3816;
   }
 
   private async solicitar<T>(metodo: string, ruta: string, cuerpo?: unknown): Promise<T> {
@@ -282,15 +296,63 @@ export class SimplirouteHttpAdapter implements LogisticaProviderPort {
     };
   }
 
-  // Ver comentario en el puerto — PATCH separado porque recién se conoce la
-  // zona/chofer real una vez creada la Visit (con la coordenada
-  // geocodificada). `driver`/`vehicle` confirmados en la documentación
-  // oficial (Visit Object, campos Integer).
-  async asignarChoferVehiculo(idExterno: string, choferIdExterno: number, vehiculoIdExterno: number): Promise<void> {
-    await this.solicitar<void>("PATCH", `/v1/routes/visits/${encodeURIComponent(idExterno)}/`, {
-      driver: choferIdExterno,
-      vehicle: vehiculoIdExterno,
+  // Bug real 2026-10-07 (reunión, confirmado contra la cuenta real):
+  // `driver`/`vehicle` de la Visit están documentados como campos del Visit
+  // Object, pero un PATCH directo sobre ellos devuelve 200 y los IGNORA en
+  // silencio — nunca quedan guardados. El mecanismo real, confirmado paso a
+  // paso contra la cuenta real (crear Plan → crear Route con vehicle/driver
+  // → PATCH visit.route): el conductor/vehículo de una Visit salen de la
+  // Route a la que está vinculada, no de campos propios. Acá se busca (o
+  // crea, si todavía no existe ese chofer/vehículo/fecha) la Route y se
+  // vincula la Visit a ella.
+  async asignarChoferVehiculo(
+    idExterno: string,
+    choferIdExterno: number,
+    vehiculoIdExterno: number,
+    fecha: Date,
+  ): Promise<void> {
+    const rutaId = await this.obtenerOCrearRuta(choferIdExterno, vehiculoIdExterno, fecha);
+    await this.solicitar<void>("PATCH", `/v1/routes/visits/${encodeURIComponent(idExterno)}/`, { route: rutaId });
+  }
+
+  // `GET /v1/plans/{fecha}/vehicles/` devuelve, por vehículo, las Routes que
+  // ya tiene ese día (`routes: [{id, plan_id}]`) — se reusa la primera si
+  // existe (un chofer puede tener varios pedidos el mismo día, todos van a
+  // la misma Route) en vez de crear una nueva cada vez. Si no existe
+  // ninguna, se crea un Plan mínimo (nombre único por timestamp, recomendado
+  // por la documentación oficial) y una Route dentro — SimpliRoute exige
+  // punto de inicio/fin para crear una Route aunque no tengamos un depósito
+  // real configurado (ver simpliroute.depositoDireccion/Latitud/Longitud).
+  private async obtenerOCrearRuta(choferIdExterno: number, vehiculoIdExterno: number, fecha: Date): Promise<string> {
+    const fechaStr = fecha.toISOString().slice(0, 10);
+
+    const vehiculos = await this.solicitar<VehiculoConRutasSimpliRoute[]>(
+      "GET",
+      `/v1/plans/${fechaStr}/vehicles/`,
+    );
+    const rutaExistente = vehiculos.find((v) => v.id === vehiculoIdExterno)?.routes?.[0];
+    if (rutaExistente) return rutaExistente.id;
+
+    const plan = await this.solicitar<{ id: string }>("POST", "/v1/plans/create-plan/", {
+      name: `Plan MyM ${fechaStr} ${Date.now()}`,
+      start_date: fechaStr,
+      end_date: fechaStr,
     });
+    const ruta = await this.solicitar<{ id: string }>("POST", "/v1/routes/routes/", {
+      vehicle: vehiculoIdExterno,
+      driver: choferIdExterno,
+      planned_date: fechaStr,
+      plan: plan.id,
+      estimated_time_start: "08:00:00",
+      estimated_time_end: "18:00:00",
+      location_start_address: this.depositoDireccion,
+      location_start_latitude: this.depositoLatitud,
+      location_start_longitude: this.depositoLongitud,
+      location_end_address: this.depositoDireccion,
+      location_end_latitude: this.depositoLatitud,
+      location_end_longitude: this.depositoLongitud,
+    });
+    return ruta.id;
   }
 
   // §19 funcional — devuelve el estado crudo tal cual lo informa SimpliRoute;

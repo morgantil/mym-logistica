@@ -33,9 +33,14 @@ export class SimplirouteMockAdapter implements LogisticaProviderPort {
     return { idExterno: `mock-${pedido.pedidoId}`, latitud: null, longitud: null, geocodeAlert: null };
   }
 
-  async asignarChoferVehiculo(idExterno: string, choferIdExterno: number, vehiculoIdExterno: number): Promise<void> {
+  async asignarChoferVehiculo(
+    idExterno: string,
+    choferIdExterno: number,
+    vehiculoIdExterno: number,
+    fecha: Date,
+  ): Promise<void> {
     this.logger.warn(
-      `[MOCK] asignarChoferVehiculo(${idExterno}, chofer=${choferIdExterno}, vehiculo=${vehiculoIdExterno}) — sin API real configurada.`,
+      `[MOCK] asignarChoferVehiculo(${idExterno}, chofer=${choferIdExterno}, vehiculo=${vehiculoIdExterno}, fecha=${fecha.toISOString().slice(0, 10)}) — sin API real configurada.`,
     );
   }
 

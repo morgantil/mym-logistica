@@ -145,6 +145,6 @@ describe("PedidosService.enviarASimpliRoute — Carga 1/3 y Conductor/Vehículo"
 
     await servicio.enviarASimpliRoute(["p1"]);
 
-    expect(asignarChoferVehiculo).toHaveBeenCalledWith("visita-1", 99, 55);
+    expect(asignarChoferVehiculo).toHaveBeenCalledWith("visita-1", 99, 55, expect.any(Date));
   });
 });
