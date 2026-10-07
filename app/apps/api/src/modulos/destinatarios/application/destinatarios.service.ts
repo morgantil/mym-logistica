@@ -57,9 +57,23 @@ export class DestinatariosService {
       return { destinatario: nuevo, alertaDireccion: null };
     }
 
+    // Bug real 2026-10-07 (reunión con Leonardo): a diferencia de la
+    // dirección (que sí se compara y se deja marcada para resolver), el
+    // teléfono de un destinatario ya existente nunca se refrescaba al
+    // reimportar — un pedido nuevo de un afiliado repetido se quedaba con el
+    // teléfono viejo guardado la primera vez, aunque el Excel trajera uno
+    // nuevo (o el mismo, ya pasado por normalizarTelefono con una versión
+    // más nueva del parseo). Se refresca directo, sin alertar como la
+    // dirección — el teléfono no tiene la misma ambigüedad ("¿cuál es la
+    // dirección correcta?") que justifica pedirle al usuario que elija.
+    let destinatario = existente;
+    if (datos.telefono !== null && datos.telefono !== existente.telefono) {
+      destinatario = await this.repositorio.actualizarTelefono(existente.id, datos.telefono);
+    }
+
     const comparacion = compararDireccion(existente.direccion, datos.direccionExcel);
     return {
-      destinatario: existente,
+      destinatario,
       alertaDireccion: comparacion.coincide ? null : comparacion,
     };
   }

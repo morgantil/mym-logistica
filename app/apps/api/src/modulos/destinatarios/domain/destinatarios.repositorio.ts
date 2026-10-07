@@ -13,6 +13,7 @@ export interface DestinatariosRepositorio {
     datos: Omit<Destinatario, "id" | "simplirouteId" | "latitud" | "longitud">,
   ): Promise<Destinatario>;
   actualizarDireccion(id: string, direccion: string): Promise<Destinatario>;
+  actualizarTelefono(id: string, telefono: string): Promise<Destinatario>;
   actualizarDatosSimpliRoute(id: string, datos: DatosSimpliRoute): Promise<Destinatario>;
 }
 

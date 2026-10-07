@@ -36,6 +36,11 @@ export class DestinatariosRepositorioPrisma implements DestinatariosRepositorio 
     return actualizado as unknown as Destinatario;
   }
 
+  async actualizarTelefono(id: string, telefono: string): Promise<Destinatario> {
+    const actualizado = await this.prisma.destinatario.update({ where: { id }, data: { telefono } });
+    return actualizado as unknown as Destinatario;
+  }
+
   async actualizarDatosSimpliRoute(id: string, datos: DatosSimpliRoute): Promise<Destinatario> {
     const actualizado = await this.prisma.destinatario.update({
       where: { id },
