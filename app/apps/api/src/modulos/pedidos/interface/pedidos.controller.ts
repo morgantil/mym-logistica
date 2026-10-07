@@ -46,6 +46,7 @@ export class PedidosController {
       estadoSimpliroute: query.estadoSimpliroute,
       prioridad: query.prioridad,
       localidad: query.localidad,
+      ruta: query.ruta,
       sinEtiquetaImpresa: query.sinEtiquetaImpresa,
     };
   }

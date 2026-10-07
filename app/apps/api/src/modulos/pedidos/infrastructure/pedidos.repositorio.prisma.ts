@@ -89,6 +89,7 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
         ? { prioridad: filtro.prioridad as unknown as Prisma.EnumPrioridadPedidoFilter }
         : {}),
       ...(filtro.localidad ? { localidad: filtro.localidad } : {}),
+      ...(filtro.ruta ? { ruta: filtro.ruta } : {}),
       ...(filtro.sinEtiquetaImpresa ? { etiquetaImpresaEn: null } : {}),
       // Bolsa/Bulto vive en Producto — matchea pedidos con al menos una línea
       // de ese envase. El propio middleware de borrado lógico no intercepta

@@ -41,7 +41,7 @@ import {
 } from "./api";
 import { BultosCelda } from "./bultos-celda";
 import { ComentarioCelda } from "./comentario-celda";
-import { RutaCelda } from "./ruta-celda";
+import { OPCIONES_RUTA, RutaCelda } from "./ruta-celda";
 import { DetallePedidoSheet } from "./detalle-pedido-sheet";
 import { ordenarColumnas } from "./orden-columnas";
 import {
@@ -240,6 +240,7 @@ export function PedidosTabla() {
   const [estadoSimpliroute, setEstadoSimpliroute] = useState(SENTINEL_TODOS);
   const [prioridad, setPrioridad] = useState(SENTINEL_TODOS);
   const [localidad, setLocalidad] = useState(SENTINEL_TODOS);
+  const [ruta, setRuta] = useState(SENTINEL_TODOS);
   const [sinEtiquetaImpresa, setSinEtiquetaImpresa] = useState(false);
 
   const { data: clientesDisponibles = [] } = useQuery({
@@ -290,6 +291,7 @@ export function PedidosTabla() {
     estadoSimpliroute,
     prioridad,
     localidad,
+    ruta,
     sinEtiquetaImpresa,
   ]);
 
@@ -310,6 +312,7 @@ export function PedidosTabla() {
     estadoSimpliroute: estadoSimpliroute === SENTINEL_TODOS ? undefined : (estadoSimpliroute as EstadoSimpliroute),
     prioridad: prioridad === SENTINEL_TODOS ? undefined : (prioridad as PrioridadPedido),
     localidad: localidad === SENTINEL_TODOS ? undefined : localidad,
+    ruta: ruta === SENTINEL_TODOS ? undefined : ruta,
     sinEtiquetaImpresa: sinEtiquetaImpresa || undefined,
     ordenarPor: orden?.campo,
     direccionOrden: orden?.direccion,
@@ -337,6 +340,7 @@ export function PedidosTabla() {
         estadoSimpliroute,
         prioridad,
         localidad,
+        ruta,
         sinEtiquetaImpresa,
       },
     ],
@@ -881,6 +885,23 @@ export function PedidosTabla() {
                 <SelectContent className="max-h-64">
                   <SelectItem value={SENTINEL_TODOS}>Todas</SelectItem>
                   {localidadesDisponibles.map((valor) => (
+                    <SelectItem key={valor} value={valor}>
+                      {valor}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs text-muted-foreground">Ruta</Label>
+              <Select value={ruta} onValueChange={setRuta}>
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={SENTINEL_TODOS}>Todas</SelectItem>
+                  {OPCIONES_RUTA.map((valor) => (
                     <SelectItem key={valor} value={valor}>
                       {valor}
                     </SelectItem>

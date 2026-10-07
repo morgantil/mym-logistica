@@ -34,6 +34,7 @@ export interface ParametrosListarPedidos {
   estadoSimpliroute?: EstadoSimpliroute;
   prioridad?: PrioridadPedido;
   localidad?: string;
+  ruta?: string;
   sinEtiquetaImpresa?: boolean;
   ordenarPor?: CampoOrdenPedido;
   direccionOrden?: "asc" | "desc";

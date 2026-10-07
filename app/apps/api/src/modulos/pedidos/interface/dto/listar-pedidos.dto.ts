@@ -102,6 +102,11 @@ export class ListarPedidosDto {
   @MaxLength(200)
   localidad?: string;
 
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  ruta?: string;
+
   // Query param llega como string ("true"/"false") — Boolean("false") daría
   // true, por eso el Transform explícito en vez de @Type(() => Boolean).
   @IsOptional()

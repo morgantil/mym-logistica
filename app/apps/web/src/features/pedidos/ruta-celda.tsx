@@ -16,7 +16,7 @@ import type { PedidoListado } from "./tipos";
 // cargaba "Ruta 1" a mano por texto libre — se cambió a un desplegable fijo
 // (Ruta 1 a Ruta 10) para evitar variantes de tipeo ("ruta1", "Ruta  1",
 // etc.), con "Ruta 1" como default.
-const OPCIONES_RUTA = Array.from({ length: 10 }, (_, i) => `Ruta ${i + 1}`);
+export const OPCIONES_RUTA = Array.from({ length: 10 }, (_, i) => `Ruta ${i + 1}`);
 const RUTA_DEFAULT = OPCIONES_RUTA[0];
 
 export function RutaCelda({ pedido, puedeEditar }: { pedido: PedidoListado; puedeEditar: boolean }) {

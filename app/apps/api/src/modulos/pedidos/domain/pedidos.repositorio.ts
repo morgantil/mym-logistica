@@ -76,6 +76,9 @@ export interface FiltroPedidos {
   estadoSimpliroute?: EstadoSimpliroute;
   prioridad?: PrioridadPedido;
   localidad?: string;
+  // Decisión 2026-10-07 (reunión): filtro por Ruta — agregado al mismo
+  // tiempo que el campo pasó a ser un desplegable fijo (Ruta 1 a Ruta 10).
+  ruta?: string;
   // true = solo pedidos con `etiquetaImpresaEn` null. No se ofrece el
   // inverso ("con etiqueta impresa") porque no se pidió — se puede sumar
   // después con el mismo campo (true/false) si hace falta.
