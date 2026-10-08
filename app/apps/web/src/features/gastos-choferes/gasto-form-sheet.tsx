@@ -65,6 +65,21 @@ function fiscalDesdeGasto(gasto: GastoChofer | null): EstadoFiscal {
   return resultado;
 }
 
+// Pedido real 2026-10-08 (reunión, "no lo calcula automático"): el Excel
+// real trae IVA Liquidado y Total como fórmulas (=O2*0,21 y
+// =O2+Q2+T2+V2) — ya resueltas al importar (el lector las lee tal cual), pero
+// la carga MANUAL no tenía esa cuenta hecha, obligaba a calcularla a mano.
+// Mismas fórmulas acá: cero si el campo está vacío, nunca NaN.
+function aNumeroOCero(texto: string): number {
+  if (texto.trim() === "") return 0;
+  const numero = aNumeroLocal(texto);
+  return Number.isNaN(numero) ? 0 : numero;
+}
+
+function redondearA2Decimales(numero: number): number {
+  return Math.round(numero * 100) / 100;
+}
+
 function mensajeError(error: unknown): string {
   if (error instanceof AxiosError && error.response?.data?.message) {
     const mensaje = error.response.data.message;
@@ -107,6 +122,34 @@ export function GastoFormSheet({
     setFiscal(fiscalDesdeGasto(gasto));
     setError(null);
   }, [gasto]);
+
+  // IVA Liquidado = Neto Gravado × Alícuota — misma fórmula que el Excel
+  // real (=O2*0,21). Se recalcula cada vez que cambia cualquiera de los dos,
+  // igual que una celda de fórmula: no hace falta tocar IVA Liquidado a mano.
+  useEffect(() => {
+    if (tipo !== TipoGastoChofer.COMBUSTIBLE) return;
+    if (fiscal.netoGravado.trim() === "" || fiscal.alicuota.trim() === "") return;
+    const netoGravado = aNumeroLocal(fiscal.netoGravado);
+    const alicuota = aNumeroLocal(fiscal.alicuota);
+    if (Number.isNaN(netoGravado) || Number.isNaN(alicuota)) return;
+    const calculado = String(redondearA2Decimales(netoGravado * (alicuota / 100)));
+    setFiscal((actual) => (actual.ivaLiquidado === calculado ? actual : { ...actual, ivaLiquidado: calculado }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fiscal.netoGravado, fiscal.alicuota, tipo]);
+
+  // Total = Neto Gravado + IVA Liquidado + Conceptos NG/EX + Perc./Ret. —
+  // misma fórmula que el Excel real (=O2+Q2+T2+V2). Solo se recalcula si al
+  // menos uno de los cuatro tiene algo cargado — un gasto sin desglose
+  // fiscal (ej. Peaje, o Combustible sin los datos a mano) deja el Total
+  // como lo haya puesto el usuario.
+  useEffect(() => {
+    if (tipo !== TipoGastoChofer.COMBUSTIBLE) return;
+    const campos = [fiscal.netoGravado, fiscal.ivaLiquidado, fiscal.conceptosNgEx, fiscal.percepcionRetencion];
+    if (campos.every((valor) => valor.trim() === "")) return;
+    const total = campos.reduce((suma, valor) => suma + aNumeroOCero(valor), 0);
+    setMonto(String(redondearA2Decimales(total)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fiscal.netoGravado, fiscal.ivaLiquidado, fiscal.conceptosNgEx, fiscal.percepcionRetencion, tipo]);
 
   const { data: choferes } = useQuery({ queryKey: ["zonas-choferes", "choferes"], queryFn: listarChoferes });
 
@@ -192,7 +235,16 @@ export function GastoFormSheet({
                 disabled={mutacion.isPending}
               />
             </FilaFormulario>
-            <FilaFormulario label="Total" htmlFor="monto-gasto" anchoEtiqueta="140px">
+            <FilaFormulario
+              label="Total"
+              htmlFor="monto-gasto"
+              anchoEtiqueta="140px"
+              descripcion={
+                tipo === TipoGastoChofer.COMBUSTIBLE
+                  ? "Se calcula solo (Neto Gravado + IVA Liquidado + Conceptos NG/EX + Perc./Ret.) apenas cargás alguno de esos — lo podés corregir a mano después."
+                  : undefined
+              }
+            >
               <Input
                 id="monto-gasto"
                 type="text"
@@ -249,7 +301,17 @@ export function GastoFormSheet({
               </p>
               <TablaFormulario>
                 {CAMPOS_FISCALES.map(({ campo, etiqueta, tipo: tipoInput }) => (
-                  <FilaFormulario key={campo} label={etiqueta} htmlFor={`${campo}-gasto`} anchoEtiqueta="140px">
+                  <FilaFormulario
+                    key={campo}
+                    label={etiqueta}
+                    htmlFor={`${campo}-gasto`}
+                    anchoEtiqueta="140px"
+                    descripcion={
+                      campo === "ivaLiquidado"
+                        ? "Se calcula solo (Neto Gravado × Alíc.) apenas cargás los dos — lo podés corregir a mano después."
+                        : undefined
+                    }
+                  >
                     <Input
                       id={`${campo}-gasto`}
                       type={tipoInput === "number" ? "text" : tipoInput}
