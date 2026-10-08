@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { FilaFormulario, TablaFormulario } from "@/components/shell/fila-formulario";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { aNumeroLocal } from "@/lib/numero-local";
 import { actualizarPorcentaje, crearPorcentaje } from "./api";
 import type { PorcentajeSegundoServicio } from "./tipos";
 
@@ -54,9 +55,9 @@ export function PorcentajeFormSheet({
   const mutacion = useMutation({
     mutationFn: () => {
       if (editando) {
-        return actualizarPorcentaje(porcentaje.id, { porcentajePanal: Number(porcentajePanal) });
+        return actualizarPorcentaje(porcentaje.id, { porcentajePanal: aNumeroLocal(porcentajePanal) });
       }
-      return crearPorcentaje({ clienteId, porcentajePanal: Number(porcentajePanal) });
+      return crearPorcentaje({ clienteId, porcentajePanal: aNumeroLocal(porcentajePanal) });
     },
     onSuccess: () => {
       toast.success(editando ? "Porcentaje actualizado." : "Porcentaje cargado.");
@@ -99,10 +100,9 @@ export function PorcentajeFormSheet({
             <FilaFormulario label="% Pañal" htmlFor="porcentaje-panal" anchoEtiqueta="140px">
               <Input
                 id="porcentaje-panal"
-                type="number"
-                min="0"
-                max="100"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
+                placeholder="0,00"
                 value={porcentajePanal}
                 onChange={(e) => setPorcentajePanal(e.target.value)}
                 required

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { FilaFormulario, TablaFormulario } from "@/components/shell/fila-formulario";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { aNumeroLocal } from "@/lib/numero-local";
 import { actualizarTarifaTransportista, crearTarifaTransportista } from "./api";
 import type { TarifaTransportista } from "./tipos";
 
@@ -53,9 +54,9 @@ export function TarifaTransportistaFormSheet({
   const mutacion = useMutation({
     mutationFn: () => {
       if (editando) {
-        return actualizarTarifaTransportista(tarifa.id, { monto: Number(monto) });
+        return actualizarTarifaTransportista(tarifa.id, { monto: aNumeroLocal(monto) });
       }
-      return crearTarifaTransportista({ zona, monto: Number(monto) });
+      return crearTarifaTransportista({ zona, monto: aNumeroLocal(monto) });
     },
     onSuccess: () => {
       toast.success("Tarifa por viaje actualizada.");
@@ -99,9 +100,9 @@ export function TarifaTransportistaFormSheet({
             <FilaFormulario label="Monto por viaje" htmlFor="monto-transportista" anchoEtiqueta="140px">
               <Input
                 id="monto-transportista"
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
+                placeholder="0,00"
                 value={monto}
                 onChange={(e) => setMonto(e.target.value)}
                 required

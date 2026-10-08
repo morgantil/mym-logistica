@@ -8,6 +8,7 @@ import { FilaFormulario, TablaFormulario } from "@/components/shell/fila-formula
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { aNumeroLocal } from "@/lib/numero-local";
 import { listarZonasTarifarias } from "@/features/zonas-tarifarias/api";
 import { actualizarMontoUnificadoMedicamento, crearMontoUnificadoMedicamento } from "./api";
 import type { MontoUnificadoMedicamento } from "./tipos";
@@ -86,14 +87,14 @@ export function MontoUnificadoMedicamentoFormSheet({
   const mutacion = useMutation({
     mutationFn: () => {
       if (editando) {
-        return actualizarMontoUnificadoMedicamento(montoExistente.id, { monto: Number(monto) });
+        return actualizarMontoUnificadoMedicamento(montoExistente.id, { monto: aNumeroLocal(monto) });
       }
       return crearMontoUnificadoMedicamento({
         clienteId,
         zonaTarifariaId,
         tipoEnvase: tipoEnvase === VALOR_AMBOS ? undefined : tipoEnvase,
         prioridad,
-        monto: Number(monto),
+        monto: aNumeroLocal(monto),
       });
     },
     onSuccess: () => {
@@ -196,9 +197,9 @@ export function MontoUnificadoMedicamentoFormSheet({
             <FilaFormulario label="Monto" htmlFor="monto-unificado-medicamento" anchoEtiqueta="140px">
               <Input
                 id="monto-unificado-medicamento"
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
+                placeholder="0,00"
                 value={monto}
                 onChange={(e) => setMonto(e.target.value)}
                 required

@@ -8,6 +8,7 @@ import { FilaFormulario, TablaFormulario } from "@/components/shell/fila-formula
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { aNumeroLocal } from "@/lib/numero-local";
 import { listarChoferes } from "@/features/zonas-choferes/api";
 import { crearGasto, actualizarGasto } from "./api";
 import type { DatosFiscalesCombustible, GastoChofer } from "./tipos";
@@ -117,13 +118,13 @@ export function GastoFormSheet({
         for (const { campo, tipo: tipoInput } of CAMPOS_FISCALES) {
           const valor = fiscal[campo];
           if (valor === "") continue;
-          datosFiscales[campo] = (tipoInput === "number" ? Number(valor) : valor) as never;
+          datosFiscales[campo] = (tipoInput === "number" ? aNumeroLocal(valor) : valor) as never;
         }
       }
       const datos = {
         tipo,
         fecha,
-        monto: Number(monto),
+        monto: aNumeroLocal(monto),
         choferId,
         proveedor: proveedor || undefined,
         comprobante: comprobante || undefined,
@@ -194,9 +195,9 @@ export function GastoFormSheet({
             <FilaFormulario label="Total" htmlFor="monto-gasto" anchoEtiqueta="140px">
               <Input
                 id="monto-gasto"
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
+                placeholder="0,00"
                 value={monto}
                 onChange={(e) => setMonto(e.target.value)}
                 required
@@ -251,11 +252,11 @@ export function GastoFormSheet({
                   <FilaFormulario key={campo} label={etiqueta} htmlFor={`${campo}-gasto`} anchoEtiqueta="140px">
                     <Input
                       id={`${campo}-gasto`}
-                      type={tipoInput}
-                      step={tipoInput === "number" ? "0.01" : undefined}
+                      type={tipoInput === "number" ? "text" : tipoInput}
+                      inputMode={tipoInput === "number" ? "decimal" : undefined}
                       value={fiscal[campo]}
                       onChange={(e) => setFiscal((actual) => ({ ...actual, [campo]: e.target.value }))}
-                      placeholder="Opcional"
+                      placeholder={tipoInput === "number" ? "Opcional (ej. 9372,24)" : "Opcional"}
                       disabled={mutacion.isPending}
                     />
                   </FilaFormulario>

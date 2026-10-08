@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { aNumeroLocal } from "@/lib/numero-local";
 import { listarClientesActivos } from "@/features/clientes/api";
 import {
   actualizarMontoUnificadoMedicamento,
@@ -100,7 +101,7 @@ export function TarifasTab({ clienteId }: { clienteId: string | null }) {
   // de una el monto base de todas las tarifas y montos ACTIVOS de este cliente.
   const [porcentajeAjuste, setPorcentajeAjuste] = useState("");
   const mutacionAjuste = useMutation({
-    mutationFn: () => aplicarAjustePorcentual(clienteId!, Number(porcentajeAjuste)),
+    mutationFn: () => aplicarAjustePorcentual(clienteId!, aNumeroLocal(porcentajeAjuste)),
     onSuccess: ({ tarifasActualizadas, montosActualizados }) => {
       toast.success(`Ajustadas ${tarifasActualizadas} tarifa(s) y ${montosActualizados} monto(s).`);
       setPorcentajeAjuste("");
@@ -127,8 +128,8 @@ export function TarifasTab({ clienteId }: { clienteId: string | null }) {
           <div className="flex flex-col gap-1">
             <span className="text-sm text-muted-foreground">% de ajuste</span>
             <Input
-              type="number"
-              step="0.01"
+              type="text"
+              inputMode="decimal"
               value={porcentajeAjuste}
               onChange={(e) => setPorcentajeAjuste(e.target.value)}
               placeholder="Ej. 10 o -5"
@@ -140,7 +141,7 @@ export function TarifasTab({ clienteId }: { clienteId: string | null }) {
             variant="outline"
             size="sm"
             disabled={
-              porcentajeAjuste.trim() === "" || Number.isNaN(Number(porcentajeAjuste)) || mutacionAjuste.isPending
+              porcentajeAjuste.trim() === "" || Number.isNaN(aNumeroLocal(porcentajeAjuste)) || mutacionAjuste.isPending
             }
             onClick={() => {
               if (

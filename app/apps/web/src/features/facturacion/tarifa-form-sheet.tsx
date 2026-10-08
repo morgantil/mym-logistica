@@ -8,6 +8,7 @@ import { FilaFormulario, TablaFormulario } from "@/components/shell/fila-formula
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { aNumeroLocal } from "@/lib/numero-local";
 import { listarZonasTarifarias } from "@/features/zonas-tarifarias/api";
 import { actualizarTarifa, crearTarifa } from "./api";
 import type { TarifaCliente } from "./tipos";
@@ -101,7 +102,7 @@ export function TarifaFormSheet({
   const mutacion = useMutation({
     mutationFn: () => {
       if (editando) {
-        return actualizarTarifa(tarifa.id, { monto: Number(monto) });
+        return actualizarTarifa(tarifa.id, { monto: aNumeroLocal(monto) });
       }
       return crearTarifa({
         clienteId,
@@ -109,7 +110,7 @@ export function TarifaFormSheet({
         tipoServicio,
         tipoEnvase: esMedicamento && tipoEnvase ? tipoEnvase : undefined,
         prioridad,
-        monto: Number(monto),
+        monto: aNumeroLocal(monto),
       });
     },
     onSuccess: () => {
@@ -237,9 +238,9 @@ export function TarifaFormSheet({
             <FilaFormulario label="Monto" htmlFor="monto-tarifa" anchoEtiqueta="140px">
               <Input
                 id="monto-tarifa"
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
+                placeholder="0,00"
                 value={monto}
                 onChange={(e) => setMonto(e.target.value)}
                 required
