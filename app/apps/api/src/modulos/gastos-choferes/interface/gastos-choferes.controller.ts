@@ -81,7 +81,7 @@ export class GastosChoferesController {
   // ABM manual (item 14.1 TEMAS_PENDIENTES.md, reunión 2026-10-06) — además
   // del import en bloque de arriba, un gasto suelto se puede cargar/editar/
   // borrar a mano.
-  @Post()
+  //
   // Error real corregido 2026-10-07 (reunión): además de fecha/monto/chofer/
   // proveedor/comprobante, el comprobante fiscal completo de Combustible
   // (CUIT, IVA, Cond Fisc, etc.) — ver DatosFiscalesCombustibleDto. `?? undefined`
@@ -113,6 +113,7 @@ export class GastosChoferesController {
     };
   }
 
+  @Post()
   crear(@Body() dto: CrearGastoDto) {
     return this.gastosChoferesService.crear({
       tipo: dto.tipo,
