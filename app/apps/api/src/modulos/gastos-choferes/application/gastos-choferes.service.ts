@@ -16,6 +16,7 @@ import { generarGastosChoferesExcel } from "../infrastructure/gastos-choferes-ex
 
 const HOJA_COMBUSTIBLE = "HWCompra-modelo";
 const HOJA_PEAJES = "PEAJES";
+const MAX_DIAS_REPORTE = 30;
 
 // Peaje no trae comprobante fiscal (la hoja PEAJES solo tiene chofer+monto)
 // — todos estos campos quedan null a propósito, nunca se inventan.
@@ -211,7 +212,23 @@ export class GastosChoferesService {
     return this.repositorio.eliminar(id);
   }
 
+  // Pedido en reunión 2026-10-07: la descarga usa el mismo date picker
+  // Desde/Hasta que ya filtra la grilla (y el mismo formato de columnas que
+  // trae el Excel que se sube, ver generarGastosChoferesExcel), con un tope
+  // de 30 días cuando se elige un rango explícito — mismo criterio que el
+  // tope de Transportistas (4.3), pero acá el límite pedido es 30, no 31.
   async generarReporteExcel(filtro: FiltroGastosChofer): Promise<Buffer> {
+    if (filtro.fechaDesde && filtro.fechaHasta) {
+      // fechaHasta ya viene ajustada +1 día (exclusiva, para el `lt` de
+      // siempre) desde el controller, así que esta resta ya da la cantidad
+      // de días inclusive elegida, sin necesitar otro +1 acá.
+      const cantidadDias = Math.round(
+        (filtro.fechaHasta.getTime() - filtro.fechaDesde.getTime()) / 86_400_000,
+      );
+      if (cantidadDias > MAX_DIAS_REPORTE) {
+        throw new BadRequestException(`El rango no puede superar los ${MAX_DIAS_REPORTE} días.`);
+      }
+    }
     const gastos = await this.repositorio.listar(filtro);
     return generarGastosChoferesExcel(gastos);
   }

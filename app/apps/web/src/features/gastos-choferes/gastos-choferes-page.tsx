@@ -25,6 +25,8 @@ import type { GastoChofer } from "./tipos";
 
 const HOY = new Date();
 const TODOS = "TODOS";
+const MAX_DIAS_REPORTE = 30;
+const MS_POR_DIA = 86_400_000;
 
 const ETIQUETA_TIPO: Record<TipoGastoChofer, string> = {
   [TipoGastoChofer.COMBUSTIBLE]: "Combustible",
@@ -87,6 +89,16 @@ export function GastosChoferesPage() {
     },
     onError: (error) => toast.error(mensajeError(error)),
   });
+
+  // Pedido en reunión 2026-10-07: la descarga usa el mismo date picker
+  // Desde/Hasta que ya filtra la grilla, con tope de 30 días — el backend
+  // también lo valida (GastosChoferesService.generarReporteExcel), esto es
+  // solo para no dejar ni intentar el pedido desde el front.
+  const rangoExcedeTope =
+    fechaDesde !== "" &&
+    fechaHasta !== "" &&
+    Math.round((new Date(fechaHasta).getTime() - new Date(fechaDesde).getTime()) / MS_POR_DIA) + 1 >
+      MAX_DIAS_REPORTE;
 
   const mutacionDescargar = useMutation({
     mutationFn: () => descargarReporteGastos(filtro),
@@ -218,7 +230,7 @@ export function GastosChoferesPage() {
         <Button
           type="button"
           variant="outline"
-          disabled={mutacionDescargar.isPending || (gastos?.length ?? 0) === 0}
+          disabled={mutacionDescargar.isPending || (gastos?.length ?? 0) === 0 || rangoExcedeTope}
           onClick={() => mutacionDescargar.mutate()}
         >
           {mutacionDescargar.isPending ? "Generando…" : "Descargar Excel"}
@@ -227,6 +239,11 @@ export function GastosChoferesPage() {
           Nuevo gasto
         </Button>
       </div>
+      {rangoExcedeTope && (
+        <p className="-mt-3 text-sm text-destructive">
+          El rango Desde/Hasta no puede superar los {MAX_DIAS_REPORTE} días para descargar.
+        </p>
+      )}
 
       <Table>
         <TableHeader>
