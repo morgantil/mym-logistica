@@ -23,13 +23,13 @@ export async function generarGastosChoferesExcel(gastos: GastoChofer[]): Promise
   const hoja = workbook.addWorksheet("Combustible y peajes");
 
   hoja.columns = [
-    { header: "Fecha", key: "fecha", width: 14 },
+    { header: "Fecha Emisión", key: "fecha", width: 14 },
     { header: "Tipo", key: "tipo", width: 14 },
     { header: "Chofer", key: "chofer", width: 20 },
     { header: "Texto original del archivo", key: "choferOriginal", width: 24 },
-    { header: "Proveedor", key: "proveedor", width: 28 },
+    { header: "Razón Social/Denominación Proveedor", key: "proveedor", width: 32 },
     { header: "Comprobante", key: "comprobante", width: 18 },
-    { header: "Monto", key: "monto", width: 14 },
+    { header: "Total", key: "monto", width: 14 },
     { header: "Fecha Recepción", key: "fechaRecepcion", width: 14 },
     { header: "Cpbte", key: "comprobanteCodigo", width: 10 },
     { header: "Tipo Cpbte", key: "comprobanteTipo", width: 10 },

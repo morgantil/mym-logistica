@@ -181,7 +181,7 @@ export function GastoFormSheet({
                 </SelectContent>
               </Select>
             </FilaFormulario>
-            <FilaFormulario label="Fecha" htmlFor="fecha-gasto" anchoEtiqueta="140px">
+            <FilaFormulario label="Fecha Emisión" htmlFor="fecha-gasto" anchoEtiqueta="140px">
               <Input
                 id="fecha-gasto"
                 type="date"
@@ -191,7 +191,7 @@ export function GastoFormSheet({
                 disabled={mutacion.isPending}
               />
             </FilaFormulario>
-            <FilaFormulario label="Monto" htmlFor="monto-gasto" anchoEtiqueta="140px">
+            <FilaFormulario label="Total" htmlFor="monto-gasto" anchoEtiqueta="140px">
               <Input
                 id="monto-gasto"
                 type="number"
@@ -217,7 +217,11 @@ export function GastoFormSheet({
                 </SelectContent>
               </Select>
             </FilaFormulario>
-            <FilaFormulario label="Proveedor" htmlFor="proveedor-gasto" anchoEtiqueta="140px">
+            <FilaFormulario
+              label="Razón Social/Denominación Proveedor"
+              htmlFor="proveedor-gasto"
+              anchoEtiqueta="140px"
+            >
               <Input
                 id="proveedor-gasto"
                 value={proveedor}

@@ -248,12 +248,12 @@ export function GastosChoferesPage() {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Fecha</TableHead>
+            <TableHead>Fecha Emisión</TableHead>
             <TableHead>Tipo</TableHead>
             <TableHead>Chofer</TableHead>
-            <TableHead>Proveedor</TableHead>
+            <TableHead>Razón Social/Denominación Proveedor</TableHead>
             <TableHead>Comprobante</TableHead>
-            <TableHead className="text-right">Monto</TableHead>
+            <TableHead className="text-right">Total</TableHead>
             <TableHead>Acciones</TableHead>
           </TableRow>
         </TableHeader>
