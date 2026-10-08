@@ -167,6 +167,34 @@ model GastoChofer {
   proveedor   String?
   comprobante String?
 
+  // Error real detectado 2026-10-07 (reunión con Leonardo): el archivo real
+  // de combustible ("HWCompra-modelo") trae un comprobante fiscal completo
+  // (factura), no solo fecha/monto/proveedor — se estaban perdiendo 19
+  // columnas reales al importar. Todos nullable y solo para Combustible
+  // (null en Peaje, esa hoja sigue siendo solo chofer+monto). Nombres y
+  // tipos tomados de las columnas reales del archivo, no inventados.
+  fechaRecepcion      DateTime?
+  comprobanteCodigo   String? // columna "Cpbte" (ej. "TF") — distinto de `comprobante` (el combinado Tipo+Suc+Número ya existente)
+  comprobanteTipo     String? // columna "Tipo" (ej. "A") — tipo de comprobante fiscal
+  comprobanteSucursal String? // columna "Suc." (ej. "00007") — texto, no número: conserva ceros a la izquierda
+  comprobanteNumero   String? // columna "Número"
+  tipoDocumento       String? // columna "Tipo Doc."
+  cuit                String?
+  domicilio           String?
+  codigoPostal        String?
+  provincia           String? // columna "Pcia"
+  condicionFiscal     String? // columna "Cond Fisc"
+  codigoNeto          String? // columna "Cód. Neto"
+  netoGravado         Decimal? @db.Decimal(12, 2)
+  alicuota            Decimal? @db.Decimal(5, 2) // columna "Alíc." (porcentaje, ej. 21)
+  ivaLiquidado        Decimal? @db.Decimal(12, 2)
+  ivaCredito          Decimal? @db.Decimal(12, 2)
+  codigoNgEx          String? // columna "Cód. NG/EX"
+  conceptosNgEx       Decimal? @db.Decimal(12, 2)
+  codigoPR            String? // columna "Cód. P/R"
+  percepcionRetencion Decimal? @db.Decimal(12, 2) // columna "Perc./Ret."
+  provinciaPR         String? // columna "Pcia P/R"
+
   archivoOrigen String // nombre del archivo importado, trazabilidad
 
   creadoEn       DateTime  @default(now())

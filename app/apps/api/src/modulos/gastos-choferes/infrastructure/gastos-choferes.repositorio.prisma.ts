@@ -9,6 +9,10 @@ import {
   GastosChoferesRepositorio,
 } from "../domain/gastos-choferes.repositorio";
 
+function aNumeroONull(valor: Prisma.Decimal | null): number | null {
+  return valor === null ? null : Number(valor);
+}
+
 function mapear(fila: {
   id: string;
   tipo: unknown;
@@ -21,6 +25,27 @@ function mapear(fila: {
   comprobante: string | null;
   archivoOrigen: string;
   creadoEn: Date;
+  fechaRecepcion: Date | null;
+  comprobanteCodigo: string | null;
+  comprobanteTipo: string | null;
+  comprobanteSucursal: string | null;
+  comprobanteNumero: string | null;
+  tipoDocumento: string | null;
+  cuit: string | null;
+  domicilio: string | null;
+  codigoPostal: string | null;
+  provincia: string | null;
+  condicionFiscal: string | null;
+  codigoNeto: string | null;
+  netoGravado: Prisma.Decimal | null;
+  alicuota: Prisma.Decimal | null;
+  ivaLiquidado: Prisma.Decimal | null;
+  ivaCredito: Prisma.Decimal | null;
+  codigoNgEx: string | null;
+  conceptosNgEx: Prisma.Decimal | null;
+  codigoPR: string | null;
+  percepcionRetencion: Prisma.Decimal | null;
+  provinciaPR: string | null;
 }): GastoChofer {
   return {
     id: fila.id,
@@ -34,6 +59,27 @@ function mapear(fila: {
     comprobante: fila.comprobante,
     archivoOrigen: fila.archivoOrigen,
     creadoEn: fila.creadoEn,
+    fechaRecepcion: fila.fechaRecepcion,
+    comprobanteCodigo: fila.comprobanteCodigo,
+    comprobanteTipo: fila.comprobanteTipo,
+    comprobanteSucursal: fila.comprobanteSucursal,
+    comprobanteNumero: fila.comprobanteNumero,
+    tipoDocumento: fila.tipoDocumento,
+    cuit: fila.cuit,
+    domicilio: fila.domicilio,
+    codigoPostal: fila.codigoPostal,
+    provincia: fila.provincia,
+    condicionFiscal: fila.condicionFiscal,
+    codigoNeto: fila.codigoNeto,
+    netoGravado: aNumeroONull(fila.netoGravado),
+    alicuota: aNumeroONull(fila.alicuota),
+    ivaLiquidado: aNumeroONull(fila.ivaLiquidado),
+    ivaCredito: aNumeroONull(fila.ivaCredito),
+    codigoNgEx: fila.codigoNgEx,
+    conceptosNgEx: aNumeroONull(fila.conceptosNgEx),
+    codigoPR: fila.codigoPR,
+    percepcionRetencion: aNumeroONull(fila.percepcionRetencion),
+    provinciaPR: fila.provinciaPR,
   };
 }
 

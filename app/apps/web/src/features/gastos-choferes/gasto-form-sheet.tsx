@@ -10,12 +10,59 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { listarChoferes } from "@/features/zonas-choferes/api";
 import { crearGasto, actualizarGasto } from "./api";
-import type { GastoChofer } from "./tipos";
+import type { DatosFiscalesCombustible, GastoChofer } from "./tipos";
 
 const ETIQUETA_TIPO: Record<TipoGastoChofer, string> = {
   [TipoGastoChofer.COMBUSTIBLE]: "Combustible",
   [TipoGastoChofer.PEAJE]: "Peaje",
 };
+
+// Error real corregido 2026-10-07 (reunión con Leonardo): el archivo real de
+// combustible trae un comprobante fiscal completo (19 columnas más) — acá va
+// un input por cada una, visible solo para Combustible (Peaje nunca las
+// tiene, confirmado "ese perfecto" tal como está). Campo → tipo de input y
+// etiqueta, mismos nombres que las columnas reales del Excel.
+const CAMPOS_FISCALES: { campo: keyof DatosFiscalesCombustible; etiqueta: string; tipo: "text" | "number" | "date" }[] = [
+  { campo: "fechaRecepcion", etiqueta: "Fecha Recepción", tipo: "date" },
+  { campo: "comprobanteCodigo", etiqueta: "Cpbte", tipo: "text" },
+  { campo: "comprobanteTipo", etiqueta: "Tipo Cpbte", tipo: "text" },
+  { campo: "comprobanteSucursal", etiqueta: "Suc.", tipo: "text" },
+  { campo: "comprobanteNumero", etiqueta: "Número", tipo: "text" },
+  { campo: "tipoDocumento", etiqueta: "Tipo Doc.", tipo: "text" },
+  { campo: "cuit", etiqueta: "CUIT", tipo: "text" },
+  { campo: "domicilio", etiqueta: "Domicilio", tipo: "text" },
+  { campo: "codigoPostal", etiqueta: "C.P.", tipo: "text" },
+  { campo: "provincia", etiqueta: "Pcia", tipo: "text" },
+  { campo: "condicionFiscal", etiqueta: "Cond Fisc", tipo: "text" },
+  { campo: "codigoNeto", etiqueta: "Cód. Neto", tipo: "text" },
+  { campo: "netoGravado", etiqueta: "Neto Gravado", tipo: "number" },
+  { campo: "alicuota", etiqueta: "Alíc.", tipo: "number" },
+  { campo: "ivaLiquidado", etiqueta: "IVA Liquidado", tipo: "number" },
+  { campo: "ivaCredito", etiqueta: "IVA Crédito", tipo: "number" },
+  { campo: "codigoNgEx", etiqueta: "Cód. NG/EX", tipo: "text" },
+  { campo: "conceptosNgEx", etiqueta: "Conceptos NG/EX", tipo: "number" },
+  { campo: "codigoPR", etiqueta: "Cód. P/R", tipo: "text" },
+  { campo: "percepcionRetencion", etiqueta: "Perc./Ret.", tipo: "number" },
+  { campo: "provinciaPR", etiqueta: "Pcia P/R", tipo: "text" },
+];
+
+type EstadoFiscal = Record<keyof DatosFiscalesCombustible, string>;
+
+const FISCAL_VACIO: EstadoFiscal = CAMPOS_FISCALES.reduce(
+  (acc, { campo }) => ({ ...acc, [campo]: "" }),
+  {} as EstadoFiscal,
+);
+
+function fiscalDesdeGasto(gasto: GastoChofer | null): EstadoFiscal {
+  if (!gasto) return FISCAL_VACIO;
+  const resultado = { ...FISCAL_VACIO };
+  for (const { campo, tipo } of CAMPOS_FISCALES) {
+    const valor = gasto[campo];
+    if (valor === null) continue;
+    resultado[campo] = tipo === "date" ? String(valor).slice(0, 10) : String(valor);
+  }
+  return resultado;
+}
 
 function mensajeError(error: unknown): string {
   if (error instanceof AxiosError && error.response?.data?.message) {
@@ -46,6 +93,7 @@ export function GastoFormSheet({
   const [choferId, setChoferId] = useState("");
   const [proveedor, setProveedor] = useState("");
   const [comprobante, setComprobante] = useState("");
+  const [fiscal, setFiscal] = useState<EstadoFiscal>(FISCAL_VACIO);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -55,6 +103,7 @@ export function GastoFormSheet({
     setChoferId(gasto?.choferId ?? "");
     setProveedor(gasto?.proveedor ?? "");
     setComprobante(gasto?.comprobante ?? "");
+    setFiscal(fiscalDesdeGasto(gasto));
     setError(null);
   }, [gasto]);
 
@@ -63,6 +112,14 @@ export function GastoFormSheet({
   const queryClient = useQueryClient();
   const mutacion = useMutation({
     mutationFn: () => {
+      const datosFiscales: Partial<DatosFiscalesCombustible> = {};
+      if (tipo === TipoGastoChofer.COMBUSTIBLE) {
+        for (const { campo, tipo: tipoInput } of CAMPOS_FISCALES) {
+          const valor = fiscal[campo];
+          if (valor === "") continue;
+          datosFiscales[campo] = (tipoInput === "number" ? Number(valor) : valor) as never;
+        }
+      }
       const datos = {
         tipo,
         fecha,
@@ -70,6 +127,7 @@ export function GastoFormSheet({
         choferId,
         proveedor: proveedor || undefined,
         comprobante: comprobante || undefined,
+        ...datosFiscales,
       };
       return editando ? actualizarGasto(gasto.id, datos) : crearGasto(datos);
     },
@@ -98,7 +156,7 @@ export function GastoFormSheet({
           </SheetDescription>
         </SheetHeader>
 
-        <form onSubmit={manejarSubmit} className="flex flex-col gap-4 px-4">
+        <form onSubmit={manejarSubmit} className="flex flex-col gap-4 overflow-y-auto px-4">
           {error && (
             <p
               role="alert"
@@ -173,11 +231,34 @@ export function GastoFormSheet({
                 id="comprobante-gasto"
                 value={comprobante}
                 onChange={(e) => setComprobante(e.target.value)}
-                placeholder="Opcional"
+                placeholder="Opcional (ej. A 00007-9739)"
                 disabled={mutacion.isPending}
               />
             </FilaFormulario>
           </TablaFormulario>
+
+          {tipo === TipoGastoChofer.COMBUSTIBLE && (
+            <>
+              <p className="text-sm font-medium text-muted-foreground">
+                Comprobante fiscal (opcional — mismas columnas que el Excel de la tarjeta)
+              </p>
+              <TablaFormulario>
+                {CAMPOS_FISCALES.map(({ campo, etiqueta, tipo: tipoInput }) => (
+                  <FilaFormulario key={campo} label={etiqueta} htmlFor={`${campo}-gasto`} anchoEtiqueta="140px">
+                    <Input
+                      id={`${campo}-gasto`}
+                      type={tipoInput}
+                      step={tipoInput === "number" ? "0.01" : undefined}
+                      value={fiscal[campo]}
+                      onChange={(e) => setFiscal((actual) => ({ ...actual, [campo]: e.target.value }))}
+                      placeholder="Opcional"
+                      disabled={mutacion.isPending}
+                    />
+                  </FilaFormulario>
+                ))}
+              </TablaFormulario>
+            </>
+          )}
 
           <SheetFooter className="px-0">
             <Button type="submit" disabled={mutacion.isPending || !choferId}>

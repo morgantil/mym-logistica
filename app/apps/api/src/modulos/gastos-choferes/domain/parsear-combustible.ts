@@ -1,9 +1,10 @@
 import { FilaExcelCruda } from "../../importadores/domain/lector-excel.port";
+import { DatosFiscalesCombustible } from "./gasto-chofer";
 
 // Una línea de combustible ya extraída del Excel real (hoja
 // "HWCompra-modelo") — sin resolver todavía contra el cache de choferes,
 // eso lo hace el service (necesita ir a buscarlos).
-export interface LineaCombustible {
+export interface LineaCombustible extends DatosFiscalesCombustible {
   fecha: Date;
   monto: number;
   choferTexto: string;
@@ -26,11 +27,13 @@ function aNumero(valor: unknown): number | null {
   return null;
 }
 
+function aFecha(valor: unknown): Date | null {
+  return valor instanceof Date ? valor : null;
+}
+
 // "Tipo Suc-Número" (ej. "A 00007-9739") es la forma habitual de referenciar
-// un comprobante fiscal argentino — suficiente para que alguien lo ubique en
-// el archivo original, no hace falta guardar el resto de los campos
-// impositivos (CUIT, IVA, Cond Fisc...) que trae la hoja — esto es para
-// reportar el gasto por chofer, no para repetir el libro IVA compras.
+// un comprobante fiscal argentino — combinado legible para pantalla/Excel,
+// además de guardar cada parte por separado (ver DatosFiscalesCombustible).
 function construirComprobante(fila: FilaExcelCruda): string | null {
   const tipo = aTexto(fila["Tipo"]);
   const suc = aTexto(fila["Suc."]);
@@ -39,11 +42,11 @@ function construirComprobante(fila: FilaExcelCruda): string | null {
   return [tipo, [suc, numero].filter(Boolean).join("-")].filter(Boolean).join(" ");
 }
 
-// Hoja "HWCompra-modelo": una fila = una factura de combustible. Se ignoran
-// filas sin fecha real o sin un Total positivo (fila de totales, fila vacía
-// que igual trajo algún valor suelto) — nunca se inventa una fecha o un
-// monto. Si falta el chofer, la línea igual se importa (el gasto existió)
-// pero con un texto fijo que después aparece en la cola de "sin asignar".
+// Error real detectado 2026-10-07 (reunión con Leonardo): la hoja
+// "HWCompra-modelo" trae un comprobante fiscal completo (19 columnas más
+// allá de fecha/monto/proveedor/chofer que se capturaban antes) — ahora se
+// guardan todas, nombres y tipos tomados de las columnas reales del
+// archivo (ver headers exactos abajo), no inventados.
 export function parsearCombustible(filas: FilaExcelCruda[]): LineaCombustible[] {
   const lineas: LineaCombustible[] = [];
   for (const fila of filas) {
@@ -58,6 +61,27 @@ export function parsearCombustible(filas: FilaExcelCruda[]): LineaCombustible[] 
       choferTexto: aTexto(fila["CHOFER"]) ?? "(sin chofer en el archivo)",
       proveedor: aTexto(fila["Razón Social/Denominación Proveedor"]),
       comprobante: construirComprobante(fila),
+      fechaRecepcion: aFecha(fila["Fecha Recepción"]),
+      comprobanteCodigo: aTexto(fila["Cpbte"]),
+      comprobanteTipo: aTexto(fila["Tipo"]),
+      comprobanteSucursal: aTexto(fila["Suc."]),
+      comprobanteNumero: aTexto(fila["Número"]),
+      tipoDocumento: aTexto(fila["Tipo Doc."]),
+      cuit: aTexto(fila["CUIT"]),
+      domicilio: aTexto(fila["Domicilio"]),
+      codigoPostal: aTexto(fila["C.P."]),
+      provincia: aTexto(fila["Pcia"]),
+      condicionFiscal: aTexto(fila["Cond Fisc"]),
+      codigoNeto: aTexto(fila["Cód. Neto"]),
+      netoGravado: aNumero(fila["Neto Gravado"]),
+      alicuota: aNumero(fila["Alíc."]),
+      ivaLiquidado: aNumero(fila["IVA Liquidado"]),
+      ivaCredito: aNumero(fila["IVA Crédito"]),
+      codigoNgEx: aTexto(fila["Cód. NG/EX"]),
+      conceptosNgEx: aNumero(fila["Conceptos NG/EX"]),
+      codigoPR: aTexto(fila["Cód. P/R"]),
+      percepcionRetencion: aNumero(fila["Perc./Ret."]),
+      provinciaPR: aTexto(fila["Pcia P/R"]),
     });
   }
   return lineas;

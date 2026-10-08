@@ -20,6 +20,7 @@ import { GastosChoferesService } from "../application/gastos-choferes.service";
 import { ActualizarGastoDto } from "./dto/actualizar-gasto.dto";
 import { AsignarChoferDto } from "./dto/asignar-chofer.dto";
 import { CrearGastoDto } from "./dto/crear-gasto.dto";
+import { DatosFiscalesCombustibleDto } from "./dto/datos-fiscales-combustible.dto";
 import { FiltroGastosDto } from "./dto/filtro-gastos.dto";
 
 // ABM de combustible y peajes por chofer (ítem desbloqueado 2026-10-05) —
@@ -81,6 +82,37 @@ export class GastosChoferesController {
   // del import en bloque de arriba, un gasto suelto se puede cargar/editar/
   // borrar a mano.
   @Post()
+  // Error real corregido 2026-10-07 (reunión): además de fecha/monto/chofer/
+  // proveedor/comprobante, el comprobante fiscal completo de Combustible
+  // (CUIT, IVA, Cond Fisc, etc.) — ver DatosFiscalesCombustibleDto. `?? undefined`
+  // en cada uno porque la DTO puede traer `null` explícito (JSON) y el
+  // service espera "ausente" para no tocar el campo al actualizar.
+  private extraerDatosFiscales(dto: DatosFiscalesCombustibleDto) {
+    return {
+      fechaRecepcion: dto.fechaRecepcion ? new Date(`${dto.fechaRecepcion}T00:00:00.000Z`) : undefined,
+      comprobanteCodigo: dto.comprobanteCodigo,
+      comprobanteTipo: dto.comprobanteTipo,
+      comprobanteSucursal: dto.comprobanteSucursal,
+      comprobanteNumero: dto.comprobanteNumero,
+      tipoDocumento: dto.tipoDocumento,
+      cuit: dto.cuit,
+      domicilio: dto.domicilio,
+      codigoPostal: dto.codigoPostal,
+      provincia: dto.provincia,
+      condicionFiscal: dto.condicionFiscal,
+      codigoNeto: dto.codigoNeto,
+      netoGravado: dto.netoGravado,
+      alicuota: dto.alicuota,
+      ivaLiquidado: dto.ivaLiquidado,
+      ivaCredito: dto.ivaCredito,
+      codigoNgEx: dto.codigoNgEx,
+      conceptosNgEx: dto.conceptosNgEx,
+      codigoPR: dto.codigoPR,
+      percepcionRetencion: dto.percepcionRetencion,
+      provinciaPR: dto.provinciaPR,
+    };
+  }
+
   crear(@Body() dto: CrearGastoDto) {
     return this.gastosChoferesService.crear({
       tipo: dto.tipo,
@@ -89,6 +121,7 @@ export class GastosChoferesController {
       choferId: dto.choferId,
       proveedor: dto.proveedor ?? null,
       comprobante: dto.comprobante ?? null,
+      ...this.extraerDatosFiscales(dto),
     });
   }
 
@@ -101,6 +134,7 @@ export class GastosChoferesController {
       choferId: dto.choferId,
       proveedor: dto.proveedor,
       comprobante: dto.comprobante,
+      ...this.extraerDatosFiscales(dto),
     });
   }
 

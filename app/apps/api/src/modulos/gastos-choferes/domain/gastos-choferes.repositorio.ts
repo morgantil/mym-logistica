@@ -1,7 +1,7 @@
 import { TipoGastoChofer } from "@mym/shared-types";
-import { GastoChofer } from "./gasto-chofer";
+import { DatosFiscalesCombustible, GastoChofer } from "./gasto-chofer";
 
-export interface DatosCrearGastoChofer {
+export interface DatosCrearGastoChofer extends DatosFiscalesCombustible {
   tipo: TipoGastoChofer;
   fecha: Date;
   monto: number;
@@ -18,7 +18,7 @@ export interface DatosCrearGastoChofer {
 // porque el service los completa solo (ver GastosChoferesService.crear):
 // una carga manual siempre elige un chofer real del desplegable, así que no
 // hay "texto original" distinto que preservar.
-export interface DatosActualizarGastoChofer {
+export interface DatosActualizarGastoChofer extends Partial<DatosFiscalesCombustible> {
   tipo?: TipoGastoChofer;
   fecha?: Date;
   monto?: number;

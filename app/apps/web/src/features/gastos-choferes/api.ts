@@ -1,6 +1,6 @@
 import type { TipoGastoChofer } from "@mym/shared-types";
 import { apiClient } from "@/lib/api-client";
-import type { GastoChofer, ResumenImportacionGastos } from "./tipos";
+import type { DatosFiscalesCombustible, GastoChofer, ResumenImportacionGastos } from "./tipos";
 
 export interface FiltroGastos {
   tipo?: TipoGastoChofer;
@@ -34,7 +34,7 @@ export async function asignarChofer(id: string, choferId: string): Promise<Gasto
 // ABM manual (item 14.1 TEMAS_PENDIENTES.md, reunión 2026-10-06) — además
 // del import en bloque, un gasto suelto se puede cargar/editar/borrar a
 // mano; el chofer siempre se elige de un desplegable (choferId).
-export interface DatosGasto {
+export interface DatosGasto extends Partial<DatosFiscalesCombustible> {
   tipo: TipoGastoChofer;
   fecha: string;
   monto: number;

@@ -2,7 +2,7 @@ import { BadRequestException, Inject, Injectable, NotFoundException } from "@nes
 import { TipoGastoChofer } from "@mym/shared-types";
 import { LECTOR_EXCEL, LectorExcelPort } from "../../importadores/domain/lector-excel.port";
 import { ZonasChoferesService } from "../../zonas-choferes/application/zonas-choferes.service";
-import { GastoChofer, ResumenImportacionGastos } from "../domain/gasto-chofer";
+import { DatosFiscalesCombustible, GastoChofer, ResumenImportacionGastos } from "../domain/gasto-chofer";
 import {
   DatosActualizarGastoChofer,
   FiltroGastosChofer,
@@ -16,6 +16,32 @@ import { generarGastosChoferesExcel } from "../infrastructure/gastos-choferes-ex
 
 const HOJA_COMBUSTIBLE = "HWCompra-modelo";
 const HOJA_PEAJES = "PEAJES";
+
+// Peaje no trae comprobante fiscal (la hoja PEAJES solo tiene chofer+monto)
+// — todos estos campos quedan null a propósito, nunca se inventan.
+const SIN_DATOS_FISCALES: DatosFiscalesCombustible = {
+  fechaRecepcion: null,
+  comprobanteCodigo: null,
+  comprobanteTipo: null,
+  comprobanteSucursal: null,
+  comprobanteNumero: null,
+  tipoDocumento: null,
+  cuit: null,
+  domicilio: null,
+  codigoPostal: null,
+  provincia: null,
+  condicionFiscal: null,
+  codigoNeto: null,
+  netoGravado: null,
+  alicuota: null,
+  ivaLiquidado: null,
+  ivaCredito: null,
+  codigoNgEx: null,
+  conceptosNgEx: null,
+  codigoPR: null,
+  percepcionRetencion: null,
+  provinciaPR: null,
+};
 
 @Injectable()
 export class GastosChoferesService {
@@ -67,22 +93,21 @@ export class GastosChoferesService {
     const fechaPeajes = new Date(Date.UTC(datos.anio, datos.mes - 1, 1));
 
     const datosCombustible = lineasCombustible.map((linea) => {
-      const matcheado = matchearChofer(linea.choferTexto, choferes, vehiculos);
+      const { choferTexto, ...datosFiscales } = linea;
+      const matcheado = matchearChofer(choferTexto, choferes, vehiculos);
       return {
+        ...datosFiscales,
         tipo: TipoGastoChofer.COMBUSTIBLE,
-        fecha: linea.fecha,
-        monto: linea.monto,
         choferId: matcheado?.choferId ?? null,
         choferNombre: matcheado?.choferNombre ?? null,
-        choferNombreOriginal: linea.choferTexto,
-        proveedor: linea.proveedor,
-        comprobante: linea.comprobante,
+        choferNombreOriginal: choferTexto,
         archivoOrigen: datos.nombreArchivo,
       };
     });
     const datosPeajes = lineasPeajes.map((linea) => {
       const matcheado = matchearChofer(linea.choferTexto, choferes, vehiculos);
       return {
+        ...SIN_DATOS_FISCALES,
         tipo: TipoGastoChofer.PEAJE,
         fecha: fechaPeajes,
         monto: linea.monto,
@@ -140,24 +165,23 @@ export class GastosChoferesService {
   // estas filas de las importadas, sin necesitar una columna nueva.
   private static readonly ORIGEN_MANUAL = "Carga manual";
 
-  async crear(datos: {
-    tipo: TipoGastoChofer;
-    fecha: Date;
-    monto: number;
-    choferId: string;
-    proveedor: string | null;
-    comprobante: string | null;
-  }): Promise<GastoChofer> {
+  async crear(
+    datos: {
+      tipo: TipoGastoChofer;
+      fecha: Date;
+      monto: number;
+      choferId: string;
+      proveedor: string | null;
+      comprobante: string | null;
+    } & Partial<DatosFiscalesCombustible>,
+  ): Promise<GastoChofer> {
     const chofer = await this.resolverChoferOFallar(datos.choferId);
     return this.repositorio.crear({
-      tipo: datos.tipo,
-      fecha: datos.fecha,
-      monto: datos.monto,
+      ...SIN_DATOS_FISCALES,
+      ...datos,
       choferId: chofer.id,
       choferNombre: chofer.nombre,
       choferNombreOriginal: chofer.nombre,
-      proveedor: datos.proveedor,
-      comprobante: datos.comprobante,
       archivoOrigen: GastosChoferesService.ORIGEN_MANUAL,
     });
   }
@@ -171,17 +195,12 @@ export class GastosChoferesService {
       choferId?: string;
       proveedor?: string | null;
       comprobante?: string | null;
-    },
+    } & Partial<DatosFiscalesCombustible>,
   ): Promise<GastoChofer> {
-    const cambios: DatosActualizarGastoChofer = {
-      tipo: datos.tipo,
-      fecha: datos.fecha,
-      monto: datos.monto,
-      proveedor: datos.proveedor,
-      comprobante: datos.comprobante,
-    };
-    if (datos.choferId !== undefined) {
-      const chofer = await this.resolverChoferOFallar(datos.choferId);
+    const { choferId, ...resto } = datos;
+    const cambios: DatosActualizarGastoChofer = { ...resto };
+    if (choferId !== undefined) {
+      const chofer = await this.resolverChoferOFallar(choferId);
       cambios.choferId = chofer.id;
       cambios.choferNombre = chofer.nombre;
     }
