@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { imprimirPdf } from "@/lib/imprimir-pdf";
 import { listarClientesActivos } from "@/features/clientes/api";
 import { listarPedidos } from "@/features/pedidos/api";
 import { BultosCelda } from "@/features/pedidos/bultos-celda";
@@ -64,16 +65,11 @@ export function EmbalajeDespachoPage() {
     }
   }
 
-  async function imprimirRemito(pedidoId: string, numeroPedido: number) {
+  async function imprimirRemito(pedidoId: string) {
     setImprimiendoRemito(pedidoId);
     try {
       const blob = await descargarRemito(pedidoId);
-      const url = URL.createObjectURL(blob);
-      const enlace = document.createElement("a");
-      enlace.href = url;
-      enlace.download = `remito-pedido-${numeroPedido}.pdf`;
-      enlace.click();
-      URL.revokeObjectURL(url);
+      imprimirPdf(blob);
     } catch {
       toast.error("No se pudo generar el remito. Verificá que el cliente tenga un formato configurado.");
     } finally {
@@ -231,7 +227,7 @@ export function EmbalajeDespachoPage() {
                               ? undefined
                               : "Este cliente no tiene un formato de remito configurado (pantalla Clientes)."
                           }
-                          onClick={() => imprimirRemito(pedido.id, pedido.numero)}
+                          onClick={() => imprimirRemito(pedido.id)}
                         >
                           {imprimiendoRemito === pedido.id ? "Generando…" : "Imprimir remito"}
                         </Button>

@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { imprimirPdf } from "@/lib/imprimir-pdf";
 import { descargarRemito } from "./api";
 import type { PedidoListado } from "./tipos";
 
@@ -25,12 +26,7 @@ export function DetallePedidoSheet({
     setImprimiendoRemito(true);
     try {
       const blob = await descargarRemito(pedido.id);
-      const url = URL.createObjectURL(blob);
-      const enlace = document.createElement("a");
-      enlace.href = url;
-      enlace.download = `remito-pedido-${pedido.numero}.pdf`;
-      enlace.click();
-      URL.revokeObjectURL(url);
+      imprimirPdf(blob);
     } catch {
       toast.error("No se pudo generar el remito. Verificá que el cliente tenga un formato configurado.");
     } finally {
