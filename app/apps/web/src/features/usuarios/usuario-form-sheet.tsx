@@ -49,6 +49,9 @@ interface FormularioUsuario {
   clienteIds: string[];
   usaMenuDeRoles: boolean;
   pantallasPermitidas: string[];
+  // Solo aplica al alta (vacío = el backend genera una temporal) — ver
+  // DatosCrearUsuario.password.
+  password: string;
 }
 
 function vacio(): FormularioUsuario {
@@ -60,6 +63,7 @@ function vacio(): FormularioUsuario {
     clienteIds: [],
     usaMenuDeRoles: true,
     pantallasPermitidas: [],
+    password: "",
   };
 }
 
@@ -95,6 +99,7 @@ export function UsuarioFormSheet({
               clienteIds: usuarioEnEdicion.clientesPermitidosIds,
               usaMenuDeRoles: usuarioEnEdicion.pantallasPermitidas.length === 0,
               pantallasPermitidas: usuarioEnEdicion.pantallasPermitidas,
+              password: "",
             }
           : vacio(),
       );
@@ -143,7 +148,13 @@ export function UsuarioFormSheet({
         });
       } else {
         await onGuardar({
-          crear: { email: datos.email, nombre: datos.nombre, roles: datos.roles, clienteIds } satisfies DatosCrearUsuario,
+          crear: {
+            email: datos.email,
+            nombre: datos.nombre,
+            roles: datos.roles,
+            clienteIds,
+            password: datos.password || undefined,
+          } satisfies DatosCrearUsuario,
           clienteIds,
         });
       }
@@ -194,6 +205,24 @@ export function UsuarioFormSheet({
                 autoFocus={!!usuarioEnEdicion}
               />
             </FilaFormulario>
+            {!usuarioEnEdicion && (
+              <FilaFormulario
+                label="Contraseña"
+                htmlFor="usuario-password"
+                anchoEtiqueta="140px"
+                descripcion="Opcional — si la dejás vacía, se genera una temporal y se muestra una sola vez después de guardar."
+              >
+                <Input
+                  id="usuario-password"
+                  type="text"
+                  minLength={8}
+                  placeholder="Dejar vacío para generar una automática"
+                  value={datos.password}
+                  onChange={(e) => setDatos((d) => ({ ...d, password: e.target.value }))}
+                  disabled={enviando}
+                />
+              </FilaFormulario>
+            )}
           </TablaFormulario>
 
           <div className="flex flex-col gap-2">

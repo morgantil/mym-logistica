@@ -28,6 +28,7 @@ export class UsuariosController {
       nombre: dto.nombre,
       roles: dto.roles,
       clienteIds: dto.clienteIds ?? [],
+      password: dto.password,
     });
   }
 

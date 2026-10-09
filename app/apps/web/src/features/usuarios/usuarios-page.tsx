@@ -40,7 +40,11 @@ export function UsuariosPage() {
     mutationFn: async (resultado: ResultadoFormularioUsuario) => {
       if (resultado.crear) {
         const { usuario, passwordTemporal } = await crearUsuario(resultado.crear);
-        setPasswordAMostrar({ email: usuario.email, password: passwordTemporal });
+        // null = quien dio de alta eligió su propia contraseña (ya la sabe,
+        // no hace falta mostrarla).
+        if (passwordTemporal) {
+          setPasswordAMostrar({ email: usuario.email, password: passwordTemporal });
+        }
         return usuario;
       }
       const id = usuarioEnEdicion !== "nuevo" ? usuarioEnEdicion?.id : undefined;

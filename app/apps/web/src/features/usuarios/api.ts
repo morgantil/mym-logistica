@@ -8,7 +8,7 @@ export async function listarUsuarios(): Promise<Usuario[]> {
 
 export async function crearUsuario(
   datos: DatosCrearUsuario,
-): Promise<{ usuario: Usuario; passwordTemporal: string }> {
+): Promise<{ usuario: Usuario; passwordTemporal: string | null }> {
   const { data } = await apiClient.post("/usuarios", datos);
   return data;
 }

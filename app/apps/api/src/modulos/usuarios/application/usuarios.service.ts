@@ -53,22 +53,28 @@ export class UsuariosService {
     );
   }
 
-  // Devuelve la contraseña temporal en texto plano UNA vez — el llamador
+  // Devuelve la contraseña temporal en texto plano UNA vez (solo si no se
+  // eligió una propia — ver `datos.password` abajo) — el llamador
   // (controller) es responsable de que solo se muestre en esta respuesta y
   // no se persista en ningún lado más que el hash.
+  //
+  // `password`: pedido en reunión 2026-10-09 — quien da de alta el usuario
+  // puede elegir la contraseña en vez de que siempre salga una generada al
+  // azar. Si se omite, se sigue generando una temporal como hasta ahora.
   async crear(datos: {
     email: string;
     nombre: string;
     roles: Rol[];
     clienteIds: string[];
-  }): Promise<{ usuario: UsuarioSinCredenciales; passwordTemporal: string }> {
+    password?: string;
+  }): Promise<{ usuario: UsuarioSinCredenciales; passwordTemporal: string | null }> {
     const existente = await this.repositorio.buscarPorEmail(datos.email);
     if (existente) {
       throw new ConflictException(`Ya existe un usuario con el email ${datos.email}.`);
     }
 
-    const passwordTemporal = generarPasswordTemporal();
-    const passwordHash = await argon2.hash(passwordTemporal);
+    const passwordTemporal = datos.password ? null : generarPasswordTemporal();
+    const passwordHash = await argon2.hash(datos.password ?? passwordTemporal!);
 
     const creado = await this.repositorio.crear({
       email: datos.email,

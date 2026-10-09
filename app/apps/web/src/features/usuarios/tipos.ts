@@ -17,6 +17,9 @@ export interface DatosCrearUsuario {
   nombre: string;
   roles: Rol[];
   clienteIds: string[];
+  // Opcional — si se omite, el backend genera una temporal (ver
+  // UsuariosService.crear).
+  password?: string;
 }
 
 export interface DatosActualizarUsuario {

@@ -19,6 +19,15 @@ export class CrearUsuarioDto {
   @IsArray()
   @IsUUID(undefined, { each: true })
   clienteIds?: string[];
+
+  // Pedido en reunión 2026-10-09: quien da de alta el usuario tiene que
+  // poder elegir la contraseña en vez de que siempre salga una generada al
+  // azar. Opcional — si se omite, se sigue generando una temporal como
+  // hasta ahora (ver UsuariosService.crear).
+  @IsOptional()
+  @IsString()
+  @MinLength(8)
+  password?: string;
 }
 
 export class ActualizarUsuarioDto {
