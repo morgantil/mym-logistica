@@ -78,26 +78,30 @@ function dibujarObservaciones(
   }
 }
 
+// Prueba de impresión real en papel preimpreso 2026-10-09 (reunión, cliente
+// ORIEN S.A., mismo formato Bella Vista/A4): Fecha, Nombre y apellido, N.º
+// de afiliado y el inicio de la tabla de Cantidad/Descripción salían todos
+// 0,4cm más abajo de lo que debían — subidos esos 0,4cm en los cuatro.
 function dibujarRemitoBellaVista(doc: PDFKit.PDFDocument, pedido: PedidoListado) {
-  doc.font("Helvetica").fontSize(10).text(formatearFecha(pedido.fechaProgramada), cm(14.3), cm(4), {
+  doc.font("Helvetica").fontSize(10).text(formatearFecha(pedido.fechaProgramada), cm(14.3), cm(3.6), {
     lineBreak: false,
   });
 
   // "Nombre y apellido · Dirección · Localidad" es un único renglón en este
   // formato (así lo agrupa el propio papel).
-  doc.fontSize(10).text(`${pedido.destinatarioNombre} - ${pedido.direccionUsada}, ${pedido.localidad}`, cm(1.2), cm(7), {
+  doc.fontSize(10).text(`${pedido.destinatarioNombre} - ${pedido.direccionUsada}, ${pedido.localidad}`, cm(1.2), cm(6.6), {
     width: cm(17),
   });
 
   // "Entre calles" no se captura como campo propio (se fusiona a
   // Observaciones al importar, ver campo-canonico.ts) — en ese renglón del
   // papel va el Nº de afiliado, el otro dato que muestra el boceto ahí.
-  doc.fontSize(10).text(`N.º de afiliado: ${pedido.numeroAfiliado}`, cm(1.2), cm(8), { width: cm(17) });
+  doc.fontSize(10).text(`N.º de afiliado: ${pedido.numeroAfiliado}`, cm(1.2), cm(7.6), { width: cm(17) });
 
   dibujarProductos(doc, pedido, {
     xCantidad: 1.2,
     xDescripcion: 3.2,
-    y: 9.5,
+    y: 9.1,
     anchoDescripcion: 17.5,
     altoCaja: 10,
   });
