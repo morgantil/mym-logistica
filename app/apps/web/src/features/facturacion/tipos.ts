@@ -122,6 +122,18 @@ export interface ResumenChofer {
   totalAPagar: number;
 }
 
+// Item 4.4 TEMAS_PENDIENTES.md: carga manual del inicio/fin del recorrido de
+// un chofer en un día — SimpliRoute no se usa para esto (requeriría recibir
+// webhooks, no implementado), se decidió carga manual más simple.
+export interface JornadaChofer {
+  id: string;
+  choferId: string;
+  choferNombre: string;
+  fecha: string;
+  horaInicio: string | null;
+  horaFin: string | null;
+}
+
 export interface ResultadoVistaPrevia {
   grupos: GrupoFacturacion[];
   excluidos: PedidoExcluido[];

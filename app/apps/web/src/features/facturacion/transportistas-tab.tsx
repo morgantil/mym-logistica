@@ -1,21 +1,46 @@
 import { useState } from "react";
+import { AxiosError } from "axios";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { CabaProvincia } from "@mym/shared-types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { listarChoferes } from "@/features/zonas-choferes/api";
 import {
   actualizarTarifaTransportista,
   descargarReporteTransportistas,
+  eliminarJornada,
+  guardarJornada,
   liquidacionTransportistas,
+  listarJornadas,
   listarTarifasTransportista,
   type RangoFechas,
 } from "./api";
-import { formatearMonto, NOMBRES_MES } from "./formato";
+import { calcularHorasJornada, formatearMonto, NOMBRES_MES } from "./formato";
 import { TarifaTransportistaFormSheet } from "./tarifa-transportista-form-sheet";
-import type { TarifaTransportista } from "./tipos";
+import type { JornadaChofer, TarifaTransportista } from "./tipos";
+
+function mensajeError(error: unknown): string {
+  if (error instanceof AxiosError && error.response?.data?.message) {
+    const mensaje = error.response.data.message;
+    return Array.isArray(mensaje) ? mensaje.join(" ") : mensaje;
+  }
+  return "No se pudo guardar. Probá de nuevo en unos segundos.";
+}
+
+// Primer y último día del mes, en formato YYYY-MM-DD — mismo mes/año que ya
+// filtra el resto de la pantalla.
+function limitesDelMes(mes: number, anio: number): { fechaDesde: string; fechaHasta: string } {
+  const ultimoDia = new Date(Date.UTC(anio, mes, 0)).getUTCDate();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return {
+    fechaDesde: `${anio}-${pad(mes)}-01`,
+    fechaHasta: `${anio}-${pad(mes)}-${pad(ultimoDia)}`,
+  };
+}
 
 const MAX_DIAS_RANGO_EXCEL = 31;
 const MS_POR_DIA = 86_400_000;
@@ -99,6 +124,56 @@ export function TransportistasTab({
 
   const totalViajes = resumen?.reduce((total, r) => total + r.viajesCaba + r.viajesProvincia, 0) ?? 0;
   const totalAPagar = resumen?.reduce((total, r) => total + r.totalAPagar, 0) ?? 0;
+
+  // Item 4.4 TEMAS_PENDIENTES.md: inicio/fin de recorrido cargado a mano por
+  // chofer+día (SimpliRoute lo modela como Route.start_time/end_time, pero
+  // requeriría recibir webhooks — no implementado, se eligió carga manual).
+  const { fechaDesde: fechaDesdeMes, fechaHasta: fechaHastaMes } = limitesDelMes(mes, anio);
+  const { data: choferes } = useQuery({ queryKey: ["zonas-choferes", "choferes"], queryFn: listarChoferes });
+  const { data: jornadas } = useQuery({
+    queryKey: ["facturacion", "jornadas-choferes", fechaDesdeMes, fechaHastaMes],
+    queryFn: () => listarJornadas(fechaDesdeMes, fechaHastaMes),
+  });
+
+  const [choferIdJornada, setChoferIdJornada] = useState("");
+  const [fechaJornada, setFechaJornada] = useState("");
+  const [horaInicioJornada, setHoraInicioJornada] = useState("");
+  const [horaFinJornada, setHoraFinJornada] = useState("");
+
+  const mutacionGuardarJornada = useMutation({
+    mutationFn: () =>
+      guardarJornada({
+        choferId: choferIdJornada,
+        fecha: fechaJornada,
+        horaInicio: horaInicioJornada || null,
+        horaFin: horaFinJornada || null,
+      }),
+    onSuccess: () => {
+      toast.success("Jornada guardada.");
+      queryClient.invalidateQueries({ queryKey: ["facturacion", "jornadas-choferes"] });
+      setChoferIdJornada("");
+      setFechaJornada("");
+      setHoraInicioJornada("");
+      setHoraFinJornada("");
+    },
+    onError: (error) => toast.error(mensajeError(error)),
+  });
+
+  const mutacionEliminarJornada = useMutation({
+    mutationFn: (id: string) => eliminarJornada(id),
+    onSuccess: () => {
+      toast.success("Jornada eliminada.");
+      queryClient.invalidateQueries({ queryKey: ["facturacion", "jornadas-choferes"] });
+    },
+    onError: (error) => toast.error(mensajeError(error)),
+  });
+
+  function editarJornada(jornada: JornadaChofer) {
+    setChoferIdJornada(jornada.choferId);
+    setFechaJornada(jornada.fecha.slice(0, 10));
+    setHoraInicioJornada(jornada.horaInicio ?? "");
+    setHoraFinJornada(jornada.horaFin ?? "");
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -278,6 +353,131 @@ export function TransportistasTab({
             </TableRow>
           </TableFooter>
         )}
+      </Table>
+
+      <div className="flex items-center justify-between pt-2">
+        <h2 className="font-medium">
+          Jornadas de choferes — {NOMBRES_MES[mes - 1]} {anio}
+        </h2>
+      </div>
+      <p className="text-sm text-muted-foreground -mt-2">
+        Carga manual de inicio y fin de recorrido por chofer y día — no viene de SimpliRoute.
+      </p>
+
+      <div className="flex flex-col gap-3 rounded-md border p-3">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-col gap-1">
+            <label htmlFor="chofer-jornada" className="text-sm text-muted-foreground">
+              Chofer
+            </label>
+            <Select value={choferIdJornada} onValueChange={setChoferIdJornada}>
+              <SelectTrigger id="chofer-jornada" className="w-48">
+                <SelectValue placeholder="Elegí un chofer" />
+              </SelectTrigger>
+              <SelectContent>
+                {choferes?.map((chofer) => (
+                  <SelectItem key={chofer.id} value={String(chofer.id)}>
+                    {chofer.nombre}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="fecha-jornada" className="text-sm text-muted-foreground">
+              Fecha
+            </label>
+            <Input
+              id="fecha-jornada"
+              type="date"
+              value={fechaJornada}
+              onChange={(e) => setFechaJornada(e.target.value)}
+              className="w-40"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="hora-inicio-jornada" className="text-sm text-muted-foreground">
+              Hora de inicio
+            </label>
+            <Input
+              id="hora-inicio-jornada"
+              type="time"
+              value={horaInicioJornada}
+              onChange={(e) => setHoraInicioJornada(e.target.value)}
+              className="w-32"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="hora-fin-jornada" className="text-sm text-muted-foreground">
+              Hora de fin
+            </label>
+            <Input
+              id="hora-fin-jornada"
+              type="time"
+              value={horaFinJornada}
+              onChange={(e) => setHoraFinJornada(e.target.value)}
+              className="w-32"
+            />
+          </div>
+          <Button
+            type="button"
+            disabled={!choferIdJornada || !fechaJornada || mutacionGuardarJornada.isPending}
+            onClick={() => mutacionGuardarJornada.mutate()}
+          >
+            {mutacionGuardarJornada.isPending ? "Guardando…" : "Guardar"}
+          </Button>
+        </div>
+      </div>
+
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Chofer</TableHead>
+            <TableHead>Fecha</TableHead>
+            <TableHead>Hora de inicio</TableHead>
+            <TableHead>Hora de fin</TableHead>
+            <TableHead>Total de horas</TableHead>
+            <TableHead>Acciones</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {jornadas?.length === 0 || !jornadas ? (
+            <TableRow>
+              <TableCell colSpan={6} className="text-muted-foreground">
+                Sin jornadas cargadas en {NOMBRES_MES[mes - 1]} {anio} todavía.
+              </TableCell>
+            </TableRow>
+          ) : (
+            jornadas.map((jornada) => {
+              const horas = calcularHorasJornada(jornada.horaInicio, jornada.horaFin);
+              return (
+                <TableRow key={jornada.id}>
+                  <TableCell>{jornada.choferNombre}</TableCell>
+                  <TableCell>{new Date(jornada.fecha).toLocaleDateString("es-AR", { timeZone: "UTC" })}</TableCell>
+                  <TableCell>{jornada.horaInicio ?? "—"}</TableCell>
+                  <TableCell>{jornada.horaFin ?? "—"}</TableCell>
+                  <TableCell>{horas !== null ? `${horas}hs` : "—"}</TableCell>
+                  <TableCell>
+                    <div className="flex gap-2">
+                      <Button type="button" variant="outline" size="sm" onClick={() => editarJornada(jornada)}>
+                        Editar
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={mutacionEliminarJornada.isPending}
+                        onClick={() => mutacionEliminarJornada.mutate(jornada.id)}
+                      >
+                        Eliminar
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })
+          )}
+        </TableBody>
       </Table>
 
       <TarifaTransportistaFormSheet

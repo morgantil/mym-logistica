@@ -3,6 +3,7 @@ import { apiClient } from "@/lib/api-client";
 import type {
   CombinacionUnificacionClientes,
   GrupoFacturacion,
+  JornadaChofer,
   MontoUnificadoMedicamento,
   PedidoFacturado,
   PorcentajeSegundoServicio,
@@ -239,4 +240,26 @@ export async function descargarReporteMensual(
     responseType: "blob",
   });
   return data;
+}
+
+// Item 4.4 TEMAS_PENDIENTES.md — carga manual de inicio/fin de recorrido.
+export async function listarJornadas(fechaDesde: string, fechaHasta: string): Promise<JornadaChofer[]> {
+  const { data } = await apiClient.get<JornadaChofer[]>("/jornadas-choferes", {
+    params: { fechaDesde, fechaHasta },
+  });
+  return data;
+}
+
+export async function guardarJornada(datos: {
+  choferId: string;
+  fecha: string;
+  horaInicio: string | null;
+  horaFin: string | null;
+}): Promise<JornadaChofer> {
+  const { data } = await apiClient.post<JornadaChofer>("/jornadas-choferes", datos);
+  return data;
+}
+
+export async function eliminarJornada(id: string): Promise<void> {
+  await apiClient.delete(`/jornadas-choferes/${id}`);
 }

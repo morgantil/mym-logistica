@@ -1065,3 +1065,30 @@ model RegistroAuditoria {
   @@index([usuarioId])
   @@map("registros_auditoria")
 }
+
+// Jornada de un chofer en un día puntual — pedido en reunión 2026-10-09
+// (pantalla Facturación → Transportistas): mostrar hora de inicio y fin del
+// recorrido de cada chofer, para calcular el total de horas trabajadas.
+// SimpliRoute sí modela esto (Route.start_time/end_time, completados por los
+// eventos route_started/route_finished), pero no lo leemos hoy (requeriría
+// un receptor de webhooks nuevo, no existe) — se decidió carga manual en vez
+// de esa integración, más simple y sin depender de SimpliRoute para esto.
+// horaInicio/horaFin son texto "HH:mm" (hora de pared, no un instante con
+// huso horario) — más simple que un DateTime para un dato que el operador
+// tipea a mano sin zona horaria real detrás.
+model JornadaChofer {
+  id            String    @id @default(uuid())
+  choferId      String
+  choferNombre  String // snapshot, mismo criterio que GastoChofer.choferNombre
+  fecha         DateTime
+  horaInicio    String?
+  horaFin       String?
+  creadoEn      DateTime  @default(now())
+  creadoPorId   String?
+  eliminadoEn   DateTime?
+  eliminadoPorId String?
+
+  @@unique([choferId, fecha])
+  @@index([fecha])
+  @@map("jornadas_chofer")
+}
