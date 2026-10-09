@@ -86,7 +86,7 @@ export function TarifaTransportistaFormSheet({
           </SheetDescription>
         </SheetHeader>
 
-        <form onSubmit={manejarSubmit} className="flex flex-col gap-4 px-4">
+        <form onSubmit={manejarSubmit} className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4">
           {error && (
             <p
               role="alert"

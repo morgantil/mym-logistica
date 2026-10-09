@@ -62,7 +62,7 @@ export function ResolverDireccionSheet({
               </SheetDescription>
             </SheetHeader>
 
-            <div className="flex flex-col gap-4 px-4">
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4">
               <div className="rounded-md border p-3 text-sm">
                 <p className="text-muted-foreground">Dirección del Excel</p>
                 <p className="font-medium">{pedido.direccionOriginal}</p>

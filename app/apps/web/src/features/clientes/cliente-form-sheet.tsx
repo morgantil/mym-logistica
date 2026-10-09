@@ -105,7 +105,7 @@ export function ClienteFormSheet({
           <SheetTitle>{editando ? "Editar cliente" : "Nuevo cliente"}</SheetTitle>
         </SheetHeader>
 
-        <form onSubmit={manejarSubmit} className="flex flex-col gap-4 px-4">
+        <form onSubmit={manejarSubmit} className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4">
           <TablaFormulario>
             <FilaFormulario label="Nombre" htmlFor="nombre-cliente" anchoEtiqueta="140px">
               <Input

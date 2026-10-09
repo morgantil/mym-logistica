@@ -45,7 +45,7 @@ export function PasswordTemporalSheet({
           <SheetTitle>Contraseña temporal</SheetTitle>
         </SheetHeader>
 
-        <div className="flex flex-col gap-4 px-4">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4">
           <p className="text-sm text-muted-foreground">
             Pasásela a <strong>{email}</strong> por un canal seguro. No queda guardada en ningún lado — si
             se pierde, hay que generar una nueva desde "Resetear contraseña".

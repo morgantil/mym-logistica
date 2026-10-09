@@ -46,7 +46,7 @@ export function DetallePedidoSheet({
               </SheetDescription>
             </SheetHeader>
 
-            <div className="flex flex-col gap-4 px-4">
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4">
               <Table>
                 <TableHeader>
                   <TableRow>
