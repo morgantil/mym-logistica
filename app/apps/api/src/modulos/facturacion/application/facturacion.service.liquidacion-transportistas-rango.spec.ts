@@ -11,7 +11,7 @@ function armarServicio() {
     tarifaTransportistaActiva: jest.fn().mockResolvedValue({ monto: 100, zona: CabaProvincia.CABA }),
   };
   const pedidosService = { sincronizarEstados: jest.fn().mockResolvedValue(undefined) };
-  const servicio = new FacturacionService(repositorio as never, pedidosService as never, {} as never, {} as never);
+  const servicio = new FacturacionService(repositorio as never, pedidosService as never, {} as never, {} as never, {} as never);
   return { servicio, listarEntregadosPorChoferEnPeriodo };
 }
 

@@ -10,7 +10,7 @@ function armarServicio(existeConfirmado: boolean) {
     existeGrupoConfirmado: jest.fn().mockResolvedValue(existeConfirmado),
     reabrir,
   };
-  const servicio = new FacturacionService(repositorio as never, {} as never, {} as never, {} as never);
+  const servicio = new FacturacionService(repositorio as never, {} as never, {} as never, {} as never, {} as never);
   return { servicio, reabrir };
 }
 

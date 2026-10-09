@@ -12,5 +12,6 @@ import { JornadasChoferesController } from "./interface/jornadas-choferes.contro
     JornadasChoferesService,
     { provide: JORNADAS_CHOFERES_REPOSITORIO, useClass: JornadasChoferesRepositorioPrisma },
   ],
+  exports: [JornadasChoferesService],
 })
 export class JornadasChoferesModule {}

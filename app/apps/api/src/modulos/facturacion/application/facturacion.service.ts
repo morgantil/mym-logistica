@@ -1,6 +1,7 @@
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { CabaProvincia, PrioridadPedido, TipoEnvase, TipoServicio, TipoServicioCliente } from "@mym/shared-types";
 import { ClientesService } from "../../clientes/application/clientes.service";
+import { JornadasChoferesService } from "../../jornadas-choferes/application/jornadas-choferes.service";
 import { PedidoFacturable } from "../../pedidos/domain/pedido";
 import { PedidosService } from "../../pedidos/application/pedidos.service";
 import { ZonasTarifariasService } from "../../zonas-tarifarias/application/zonas-tarifarias.service";
@@ -85,6 +86,7 @@ export class FacturacionService {
     private pedidosService: PedidosService,
     private clientesService: ClientesService,
     private zonasTarifariasService: ZonasTarifariasService,
+    private jornadasChoferesService: JornadasChoferesService,
   ) {}
 
   listarTarifas(clienteId: string) {
@@ -730,6 +732,15 @@ export class FacturacionService {
     const resumen = await this.liquidacionTransportistas(mes, anio, fechaDesde, fechaHasta);
     const periodo =
       fechaDesde && fechaHasta ? `${fechaDesde} al ${fechaHasta}` : `${NOMBRES_MES[mes - 1]} ${anio}`;
-    return generarLiquidacionTransportistasExcel({ periodo, resumen });
+    // Item 4.4 TEMAS_PENDIENTES.md: las jornadas (Fecha/Hora inicio/Hora
+    // fin/Total horas) van en una hoja aparte del mismo Excel — mismo rango
+    // de fechas ya calculado arriba (rangoElegido ya ajusta fechaHasta +1
+    // día exclusivo, mismo criterio que usa JornadasChoferesRepositorio).
+    const rango = rangoElegido(mes, anio, fechaDesde, fechaHasta);
+    const jornadas = await this.jornadasChoferesService.listar({
+      fechaDesde: rango.fechaDesde,
+      fechaHasta: rango.fechaHasta,
+    });
+    return generarLiquidacionTransportistasExcel({ periodo, resumen, jornadas });
   }
 }
