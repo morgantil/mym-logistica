@@ -29,7 +29,7 @@ export function EmbalajeDespachoPage() {
   const [fecha, setFecha] = useState(HOY);
   const [clienteId, setClienteId] = useState<string>(TODOS);
   const [estado, setEstado] = useState<string>(TODOS);
-  const [descargando, setDescargando] = useState<string | null>(null);
+  const [imprimiendoEtiquetas, setImprimiendoEtiquetas] = useState<string | null>(null);
   const [imprimiendoRemito, setImprimiendoRemito] = useState<string | null>(null);
 
   const { data: clientes } = useQuery({ queryKey: ["clientes"], queryFn: listarClientesActivos });
@@ -47,21 +47,16 @@ export function EmbalajeDespachoPage() {
       }),
   });
 
-  async function imprimirEtiquetas(pedidoId: string, numeroPedido: number) {
-    setDescargando(pedidoId);
+  async function imprimirEtiquetas(pedidoId: string) {
+    setImprimiendoEtiquetas(pedidoId);
     try {
       const blob = await descargarEtiquetas(pedidoId);
-      const url = URL.createObjectURL(blob);
-      const enlace = document.createElement("a");
-      enlace.href = url;
-      enlace.download = `etiquetas-pedido-${numeroPedido}.pdf`;
-      enlace.click();
-      URL.revokeObjectURL(url);
+      imprimirPdf(blob);
       queryClient.invalidateQueries({ queryKey: ["pedidos"] });
     } catch {
       toast.error("No se pudieron generar las etiquetas. Verificá que el pedido tenga bultos cargados.");
     } finally {
-      setDescargando(null);
+      setImprimiendoEtiquetas(null);
     }
   }
 
@@ -208,10 +203,10 @@ export function EmbalajeDespachoPage() {
                           type="button"
                           variant="outline"
                           size="sm"
-                          disabled={!pedido.bultos || descargando === pedido.id}
-                          onClick={() => imprimirEtiquetas(pedido.id, pedido.numero)}
+                          disabled={!pedido.bultos || imprimiendoEtiquetas === pedido.id}
+                          onClick={() => imprimirEtiquetas(pedido.id)}
                         >
-                          {descargando === pedido.id
+                          {imprimiendoEtiquetas === pedido.id
                             ? "Generando…"
                             : pedido.etiquetaImpresaEn
                               ? "Reimprimir"
