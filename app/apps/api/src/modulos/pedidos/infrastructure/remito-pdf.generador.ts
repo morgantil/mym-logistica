@@ -108,7 +108,7 @@ function dibujarRemitoBellaVista(doc: PDFKit.PDFDocument, pedido: PedidoListado)
 // Prueba de impresión real en papel preimpreso 2026-10-09 (reunión): el
 // problema real no eran estas coordenadas sino el tamaño de papel de la
 // impresora (quedaba en A4/Carta en vez de 17×22cm) — una vez fijado eso del
-// lado de la impresora, Nombre y Observaciones pedían bajar 0,3cm más de lo
+// lado de la impresora, Nombre y Observaciones pedían bajar 0,4cm más de lo
 // que decía el Excel original (quedaban muy pegados al renglón preimpreso de
 // arriba). Fecha y Dirección no se tocaron, salieron bien.
 function dibujarRemitoFarmapal(doc: PDFKit.PDFDocument, pedido: PedidoListado) {
@@ -116,7 +116,7 @@ function dibujarRemitoFarmapal(doc: PDFKit.PDFDocument, pedido: PedidoListado) {
     lineBreak: false,
   });
 
-  doc.fontSize(9).text(`${pedido.destinatarioNombre}   Afiliado: ${pedido.numeroAfiliado}`, cm(1), cm(5.3), {
+  doc.fontSize(9).text(`${pedido.destinatarioNombre}   Afiliado: ${pedido.numeroAfiliado}`, cm(1), cm(5.4), {
     width: cm(15),
   });
 
@@ -132,7 +132,7 @@ function dibujarRemitoFarmapal(doc: PDFKit.PDFDocument, pedido: PedidoListado) {
     altoCaja: 9,
   });
 
-  dibujarObservaciones(doc, pedido, { x: 1, y: 17.4, ancho: 4.5 });
+  dibujarObservaciones(doc, pedido, { x: 1, y: 17.5, ancho: 4.5 });
 }
 
 const PAPEL: Record<FormatoRemito, { anchoCm: number; altoCm: number; dibujar: typeof dibujarRemitoBellaVista }> = {
