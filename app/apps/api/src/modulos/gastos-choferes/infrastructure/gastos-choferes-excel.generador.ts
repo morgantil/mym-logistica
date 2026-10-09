@@ -1,10 +1,15 @@
 import ExcelJS from "exceljs";
-import { TipoGastoChofer } from "@mym/shared-types";
+import { EstadoGastoChofer, TipoGastoChofer } from "@mym/shared-types";
 import { GastoChofer } from "../domain/gasto-chofer";
 
 const TEXTO_TIPO: Record<TipoGastoChofer, string> = {
   [TipoGastoChofer.COMBUSTIBLE]: "Combustible",
   [TipoGastoChofer.PEAJE]: "Peaje",
+};
+
+const TEXTO_ESTADO: Record<EstadoGastoChofer, string> = {
+  [EstadoGastoChofer.PENDIENTE]: "Pendiente",
+  [EstadoGastoChofer.PAGADO]: "Pagado",
 };
 
 function aFechaOVacio(fecha: Date | null): string {
@@ -30,6 +35,7 @@ export async function generarGastosChoferesExcel(gastos: GastoChofer[]): Promise
     { header: "Razón Social/Denominación Proveedor", key: "proveedor", width: 32 },
     { header: "Comprobante", key: "comprobante", width: 18 },
     { header: "Total", key: "monto", width: 14 },
+    { header: "Estado", key: "estado", width: 12 },
     { header: "Fecha Recepción", key: "fechaRecepcion", width: 14 },
     { header: "Cpbte", key: "comprobanteCodigo", width: 10 },
     { header: "Tipo Cpbte", key: "comprobanteTipo", width: 10 },
@@ -64,6 +70,7 @@ export async function generarGastosChoferesExcel(gastos: GastoChofer[]): Promise
       proveedor: gasto.proveedor ?? "",
       comprobante: gasto.comprobante ?? "",
       monto: gasto.monto,
+      estado: TEXTO_ESTADO[gasto.estado],
       fechaRecepcion: aFechaOVacio(gasto.fechaRecepcion),
       comprobanteCodigo: gasto.comprobanteCodigo ?? "",
       comprobanteTipo: gasto.comprobanteTipo ?? "",
