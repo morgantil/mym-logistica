@@ -73,6 +73,10 @@ export interface PedidoListado {
   clienteFormatoRemito: FormatoRemito | null;
   destinatarioNombre: string;
   destinatarioTelefono: string | null;
+  // Quién importó el pedido — null si no vino de una importación. Pedido en
+  // reunión 2026-10-09.
+  importadoPorId: string | null;
+  importadoPorNombre: string | null;
   zonaNombre: string | null;
   choferNombre: string | null;
   productos: ProductoPedido[];

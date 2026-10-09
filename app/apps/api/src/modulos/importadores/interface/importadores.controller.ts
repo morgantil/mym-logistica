@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Get,
   Post,
   UploadedFile,
   UseInterceptors,
@@ -22,6 +23,15 @@ import { MapeoColumnas } from "../domain/campo-canonico";
 @Controller("importaciones")
 export class ImportadoresController {
   constructor(private importarExcelService: ImportarExcelService) {}
+
+  // Sin @Roles a propósito — mismo criterio que /choferes y /zonas: es un
+  // lookup de solo lectura para el desplegable del filtro "Importado por"
+  // en Pedidos, no expone nada sensible (solo id+nombre de quienes ya
+  // importaron algo), no hace falta restringirlo a un rol puntual.
+  @Get("usuarios")
+  listarUsuariosImportadores() {
+    return this.importarExcelService.listarUsuariosImportadores();
+  }
 
   // `clienteId` es obligatorio — decisión 2026-09-16, ver comentario en
   // ImportarExcelService (se sacó la detección automática por nombre de

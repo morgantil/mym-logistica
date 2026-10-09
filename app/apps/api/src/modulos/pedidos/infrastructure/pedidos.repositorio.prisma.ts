@@ -25,18 +25,21 @@ const INCLUDE_LISTADO = {
   cliente: { select: { nombre: true, formatoRemito: true } },
   destinatario: { select: { nombre: true, telefono: true } },
   productos: { select: { codigo: true, descripcion: true, cantidad: true, ticket: true, tipoEnvase: true } },
+  importacion: { select: { usuarioId: true, usuario: { select: { nombre: true } } } },
 } satisfies Prisma.PedidoInclude;
 
 type FilaPedidoListado = Prisma.PedidoGetPayload<{ include: typeof INCLUDE_LISTADO }>;
 
 function mapearListado(fila: FilaPedidoListado): PedidoListado {
-  const { cliente, destinatario, ...resto } = fila;
+  const { cliente, destinatario, importacion, ...resto } = fila;
   return {
     ...(resto as unknown as Pedido),
     clienteNombre: cliente.nombre,
     clienteFormatoRemito: cliente.formatoRemito as unknown as PedidoListado["clienteFormatoRemito"],
     destinatarioNombre: destinatario.nombre,
     destinatarioTelefono: destinatario.telefono,
+    importadoPorId: importacion?.usuarioId ?? null,
+    importadoPorNombre: importacion?.usuario.nombre ?? null,
     productos: fila.productos as unknown as PedidoListado["productos"],
   };
 }
@@ -91,6 +94,7 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
       ...(filtro.localidad ? { localidad: filtro.localidad } : {}),
       ...(filtro.ruta ? { ruta: filtro.ruta } : {}),
       ...(filtro.sinEtiquetaImpresa ? { etiquetaImpresaEn: null } : {}),
+      ...(filtro.usuarioImportadorId ? { importacion: { usuarioId: filtro.usuarioImportadorId } } : {}),
       // Bolsa/Bulto vive en Producto — matchea pedidos con al menos una línea
       // de ese envase. El propio middleware de borrado lógico no intercepta
       // relaciones anidadas (solo operaciones directas sobre el modelo

@@ -69,6 +69,10 @@ export class ImportarExcelService {
     private clientesService: ClientesService,
   ) {}
 
+  listarUsuariosImportadores(): Promise<{ id: string; nombre: string }[]> {
+    return this.importacionesRepositorio.listarUsuariosImportadores();
+  }
+
   // Decisión 2026-09-29 (mismo hallazgo que las tarifas: nada impedía
   // importar un Excel de Medicamentos para un cliente de Pañales, o al
   // revés) — mismo criterio que FacturacionService.validarTipoServicioDeCliente.

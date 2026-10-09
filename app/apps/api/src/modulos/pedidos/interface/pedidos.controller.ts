@@ -48,6 +48,7 @@ export class PedidosController {
       localidad: query.localidad,
       ruta: query.ruta,
       sinEtiquetaImpresa: query.sinEtiquetaImpresa,
+      usuarioImportadorId: query.usuarioImportadorId,
     };
   }
 

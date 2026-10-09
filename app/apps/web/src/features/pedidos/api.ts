@@ -36,6 +36,7 @@ export interface ParametrosListarPedidos {
   localidad?: string;
   ruta?: string;
   sinEtiquetaImpresa?: boolean;
+  usuarioImportadorId?: string;
   ordenarPor?: CampoOrdenPedido;
   direccionOrden?: "asc" | "desc";
 }

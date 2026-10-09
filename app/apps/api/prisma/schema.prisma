@@ -252,6 +252,7 @@ model Usuario {
 
   clientesPermitidos UsuarioCliente[]
   sesiones           SesionRefreshToken[]
+  importaciones      ImportacionExcel[]
 
   @@map("usuarios")
 }
@@ -655,6 +656,12 @@ model ImportacionExcel {
   creadoEn DateTime @default(now())
 
   cliente Cliente? @relation(fields: [clienteId], references: [id])
+  // Pedido en reunión 2026-10-09: filtrar pedidos por quién los importó —
+  // `usuarioId` ya se guardaba desde el principio, pero sin esta relación
+  // Prisma no podía traer el nombre con un `include` (hacía falta una
+  // segunda consulta a mano). Confirmado 0 usuarioId huérfanos antes de
+  // agregarla (ver migración).
+  usuario Usuario  @relation(fields: [usuarioId], references: [id])
   pedidos Pedido[]
 
   @@map("importaciones_excel")

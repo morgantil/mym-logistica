@@ -28,6 +28,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth-context";
 import { listarClientesActivos } from "@/features/clientes/api";
+import { listarUsuariosImportadores } from "@/features/importar/api";
 import { listarChoferes, listarZonas } from "@/features/zonas-choferes/api";
 import {
   actualizarColumnasPedidos,
@@ -125,6 +126,7 @@ const IDS_COLUMNAS_DEFAULT = [
   "observaciones",
   "comentario",
   "ruta",
+  "importadoPor",
 ] as const;
 
 const LABEL_COLUMNA: Record<(typeof IDS_COLUMNAS_DEFAULT)[number], string> = {
@@ -154,12 +156,13 @@ const LABEL_COLUMNA: Record<(typeof IDS_COLUMNAS_DEFAULT)[number], string> = {
   observaciones: "Observaciones",
   comentario: "Comentarios",
   ruta: "Ruta",
+  importadoPor: "Importado por",
 };
 
 // "productos" es un cálculo agregado (suma de varios renglones), no una
 // columna guardada — ordenar por eso necesitaría un query aparte, no se
 // implementó (ver CampoOrdenPedido). Todas las demás sí son ordenables.
-const NO_ORDENABLES = new Set<(typeof IDS_COLUMNAS_DEFAULT)[number]>(["productos"]);
+const NO_ORDENABLES = new Set<(typeof IDS_COLUMNAS_DEFAULT)[number]>(["productos", "importadoPor"]);
 
 export function PedidosTabla() {
   const { usuario } = useAuth();
@@ -242,6 +245,7 @@ export function PedidosTabla() {
   const [localidad, setLocalidad] = useState(SENTINEL_TODOS);
   const [ruta, setRuta] = useState(SENTINEL_TODOS);
   const [sinEtiquetaImpresa, setSinEtiquetaImpresa] = useState(false);
+  const [usuarioImportadorId, setUsuarioImportadorId] = useState(SENTINEL_TODOS);
 
   const { data: clientesDisponibles = [] } = useQuery({
     queryKey: ["clientes", "activos"],
@@ -252,6 +256,10 @@ export function PedidosTabla() {
   const { data: localidadesDisponibles = [] } = useQuery({
     queryKey: ["pedidos", "localidades"],
     queryFn: listarLocalidadesPedidos,
+  });
+  const { data: usuariosImportadoresDisponibles = [] } = useQuery({
+    queryKey: ["importaciones", "usuarios"],
+    queryFn: listarUsuariosImportadores,
   });
 
   // Orden de la grilla — decisión 2026-09-01. Un solo campo a la vez (no
@@ -293,6 +301,7 @@ export function PedidosTabla() {
     localidad,
     ruta,
     sinEtiquetaImpresa,
+    usuarioImportadorId,
   ]);
 
   // Factoreado para que "Exportar a Excel" nunca pueda quedar desalineado de
@@ -314,6 +323,7 @@ export function PedidosTabla() {
     localidad: localidad === SENTINEL_TODOS ? undefined : localidad,
     ruta: ruta === SENTINEL_TODOS ? undefined : ruta,
     sinEtiquetaImpresa: sinEtiquetaImpresa || undefined,
+    usuarioImportadorId: usuarioImportadorId === SENTINEL_TODOS ? undefined : usuarioImportadorId,
     ordenarPor: orden?.campo,
     direccionOrden: orden?.direccion,
   };
@@ -342,6 +352,7 @@ export function PedidosTabla() {
         localidad,
         ruta,
         sinEtiquetaImpresa,
+        usuarioImportadorId,
       },
     ],
     queryFn: () => listarPedidos({ pagina, porPagina: POR_PAGINA, ...filtrosActivos }),
@@ -542,6 +553,11 @@ export function PedidosTabla() {
         id: "ruta",
         header: "Ruta",
         cell: ({ row }) => <RutaCelda pedido={row.original} puedeEditar={puedeEditarRuta} />,
+      },
+      importadoPor: {
+        id: "importadoPor",
+        header: "Importado por",
+        cell: ({ row }) => row.original.importadoPorNombre ?? "—",
       },
     }),
     [puedeEditarBultos, puedeEditarComentario, puedeEditarRuta, puedeEliminar, mutacionPrioridad],
@@ -904,6 +920,23 @@ export function PedidosTabla() {
                   {OPCIONES_RUTA.map((valor) => (
                     <SelectItem key={valor} value={valor}>
                       {valor}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs text-muted-foreground">Importado por</Label>
+              <Select value={usuarioImportadorId} onValueChange={setUsuarioImportadorId}>
+                <SelectTrigger className="w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={SENTINEL_TODOS}>Todos</SelectItem>
+                  {usuariosImportadoresDisponibles.map((usuario) => (
+                    <SelectItem key={usuario.id} value={usuario.id}>
+                      {usuario.nombre}
                     </SelectItem>
                   ))}
                 </SelectContent>

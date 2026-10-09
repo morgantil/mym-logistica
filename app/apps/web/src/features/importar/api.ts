@@ -102,3 +102,10 @@ export async function crearSinonimoReceta(datos: {
 export async function eliminarSinonimoReceta(id: string): Promise<void> {
   await apiClient.delete(`/sinonimos-receta/${id}`);
 }
+
+// Item: filtro "Importado por" en Pedidos (reunión 2026-10-09) — solo
+// usuarios que ya importaron algo, no la lista completa del sistema.
+export async function listarUsuariosImportadores(): Promise<{ id: string; nombre: string }[]> {
+  const { data } = await apiClient.get<{ id: string; nombre: string }[]>("/importaciones/usuarios");
+  return data;
+}

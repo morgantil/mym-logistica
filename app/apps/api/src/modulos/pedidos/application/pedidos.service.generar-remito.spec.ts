@@ -20,6 +20,8 @@ function pedidoListado(overrides: Partial<PedidoListado> = {}): PedidoListado {
     destinatarioId: "d1",
     destinatarioNombre: "Juan Pérez",
     destinatarioTelefono: null,
+    importadoPorId: null,
+    importadoPorNombre: null,
     numeroAfiliado: "123",
     direccionOriginal: "Calle 1",
     direccionUsada: "Calle 1",

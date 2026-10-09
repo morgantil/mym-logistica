@@ -83,6 +83,10 @@ export interface FiltroPedidos {
   // inverso ("con etiqueta impresa") porque no se pidió — se puede sumar
   // después con el mismo campo (true/false) si hace falta.
   sinEtiquetaImpresa?: boolean;
+  // Pedido en reunión 2026-10-09: filtrar por quién importó el pedido —
+  // resuelto vía Pedido.importacion.usuarioId, no un campo propio del
+  // Pedido (ver comentario en INCLUDE_LISTADO, pedidos.repositorio.prisma.ts).
+  usuarioImportadorId?: string;
 }
 
 // Ordenamiento de la grilla — decisión 2026-09-01. Whitelist explícita (no un

@@ -87,6 +87,11 @@ export interface PedidoListado extends Pedido {
   clienteFormatoRemito: FormatoRemito | null;
   destinatarioNombre: string;
   destinatarioTelefono: string | null;
+  // Quién importó el pedido (vía ImportacionExcel.usuarioId) — null si no
+  // vino de una importación (ej. carga manual, si existiera) o si el campo
+  // importacionId del pedido es null. Pedido en reunión 2026-10-09.
+  importadoPorId: string | null;
+  importadoPorNombre: string | null;
   productos: {
     codigo: string | null;
     descripcion: string;

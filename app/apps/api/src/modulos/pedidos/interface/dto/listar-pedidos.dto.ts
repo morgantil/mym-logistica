@@ -115,6 +115,10 @@ export class ListarPedidosDto {
   sinEtiquetaImpresa?: boolean;
 
   @IsOptional()
+  @IsString()
+  usuarioImportadorId?: string;
+
+  @IsOptional()
   @IsIn(CAMPOS_ORDEN)
   ordenarPor?: CampoOrdenPedido;
 
