@@ -2,7 +2,7 @@ import { useState } from "react";
 import { AxiosError } from "axios";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { TipoGastoChofer } from "@mym/shared-types";
+import { EstadoGastoChofer, TipoGastoChofer } from "@mym/shared-types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -14,6 +14,7 @@ import { listarChoferes } from "@/features/zonas-choferes/api";
 import { formatearMonto, NOMBRES_MES } from "@/features/facturacion/formato";
 import {
   asignarChofer,
+  cambiarEstadoGasto,
   descargarReporteGastos,
   eliminarGasto,
   importarGastos,
@@ -31,6 +32,11 @@ const MS_POR_DIA = 86_400_000;
 const ETIQUETA_TIPO: Record<TipoGastoChofer, string> = {
   [TipoGastoChofer.COMBUSTIBLE]: "Combustible",
   [TipoGastoChofer.PEAJE]: "Peaje",
+};
+
+const ETIQUETA_ESTADO: Record<EstadoGastoChofer, string> = {
+  [EstadoGastoChofer.PENDIENTE]: "Pendiente",
+  [EstadoGastoChofer.PAGADO]: "Pagado",
 };
 
 function mensajeError(error: unknown): string {
@@ -54,6 +60,7 @@ export function GastosChoferesPage() {
   const [anioImportacion, setAnioImportacion] = useState(HOY.getFullYear());
 
   const [tipo, setTipo] = useState<string>(TODOS);
+  const [estado, setEstado] = useState<string>(TODOS);
   const [choferId, setChoferId] = useState<string>(TODOS);
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
@@ -64,6 +71,7 @@ export function GastosChoferesPage() {
 
   const filtro: FiltroGastos = {
     tipo: tipo === TODOS ? undefined : (tipo as TipoGastoChofer),
+    estado: estado === TODOS ? undefined : (estado as EstadoGastoChofer),
     choferId: choferId === TODOS ? undefined : choferId,
     fechaDesde: fechaDesde || undefined,
     fechaHasta: fechaHasta || undefined,
@@ -117,6 +125,15 @@ export function GastosChoferesPage() {
     mutationFn: (id: string) => eliminarGasto(id),
     onSuccess: () => {
       toast.success("Gasto eliminado.");
+      queryClient.invalidateQueries({ queryKey: ["gastos-choferes"] });
+    },
+    onError: (error) => toast.error(mensajeError(error)),
+  });
+
+  const mutacionCambiarEstado = useMutation({
+    mutationFn: ({ id, estado: nuevoEstado }: { id: string; estado: EstadoGastoChofer }) =>
+      cambiarEstadoGasto(id, nuevoEstado),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["gastos-choferes"] });
     },
     onError: (error) => toast.error(mensajeError(error)),
@@ -200,6 +217,22 @@ export function GastosChoferesPage() {
           </Select>
         </div>
         <div className="flex flex-col gap-1">
+          <span className="text-sm text-muted-foreground">Estado</span>
+          <Select value={estado} onValueChange={setEstado}>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={TODOS}>Todos</SelectItem>
+              {Object.values(EstadoGastoChofer).map((valor) => (
+                <SelectItem key={valor} value={valor}>
+                  {ETIQUETA_ESTADO[valor]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex flex-col gap-1">
           <span className="text-sm text-muted-foreground">Chofer</span>
           <Select value={choferId} onValueChange={setChoferId}>
             <SelectTrigger className="w-48">
@@ -254,19 +287,20 @@ export function GastosChoferesPage() {
             <TableHead>Razón Social/Denominación Proveedor</TableHead>
             <TableHead>Comprobante</TableHead>
             <TableHead className="text-right">Total</TableHead>
+            <TableHead>Estado</TableHead>
             <TableHead>Acciones</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {isLoading ? (
             <TableRow>
-              <TableCell colSpan={7} className="text-muted-foreground">
+              <TableCell colSpan={8} className="text-muted-foreground">
                 Cargando…
               </TableCell>
             </TableRow>
           ) : gastos?.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={7} className="text-muted-foreground">
+              <TableCell colSpan={8} className="text-muted-foreground">
                 No hay gastos para estos filtros.
               </TableCell>
             </TableRow>
@@ -285,6 +319,26 @@ export function GastosChoferesPage() {
                 <TableCell>{gasto.proveedor ?? "—"}</TableCell>
                 <TableCell>{gasto.comprobante ?? "—"}</TableCell>
                 <TableCell className="text-right">{formatearMonto(gasto.monto)}</TableCell>
+                <TableCell>
+                  <Select
+                    value={gasto.estado}
+                    onValueChange={(valor) =>
+                      mutacionCambiarEstado.mutate({ id: gasto.id, estado: valor as EstadoGastoChofer })
+                    }
+                    disabled={mutacionCambiarEstado.isPending}
+                  >
+                    <SelectTrigger className="w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.values(EstadoGastoChofer).map((valor) => (
+                        <SelectItem key={valor} value={valor}>
+                          {ETIQUETA_ESTADO[valor]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </TableCell>
                 <TableCell>
                   <div className="flex gap-2">
                     <Button type="button" variant="outline" size="sm" onClick={() => setGastoEnEdicion(gasto)}>
@@ -312,6 +366,7 @@ export function GastosChoferesPage() {
                 Total
               </TableCell>
               <TableCell className="text-right font-medium">{formatearMonto(total)}</TableCell>
+              <TableCell />
               <TableCell />
             </TableRow>
           </TableFooter>

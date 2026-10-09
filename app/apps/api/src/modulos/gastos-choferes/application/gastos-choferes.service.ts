@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { TipoGastoChofer } from "@mym/shared-types";
+import { EstadoGastoChofer, TipoGastoChofer } from "@mym/shared-types";
 import { LECTOR_EXCEL, LectorExcelPort } from "../../importadores/domain/lector-excel.port";
 import { ZonasChoferesService } from "../../zonas-choferes/application/zonas-choferes.service";
 import { DatosFiscalesCombustible, GastoChofer, ResumenImportacionGastos } from "../domain/gasto-chofer";
@@ -149,6 +149,14 @@ export class GastosChoferesService {
   async asignarChofer(id: string, choferId: string): Promise<GastoChofer> {
     const chofer = await this.resolverChoferOFallar(choferId);
     return this.repositorio.asignarChofer(id, chofer.id, chofer.nombre);
+  }
+
+  // Pedido en reunión 2026-10-09: toda fila nueva (import o carga manual)
+  // arranca en PENDIENTE (default en la base, ver schema.prisma) y se marca
+  // PAGADO a mano desde la grilla una vez pagada — puede volver a PENDIENTE
+  // si fue un error.
+  cambiarEstado(id: string, estado: EstadoGastoChofer): Promise<GastoChofer> {
+    return this.repositorio.cambiarEstado(id, estado);
   }
 
   private async resolverChoferOFallar(choferId: string): Promise<{ id: string; nombre: string }> {

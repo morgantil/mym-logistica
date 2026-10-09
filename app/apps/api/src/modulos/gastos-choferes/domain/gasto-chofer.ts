@@ -1,4 +1,4 @@
-import { TipoGastoChofer } from "@mym/shared-types";
+import { EstadoGastoChofer, TipoGastoChofer } from "@mym/shared-types";
 
 // Error real detectado 2026-10-07 (reunión con Leonardo): el archivo real de
 // combustible ("HWCompra-modelo") trae un comprobante fiscal completo
@@ -37,6 +37,7 @@ export interface GastoChofer extends DatosFiscalesCombustible {
   tipo: TipoGastoChofer;
   fecha: Date;
   monto: number;
+  estado: EstadoGastoChofer;
   choferId: string | null;
   choferNombre: string | null;
   choferNombreOriginal: string;

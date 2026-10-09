@@ -1,11 +1,15 @@
 import { Type } from "class-transformer";
 import { IsBoolean, IsDateString, IsEnum, IsOptional } from "class-validator";
-import { TipoGastoChofer } from "@mym/shared-types";
+import { EstadoGastoChofer, TipoGastoChofer } from "@mym/shared-types";
 
 export class FiltroGastosDto {
   @IsOptional()
   @IsEnum(TipoGastoChofer)
   tipo?: TipoGastoChofer;
+
+  @IsOptional()
+  @IsEnum(EstadoGastoChofer)
+  estado?: EstadoGastoChofer;
 
   @IsOptional()
   choferId?: string;

@@ -1,4 +1,4 @@
-import type { TipoGastoChofer } from "@mym/shared-types";
+import type { EstadoGastoChofer, TipoGastoChofer } from "@mym/shared-types";
 
 // Comprobante fiscal completo de Combustible (error real corregido
 // 2026-10-07 — antes se perdían 19 columnas reales al importar, ver
@@ -33,6 +33,7 @@ export interface GastoChofer extends DatosFiscalesCombustible {
   tipo: TipoGastoChofer;
   fecha: string;
   monto: number;
+  estado: EstadoGastoChofer;
   choferId: string | null;
   choferNombre: string | null;
   // Tal cual vino en la columna CHOFER del archivo — útil para resolver a

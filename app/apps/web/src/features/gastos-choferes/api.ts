@@ -1,9 +1,10 @@
-import type { TipoGastoChofer } from "@mym/shared-types";
+import type { EstadoGastoChofer, TipoGastoChofer } from "@mym/shared-types";
 import { apiClient } from "@/lib/api-client";
 import type { DatosFiscalesCombustible, GastoChofer, ResumenImportacionGastos } from "./tipos";
 
 export interface FiltroGastos {
   tipo?: TipoGastoChofer;
+  estado?: EstadoGastoChofer;
   choferId?: string;
   fechaDesde?: string;
   fechaHasta?: string;
@@ -28,6 +29,11 @@ export async function listarGastos(filtro: FiltroGastos): Promise<GastoChofer[]>
 
 export async function asignarChofer(id: string, choferId: string): Promise<GastoChofer> {
   const { data } = await apiClient.patch<GastoChofer>(`/gastos-choferes/${id}/chofer`, { choferId });
+  return data;
+}
+
+export async function cambiarEstadoGasto(id: string, estado: EstadoGastoChofer): Promise<GastoChofer> {
+  const { data } = await apiClient.patch<GastoChofer>(`/gastos-choferes/${id}/estado`, { estado });
   return data;
 }
 

@@ -19,6 +19,7 @@ import { Roles } from "../../../common/decorators/roles.decorator";
 import { GastosChoferesService } from "../application/gastos-choferes.service";
 import { ActualizarGastoDto } from "./dto/actualizar-gasto.dto";
 import { AsignarChoferDto } from "./dto/asignar-chofer.dto";
+import { CambiarEstadoGastoDto } from "./dto/cambiar-estado-gasto.dto";
 import { CrearGastoDto } from "./dto/crear-gasto.dto";
 import { DatosFiscalesCombustibleDto } from "./dto/datos-fiscales-combustible.dto";
 import { FiltroGastosDto } from "./dto/filtro-gastos.dto";
@@ -36,6 +37,7 @@ export class GastosChoferesController {
   private extraerFiltro(query: FiltroGastosDto) {
     return {
       tipo: query.tipo,
+      estado: query.estado,
       choferId: query.choferId,
       fechaDesde: query.fechaDesde ? new Date(`${query.fechaDesde}T00:00:00.000Z`) : undefined,
       fechaHasta: query.fechaHasta
@@ -147,6 +149,11 @@ export class GastosChoferesController {
   @Patch(":id/chofer")
   asignarChofer(@Param("id") id: string, @Body() dto: AsignarChoferDto) {
     return this.gastosChoferesService.asignarChofer(id, dto.choferId);
+  }
+
+  @Patch(":id/estado")
+  cambiarEstado(@Param("id") id: string, @Body() dto: CambiarEstadoGastoDto) {
+    return this.gastosChoferesService.cambiarEstado(id, dto.estado);
   }
 
   @Get("reporte-excel")

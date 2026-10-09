@@ -129,3 +129,8 @@ export enum TipoGastoChofer {
   COMBUSTIBLE = "COMBUSTIBLE",
   PEAJE = "PEAJE",
 }
+
+export enum EstadoGastoChofer {
+  PENDIENTE = "PENDIENTE",
+  PAGADO = "PAGADO",
+}

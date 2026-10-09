@@ -145,11 +145,20 @@ enum TipoGastoChofer {
   PEAJE
 }
 
+// Estado de pago del gasto — pedido en reunión 2026-10-09: toda fila nueva
+// (importada o cargada a mano) arranca en PENDIENTE; se puede marcar como
+// PAGADO desde la grilla, con filtro propio para buscar por estado.
+enum EstadoGastoChofer {
+  PENDIENTE
+  PAGADO
+}
+
 model GastoChofer {
-  id    String          @id @default(uuid())
-  tipo  TipoGastoChofer
-  fecha DateTime
-  monto Decimal         @db.Decimal(12, 2)
+  id     String            @id @default(uuid())
+  tipo   TipoGastoChofer
+  fecha  DateTime
+  monto  Decimal           @db.Decimal(12, 2)
+  estado EstadoGastoChofer @default(PENDIENTE)
 
   // Resueltos contra el cache de choferes de SimpliRoute al importar (ver
   // domain/matchear-chofer.ts) — null si no matcheó ninguno (texto raro,
@@ -204,6 +213,7 @@ model GastoChofer {
 
   @@index([tipo, fecha])
   @@index([choferId])
+  @@index([estado])
   @@map("gastos_chofer")
 }
 

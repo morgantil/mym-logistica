@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
+import { EstadoGastoChofer } from "@mym/shared-types";
 import { PrismaService } from "../../../common/prisma/prisma.service";
 import { GastoChofer } from "../domain/gasto-chofer";
 import {
@@ -18,6 +19,7 @@ function mapear(fila: {
   tipo: unknown;
   fecha: Date;
   monto: Prisma.Decimal;
+  estado: unknown;
   choferId: string | null;
   choferNombre: string | null;
   choferNombreOriginal: string;
@@ -52,6 +54,7 @@ function mapear(fila: {
     tipo: fila.tipo as GastoChofer["tipo"],
     fecha: fila.fecha,
     monto: Number(fila.monto),
+    estado: fila.estado as GastoChofer["estado"],
     choferId: fila.choferId,
     choferNombre: fila.choferNombre,
     choferNombreOriginal: fila.choferNombreOriginal,
@@ -127,6 +130,7 @@ export class GastosChoferesRepositorioPrisma implements GastosChoferesRepositori
     const filas = await this.prisma.gastoChofer.findMany({
       where: {
         ...(filtro.tipo ? { tipo: filtro.tipo as unknown as Prisma.EnumTipoGastoChoferFilter } : {}),
+        ...(filtro.estado ? { estado: filtro.estado as unknown as Prisma.EnumEstadoGastoChoferFilter } : {}),
         ...(filtro.choferId ? { choferId: filtro.choferId } : {}),
         ...(filtro.soloSinAsignar ? { choferId: null } : {}),
         ...(filtro.fechaDesde || filtro.fechaHasta
@@ -154,6 +158,16 @@ export class GastosChoferesRepositorioPrisma implements GastosChoferesRepositori
     const actualizado = await this.prisma.gastoChofer.update({
       where: { id },
       data: { choferId, choferNombre },
+    });
+    return mapear(actualizado);
+  }
+
+  async cambiarEstado(id: string, estado: EstadoGastoChofer): Promise<GastoChofer> {
+    const existente = await this.prisma.gastoChofer.findUnique({ where: { id } });
+    if (!existente) throw new NotFoundException(`Gasto ${id} no encontrado.`);
+    const actualizado = await this.prisma.gastoChofer.update({
+      where: { id },
+      data: { estado: estado as unknown as Prisma.GastoChoferUpdateInput["estado"] },
     });
     return mapear(actualizado);
   }

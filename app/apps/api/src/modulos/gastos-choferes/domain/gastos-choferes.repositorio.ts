@@ -1,4 +1,4 @@
-import { TipoGastoChofer } from "@mym/shared-types";
+import { EstadoGastoChofer, TipoGastoChofer } from "@mym/shared-types";
 import { DatosFiscalesCombustible, GastoChofer } from "./gasto-chofer";
 
 export interface DatosCrearGastoChofer extends DatosFiscalesCombustible {
@@ -22,6 +22,7 @@ export interface DatosActualizarGastoChofer extends Partial<DatosFiscalesCombust
   tipo?: TipoGastoChofer;
   fecha?: Date;
   monto?: number;
+  estado?: EstadoGastoChofer;
   choferId?: string;
   choferNombre?: string;
   proveedor?: string | null;
@@ -30,6 +31,7 @@ export interface DatosActualizarGastoChofer extends Partial<DatosFiscalesCombust
 
 export interface FiltroGastosChofer {
   tipo?: TipoGastoChofer;
+  estado?: EstadoGastoChofer;
   choferId?: string;
   fechaDesde?: Date;
   fechaHasta?: Date;
@@ -48,6 +50,7 @@ export interface GastosChoferesRepositorio {
   listar(filtro: FiltroGastosChofer): Promise<GastoChofer[]>;
   buscarPorId(id: string): Promise<GastoChofer | null>;
   asignarChofer(id: string, choferId: string, choferNombre: string): Promise<GastoChofer>;
+  cambiarEstado(id: string, estado: EstadoGastoChofer): Promise<GastoChofer>;
 }
 
 export const GASTOS_CHOFERES_REPOSITORIO = Symbol("GASTOS_CHOFERES_REPOSITORIO");
