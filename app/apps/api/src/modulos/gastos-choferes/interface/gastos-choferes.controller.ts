@@ -15,6 +15,7 @@ import {
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { Rol } from "@prisma/client";
+import { LIMITES_ARCHIVO_EXCEL } from "../../../common/constants/limites-archivo";
 import { Roles } from "../../../common/decorators/roles.decorator";
 import { GastosChoferesService } from "../application/gastos-choferes.service";
 import { ActualizarGastoDto } from "./dto/actualizar-gasto.dto";
@@ -50,7 +51,7 @@ export class GastosChoferesController {
   // `mes`/`anio` obligatorios — ver comentario en GastosChoferesService.importar
   // (la hoja de peajes no trae fecha por fila).
   @Post("importar")
-  @UseInterceptors(FileInterceptor("archivo"))
+  @UseInterceptors(FileInterceptor("archivo", { limits: LIMITES_ARCHIVO_EXCEL }))
   importar(
     @UploadedFile() archivo: Express.Multer.File | undefined,
     @Body("mes") mesTexto: string | undefined,

@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Patch, Post, Req, Res, UseGuards } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { Throttle } from "@nestjs/throttler";
 import { Request, Response } from "express";
 import { parseDuracionAMs } from "../../../common/utils/duracion";
 import { AuthService } from "../auth.service";
@@ -52,6 +53,11 @@ export class AuthController {
   }
 
   // El DTO valida el shape del body; las credenciales en sí las valida LocalStrategy.
+  // Límite propio, más estricto que el global (ver AppModule) — 5 intentos
+  // por minuto por IP, suficiente para que alguien se equivoque tipeando
+  // pero no para fuerza bruta. Mejora de seguridad 2026-10-10, ver
+  // REPORTE_SEGURIDAD_Y_ROBUSTEZ.md.
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
   @Publico()
   @UseGuards(LocalAuthGuard)
   @Post("login")

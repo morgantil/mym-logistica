@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
+import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import configuration from "./config/configuration";
 import { PrismaModule } from "./common/prisma/prisma.module";
 import { PermisosModule } from "./common/permisos/permisos.module";
@@ -25,6 +26,12 @@ import { JornadasChoferesModule } from "./modulos/jornadas-choferes/jornadas-cho
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, load: [configuration] }),
+    // Límite global contra abuso básico (scraping, scripts) — generoso a
+    // propósito, no debería notarlo el uso normal. Rutas sensibles como
+    // /auth/login tienen su propio límite más estricto con @Throttle() en
+    // el controller (ver AuthController) — mejora de seguridad 2026-10-10,
+    // antes no había ningún freno a fuerza bruta contra el login.
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
     PrismaModule,
     PermisosModule,
     UsuariosModule,
@@ -43,6 +50,7 @@ import { JornadasChoferesModule } from "./modulos/jornadas-choferes/jornadas-cho
   ],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: ContextoInterceptor },
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_FILTER, useClass: ConflictoVersionFilter },
