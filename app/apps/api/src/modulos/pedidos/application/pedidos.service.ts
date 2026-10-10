@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
-import { PrioridadPedido, ResolucionDireccion, TipoServicio } from "@mym/shared-types";
+import { PrioridadPedido, ResolucionDireccion, TipoReporte, TipoServicio } from "@mym/shared-types";
 import { PermisosClienteService } from "../../../common/permisos/permisos-cliente.service";
 import { ClientesService } from "../../clientes/application/clientes.service";
 import { DestinatariosService } from "../../destinatarios/application/destinatarios.service";
@@ -8,6 +8,7 @@ import {
   NORMALIZADOR_DIRECCIONES,
   NormalizadorDireccionesPort,
 } from "../../geografia/domain/normalizador-direcciones.port";
+import { LimitesReporteService } from "../../limites-reporte/application/limites-reporte.service";
 import { ZonasChoferesService } from "../../zonas-choferes/application/zonas-choferes.service";
 import { generarEtiquetasPdf } from "../infrastructure/etiqueta-pdf.generador";
 import { generarPedidosExcel } from "../infrastructure/pedidos-excel.generador";
@@ -59,6 +60,7 @@ export class PedidosService {
     private zonasChoferesService: ZonasChoferesService,
     @Inject(NORMALIZADOR_DIRECCIONES) private readonly normalizadorDirecciones: NormalizadorDireccionesPort,
     private clientesService: ClientesService,
+    private limitesReporteService: LimitesReporteService,
   ) {}
 
   // La grilla principal (§14 funcional) y Embalaje y Despacho (§8.1, con
@@ -92,12 +94,31 @@ export class PedidosService {
 
   // Decisión 2026-10-04 (reunión con el cliente): "Exportar a Excel" respeta
   // los mismos filtros Y los mismos permisos por cliente que la grilla.
+  //
+  // Mejora de robustez 2026-10-10 (ver REPORTE_SEGURIDAD_Y_ROBUSTEZ.md): este
+  // export era el único de los tres (Transportistas/Combustible/Pedidos) sin
+  // ningún tope de rango — sin fechas en el filtro, bajaba TODO el histórico
+  // de pedidos. Ahora, igual que los otros dos, tiene un tope editable por
+  // Administración (ver LimitesReporteService): si falta `fechaDesde` o
+  // `fechaHasta`, se completa con un default acotado a los últimos
+  // `maxDias` días en vez de quedar sin límite, y cualquier rango (elegido o
+  // completado) que supere el tope se rechaza igual que en los otros dos.
   async exportarParaUsuario(
     usuarioId: string,
     filtro: Omit<FiltroPedidos, "clienteIds"> & { clienteId?: string },
     orden?: OrdenPedidos,
   ): Promise<Buffer> {
     const { clienteId, ...resto } = filtro;
+
+    const maxDias = await this.limitesReporteService.obtenerMaxDias(TipoReporte.PEDIDOS);
+    let { fechaDesde, fechaHasta } = resto;
+    if (!fechaHasta) fechaHasta = new Date();
+    if (!fechaDesde) fechaDesde = new Date(fechaHasta.getTime() - (maxDias - 1) * 86_400_000);
+    const cantidadDias = Math.round((fechaHasta.getTime() - fechaDesde.getTime()) / 86_400_000) + 1;
+    if (cantidadDias > maxDias) {
+      throw new BadRequestException(`El rango no puede superar los ${maxDias} días.`);
+    }
+
     const clientesPermitidos = await this.permisosCliente.clientesPermitidosPara(usuarioId);
 
     let clienteIds: string[] | undefined;
@@ -110,7 +131,10 @@ export class PedidosService {
       clienteIds = clientesPermitidos ?? undefined;
     }
 
-    const pedidos = await this.repositorio.listarTodosParaExportar({ ...resto, clienteIds }, orden);
+    const pedidos = await this.repositorio.listarTodosParaExportar(
+      { ...resto, fechaDesde, fechaHasta, clienteIds },
+      orden,
+    );
     return generarPedidosExcel(pedidos);
   }
 

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth-context";
 import { listarTodosLosClientes } from "@/features/clientes/api";
+import { LimitesReporteSection } from "@/features/limites-reporte/limites-reporte-section";
 import {
   actualizarClientesPermitidos,
   actualizarUsuario,
@@ -185,6 +186,8 @@ export function UsuariosPage() {
           </TableBody>
         </Table>
       )}
+
+      <LimitesReporteSection />
 
       <UsuarioFormSheet
         abierto={usuarioEnEdicion !== null}

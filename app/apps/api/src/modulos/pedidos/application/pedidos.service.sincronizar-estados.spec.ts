@@ -44,6 +44,7 @@ function armarServicio(datos: {
     zonasChoferesService as never,
     {} as never,
     {} as never,
+    {} as never,
   );
   return { servicio, actualizarEstadoDesdeProveedor, resolverZonaPorChofer };
 }

@@ -1,7 +1,15 @@
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
-import { CabaProvincia, PrioridadPedido, TipoEnvase, TipoServicio, TipoServicioCliente } from "@mym/shared-types";
+import {
+  CabaProvincia,
+  PrioridadPedido,
+  TipoEnvase,
+  TipoReporte,
+  TipoServicio,
+  TipoServicioCliente,
+} from "@mym/shared-types";
 import { ClientesService } from "../../clientes/application/clientes.service";
 import { JornadasChoferesService } from "../../jornadas-choferes/application/jornadas-choferes.service";
+import { LimitesReporteService } from "../../limites-reporte/application/limites-reporte.service";
 import { PedidoFacturable } from "../../pedidos/domain/pedido";
 import { PedidosService } from "../../pedidos/application/pedidos.service";
 import { ZonasTarifariasService } from "../../zonas-tarifarias/application/zonas-tarifarias.service";
@@ -48,29 +56,30 @@ function rangoDelMes(mes: number, anio: number): { fechaDesde: Date; fechaHasta:
   };
 }
 
-const MAX_DIAS_RANGO = 31;
-
 // Decisión 2026-10-04: rango de fechas elegido libremente por el usuario
 // (datepicker), ambos extremos inclusive tal como los elige — `fechaHasta`
 // se lleva al día siguiente para que la comparación `lt` de siempre incluya
 // ese día completo. Si no vienen los dos, se usa el mes completo (default
 // actual, sin cambios de comportamiento).
-// Decisión 2026-10-06 (reunión con Pablo Renzo): tope de 31 días cuando el
+// Decisión 2026-10-06 (reunión con Pablo Renzo): tope de días cuando el
 // rango viene explícito — sin este tope, la pantalla de Transportistas
 // (único lugar donde el rango no está acotado por un selector de mes en el
-// front) podría pedir un período arbitrariamente largo.
+// front) podría pedir un período arbitrariamente largo. Desde 2026-10-10 el
+// tope es editable por Administración (`maxDias`, ver LimitesReporteService)
+// en vez de hardcodeado — el llamador lo resuelve antes de llamar acá.
 function rangoElegido(
   mes: number,
   anio: number,
-  fechaDesde?: string,
-  fechaHasta?: string,
+  fechaDesde: string | undefined,
+  fechaHasta: string | undefined,
+  maxDias: number,
 ): { fechaDesde: Date; fechaHasta: Date } {
   if (!fechaDesde || !fechaHasta) return rangoDelMes(mes, anio);
   const desde = new Date(`${fechaDesde}T00:00:00.000Z`);
   const hastaElegida = new Date(`${fechaHasta}T00:00:00.000Z`);
   const cantidadDias = Math.round((hastaElegida.getTime() - desde.getTime()) / 86_400_000) + 1;
-  if (cantidadDias > MAX_DIAS_RANGO) {
-    throw new BadRequestException(`El rango no puede superar los ${MAX_DIAS_RANGO} días.`);
+  if (cantidadDias > maxDias) {
+    throw new BadRequestException(`El rango no puede superar los ${maxDias} días.`);
   }
   const hasta = new Date(hastaElegida);
   hasta.setUTCDate(hasta.getUTCDate() + 1);
@@ -87,6 +96,7 @@ export class FacturacionService {
     private clientesService: ClientesService,
     private zonasTarifariasService: ZonasTarifariasService,
     private jornadasChoferesService: JornadasChoferesService,
+    private limitesReporteService: LimitesReporteService,
   ) {}
 
   listarTarifas(clienteId: string) {
@@ -697,7 +707,8 @@ export class FacturacionService {
   ): Promise<ResumenChofer[]> {
     await this.pedidosService.sincronizarEstados();
 
-    const rango = rangoElegido(mes, anio, fechaDesde, fechaHasta);
+    const maxDias = await this.limitesReporteService.obtenerMaxDias(TipoReporte.TRANSPORTISTAS);
+    const rango = rangoElegido(mes, anio, fechaDesde, fechaHasta, maxDias);
     const pedidos = await this.repositorio.listarEntregadosPorChoferEnPeriodo(rango.fechaDesde, rango.fechaHasta);
     if (pedidos.length === 0) return [];
 
@@ -736,7 +747,8 @@ export class FacturacionService {
     // fin/Total horas) van en una hoja aparte del mismo Excel — mismo rango
     // de fechas ya calculado arriba (rangoElegido ya ajusta fechaHasta +1
     // día exclusivo, mismo criterio que usa JornadasChoferesRepositorio).
-    const rango = rangoElegido(mes, anio, fechaDesde, fechaHasta);
+    const maxDias = await this.limitesReporteService.obtenerMaxDias(TipoReporte.TRANSPORTISTAS);
+    const rango = rangoElegido(mes, anio, fechaDesde, fechaHasta, maxDias);
     const jornadas = await this.jornadasChoferesService.listar({
       fechaDesde: rango.fechaDesde,
       fechaHasta: rango.fechaHasta,

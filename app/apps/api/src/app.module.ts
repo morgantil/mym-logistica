@@ -23,6 +23,7 @@ import { ImportadoresModule } from "./modulos/importadores/importadores.module";
 import { FacturacionModule } from "./modulos/facturacion/facturacion.module";
 import { GastosChoferesModule } from "./modulos/gastos-choferes/gastos-choferes.module";
 import { JornadasChoferesModule } from "./modulos/jornadas-choferes/jornadas-choferes.module";
+import { LimitesReporteModule } from "./modulos/limites-reporte/limites-reporte.module";
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { JornadasChoferesModule } from "./modulos/jornadas-choferes/jornadas-cho
     FacturacionModule,
     GastosChoferesModule,
     JornadasChoferesModule,
+    LimitesReporteModule,
   ],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: ContextoInterceptor },

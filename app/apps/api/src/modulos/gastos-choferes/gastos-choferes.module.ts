@@ -2,13 +2,14 @@ import { Module } from "@nestjs/common";
 import { ZonasChoferesModule } from "../zonas-choferes/zonas-choferes.module";
 import { LECTOR_EXCEL } from "../importadores/domain/lector-excel.port";
 import { LectorExcelExceljsAdapter } from "../importadores/infrastructure/lector-excel-exceljs.adapter";
+import { LimitesReporteModule } from "../limites-reporte/limites-reporte.module";
 import { GASTOS_CHOFERES_REPOSITORIO } from "./domain/gastos-choferes.repositorio";
 import { GastosChoferesRepositorioPrisma } from "./infrastructure/gastos-choferes.repositorio.prisma";
 import { GastosChoferesService } from "./application/gastos-choferes.service";
 import { GastosChoferesController } from "./interface/gastos-choferes.controller";
 
 @Module({
-  imports: [ZonasChoferesModule],
+  imports: [ZonasChoferesModule, LimitesReporteModule],
   controllers: [GastosChoferesController],
   providers: [
     GastosChoferesService,

@@ -4,6 +4,7 @@ import { ClientesModule } from "../clientes/clientes.module";
 import { DestinatariosModule } from "../destinatarios/destinatarios.module";
 import { SimplirouteModule } from "../simpliroute/simpliroute.module";
 import { GeografiaModule } from "../geografia/geografia.module";
+import { LimitesReporteModule } from "../limites-reporte/limites-reporte.module";
 import { ZonasChoferesModule } from "../zonas-choferes/zonas-choferes.module";
 import { PEDIDOS_REPOSITORIO } from "./domain/pedidos.repositorio";
 import { PedidosRepositorioPrisma } from "./infrastructure/pedidos.repositorio.prisma";
@@ -18,6 +19,7 @@ import { PedidosController } from "./interface/pedidos.controller";
     SimplirouteModule,
     ZonasChoferesModule,
     GeografiaModule,
+    LimitesReporteModule,
   ],
   controllers: [PedidosController],
   providers: [
