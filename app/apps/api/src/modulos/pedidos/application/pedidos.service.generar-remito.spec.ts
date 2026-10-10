@@ -75,6 +75,7 @@ function armarServicio(pedido: PedidoListado | null) {
     {} as never,
     {} as never,
     {} as never,
+    {} as never,
   );
   return servicio;
 }

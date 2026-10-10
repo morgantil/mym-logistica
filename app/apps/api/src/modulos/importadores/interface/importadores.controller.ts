@@ -10,6 +10,7 @@ import {
 import { FileInterceptor } from "@nestjs/platform-express";
 import { Rol } from "@prisma/client";
 import { TipoServicio } from "@mym/shared-types";
+import { LIMITES_ARCHIVO_EXCEL } from "../../../common/constants/limites-archivo";
 import { Roles } from "../../../common/decorators/roles.decorator";
 import { UsuarioActual, UsuarioAutenticado } from "../../../common/decorators/usuario-actual.decorator";
 import { ImportarExcelService } from "../application/importar-excel.service";
@@ -41,7 +42,7 @@ export class ImportadoresController {
   // importar qué traiga el Excel.
   @Roles(Rol.OPERACIONES, Rol.ADMINISTRACION)
   @Post()
-  @UseInterceptors(FileInterceptor("archivo"))
+  @UseInterceptors(FileInterceptor("archivo", { limits: LIMITES_ARCHIVO_EXCEL }))
   subir(
     @UploadedFile() archivo: Express.Multer.File | undefined,
     @Body("clienteId") clienteId: string | undefined,
@@ -81,7 +82,7 @@ export class ImportadoresController {
   // la misma fecha de entrega ya informada en el primer paso.
   @Roles(Rol.OPERACIONES, Rol.ADMINISTRACION)
   @Post("confirmar-mapeo")
-  @UseInterceptors(FileInterceptor("archivo"))
+  @UseInterceptors(FileInterceptor("archivo", { limits: LIMITES_ARCHIVO_EXCEL }))
   confirmarMapeo(
     @UploadedFile() archivo: Express.Multer.File | undefined,
     @Body("clienteId") clienteId: string,

@@ -11,7 +11,17 @@ function armarServicio() {
     tarifaTransportistaActiva: jest.fn().mockResolvedValue({ monto: 100, zona: CabaProvincia.CABA }),
   };
   const pedidosService = { sincronizarEstados: jest.fn().mockResolvedValue(undefined) };
-  const servicio = new FacturacionService(repositorio as never, pedidosService as never, {} as never, {} as never, {} as never);
+  // Mismo tope (31 días) que el valor sembrado por default para
+  // Transportistas — ver migración 20261010033630_limite_reporte.
+  const limitesReporteService = { obtenerMaxDias: jest.fn().mockResolvedValue(31) };
+  const servicio = new FacturacionService(
+    repositorio as never,
+    pedidosService as never,
+    {} as never,
+    {} as never,
+    {} as never,
+    limitesReporteService as never,
+  );
   return { servicio, listarEntregadosPorChoferEnPeriodo };
 }
 

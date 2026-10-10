@@ -14,7 +14,7 @@ function armarServicio(datos: {
     actualizarTarifa,
     actualizarMontoUnificadoMedicamento,
   };
-  const servicio = new FacturacionService(repositorio as never, {} as never, {} as never, {} as never, {} as never);
+  const servicio = new FacturacionService(repositorio as never, {} as never, {} as never, {} as never, {} as never, {} as never);
   return { servicio, actualizarTarifa, actualizarMontoUnificadoMedicamento };
 }
 

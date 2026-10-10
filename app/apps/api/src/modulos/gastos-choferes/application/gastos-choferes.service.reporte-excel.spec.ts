@@ -5,7 +5,15 @@ import { GastosChoferesService } from "./gastos-choferes.service";
 // a diferencia de Transportistas — ver 4.3 en TEMAS_PENDIENTES.md).
 function armarServicio() {
   const repositorio = { listar: jest.fn().mockResolvedValue([]) };
-  const servicio = new GastosChoferesService(repositorio as never, {} as never, {} as never);
+  // Mismo tope (30 días) que el valor sembrado por default para Combustible
+  // — ver migración 20261010033630_limite_reporte.
+  const limitesReporteService = { obtenerMaxDias: jest.fn().mockResolvedValue(30) };
+  const servicio = new GastosChoferesService(
+    repositorio as never,
+    {} as never,
+    {} as never,
+    limitesReporteService as never,
+  );
   return { servicio, repositorio };
 }
 

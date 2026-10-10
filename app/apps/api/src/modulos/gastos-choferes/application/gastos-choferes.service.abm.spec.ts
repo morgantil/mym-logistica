@@ -13,7 +13,7 @@ function armarServicio() {
   const zonasChoferesService = {
     listarChoferes: jest.fn().mockResolvedValue([{ id: 42, nombre: "Lucía" }]),
   };
-  const servicio = new GastosChoferesService(repositorio as never, {} as never, zonasChoferesService as never);
+  const servicio = new GastosChoferesService(repositorio as never, {} as never, zonasChoferesService as never, {} as never);
   return { servicio, crear, actualizar, eliminar };
 }
 

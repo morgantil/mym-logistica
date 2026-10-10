@@ -98,6 +98,7 @@ function armarServicio(datos: { pedido: Pedido; usaCarga3: boolean }) {
     zonasChoferesService as never,
     normalizadorDirecciones as never,
     clientesService as never,
+    {} as never,
   );
 
   return { servicio, enviarPedido, asignarChoferVehiculo };

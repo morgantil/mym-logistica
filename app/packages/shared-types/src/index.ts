@@ -134,3 +134,11 @@ export enum EstadoGastoChofer {
   PENDIENTE = "PENDIENTE",
   PAGADO = "PAGADO",
 }
+
+// Tope de días editable por Administración para cada reporte Excel — ver
+// comentario en schema.prisma, modelo LimiteReporte.
+export enum TipoReporte {
+  TRANSPORTISTAS = "TRANSPORTISTAS",
+  COMBUSTIBLE = "COMBUSTIBLE",
+  PEDIDOS = "PEDIDOS",
+}
