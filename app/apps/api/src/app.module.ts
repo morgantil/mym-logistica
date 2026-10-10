@@ -7,6 +7,7 @@ import { PrismaModule } from "./common/prisma/prisma.module";
 import { PermisosModule } from "./common/permisos/permisos.module";
 import { ContextoInterceptor } from "./common/contexto/contexto.interceptor";
 import { ConflictoVersionFilter } from "./common/filters/conflicto-version.filter";
+import { LoggingExceptionFilter } from "./common/filters/logging-exception.filter";
 import { JwtAuthGuard } from "./common/guards/jwt-auth.guard";
 import { RolesGuard } from "./common/guards/roles.guard";
 import { UsuariosModule } from "./modulos/usuarios/usuarios.module";
@@ -53,6 +54,12 @@ import { JornadasChoferesModule } from "./modulos/jornadas-choferes/jornadas-cho
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    // Orden importa: entre filtros globales, Nest le da precedencia al
+    // ÚLTIMO registrado que matchee el tipo de excepción — confirmado
+    // probando en vivo (al revés de lo intuitivo). ConflictoVersionFilter
+    // va último para que su 409 específico no quede pisado por el 500
+    // genérico del catch-all de abajo.
+    { provide: APP_FILTER, useClass: LoggingExceptionFilter },
     { provide: APP_FILTER, useClass: ConflictoVersionFilter },
   ],
 })
