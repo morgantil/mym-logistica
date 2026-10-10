@@ -827,6 +827,22 @@ model Pedido {
 
   @@index([clienteId, estado, fechaProgramada])
   @@index([destinatarioId])
+  // Mejora de robustez 2026-10-10 (ver REPORTE_SEGURIDAD_Y_ROBUSTEZ.md):
+  // la grilla de Pedidos filtra por muchos más campos combinables (ver
+  // FiltroPedidos) que no tenían ningún índice — con el volumen de hoy
+  // (bajo centenar de filas) no se nota, pero a 3-4 años de carga real sí.
+  // Chofer y Zona llevan fechaProgramada de compañera porque son las
+  // combinaciones más probables en el uso diario (operación del día de un
+  // chofer/zona); el resto queda como índice simple — Postgres combina
+  // varios índices simples con bitmap AND cuando hace falta, no hace falta
+  // una columna compuesta para cada combinación posible.
+  @@index([choferId, fechaProgramada])
+  @@index([zonaId, fechaProgramada])
+  @@index([ruta])
+  @@index([localidad])
+  @@index([prioridad])
+  @@index([estadoSimpliroute])
+  @@index([importacionId])
   @@map("pedidos")
 }
 
