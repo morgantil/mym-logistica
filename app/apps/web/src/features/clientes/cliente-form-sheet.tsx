@@ -54,6 +54,10 @@ export function ClienteFormSheet({
   const [facturaPorCordon, setFacturaPorCordon] = useState(false);
   const [formatoRemito, setFormatoRemito] = useState<string>(SIN_REMITO);
   const [usaCarga3, setUsaCarga3] = useState(false);
+  const [tipoVisitaSimpliRoute, setTipoVisitaSimpliRoute] = useState("");
+  const [notaSimpliRoute, setNotaSimpliRoute] = useState("");
+  const [sellerSimpliRoute, setSellerSimpliRoute] = useState("");
+  const [remitoHabilitado, setRemitoHabilitado] = useState(false);
 
   useEffect(() => {
     if (editando) {
@@ -62,18 +66,32 @@ export function ClienteFormSheet({
       setFacturaPorCordon(cliente.facturaPorCordon);
       setFormatoRemito(cliente.formatoRemito ?? SIN_REMITO);
       setUsaCarga3(cliente.usaCarga3);
+      setTipoVisitaSimpliRoute(cliente.tipoVisitaSimpliRoute ?? "");
+      setNotaSimpliRoute(cliente.notaSimpliRoute ?? "");
+      setSellerSimpliRoute(cliente.sellerSimpliRoute ?? "");
+      setRemitoHabilitado(cliente.remitoHabilitado);
     } else {
       setNombre("");
       setTipoServicio(TipoServicioCliente.PANAL);
       setFacturaPorCordon(false);
       setFormatoRemito(SIN_REMITO);
       setUsaCarga3(false);
+      setTipoVisitaSimpliRoute("");
+      setNotaSimpliRoute("");
+      setSellerSimpliRoute("");
+      setRemitoHabilitado(false);
     }
   }, [cliente, editando]);
 
   const queryClient = useQueryClient();
   const mutacion = useMutation({
     mutationFn: async () => {
+      const camposSimpliRoute = {
+        tipoVisitaSimpliRoute: tipoVisitaSimpliRoute || undefined,
+        notaSimpliRoute: notaSimpliRoute || undefined,
+        sellerSimpliRoute: sellerSimpliRoute || undefined,
+        remitoHabilitado,
+      };
       if (editando) {
         return actualizarCliente(cliente.id, {
           nombre,
@@ -81,9 +99,10 @@ export function ClienteFormSheet({
           facturaPorCordon,
           formatoRemito: formatoRemito === SIN_REMITO ? null : (formatoRemito as FormatoRemito),
           usaCarga3,
+          ...camposSimpliRoute,
         });
       }
-      return crearCliente({ nombre, tipoServicio, facturaPorCordon });
+      return crearCliente({ nombre, tipoServicio, facturaPorCordon, ...camposSimpliRoute });
     },
     onSuccess: () => {
       toast.success(editando ? "Cliente actualizado." : "Cliente creado.");
@@ -155,6 +174,62 @@ export function ClienteFormSheet({
                 id="factura-por-cordon-cliente"
                 checked={facturaPorCordon}
                 onCheckedChange={(valor) => setFacturaPorCordon(valor === true)}
+                disabled={mutacion.isPending}
+              />
+            </FilaFormulario>
+
+            <FilaFormulario
+              label="Tipo de visita (SimpliRoute)"
+              htmlFor="tipo-visita-cliente"
+              anchoEtiqueta="140px"
+              descripcion="Texto libre que identifica a este cliente en SimpliRoute — reunión 2026-10-23."
+            >
+              <Input
+                id="tipo-visita-cliente"
+                value={tipoVisitaSimpliRoute}
+                onChange={(e) => setTipoVisitaSimpliRoute(e.target.value)}
+                disabled={mutacion.isPending}
+              />
+            </FilaFormulario>
+
+            <FilaFormulario
+              label="Nota (SimpliRoute)"
+              htmlFor="nota-simpliroute-cliente"
+              anchoEtiqueta="140px"
+              descripcion="Texto fijo que se agrega a la nota que ve el chofer en todos los pedidos de este cliente."
+            >
+              <Input
+                id="nota-simpliroute-cliente"
+                value={notaSimpliRoute}
+                onChange={(e) => setNotaSimpliRoute(e.target.value)}
+                disabled={mutacion.isPending}
+              />
+            </FilaFormulario>
+
+            <FilaFormulario
+              label="Seller (SimpliRoute)"
+              htmlFor="seller-cliente"
+              anchoEtiqueta="140px"
+              descripcion="Nombre o alias del Seller tal cual figura en SimpliRoute. Si no hay coincidencia, o la cuenta no tiene Sellers habilitado, el envío sigue igual sin este dato."
+            >
+              <Input
+                id="seller-cliente"
+                value={sellerSimpliRoute}
+                onChange={(e) => setSellerSimpliRoute(e.target.value)}
+                disabled={mutacion.isPending}
+              />
+            </FilaFormulario>
+
+            <FilaFormulario
+              label="Manda remito a SimpliRoute"
+              htmlFor="remito-habilitado-cliente"
+              anchoEtiqueta="140px"
+              descripcion="Si este cliente trae remito en su Excel, se manda como referencia del pedido en SimpliRoute en vez de nuestro propio identificador interno."
+            >
+              <Checkbox
+                id="remito-habilitado-cliente"
+                checked={remitoHabilitado}
+                onCheckedChange={(valor) => setRemitoHabilitado(valor === true)}
                 disabled={mutacion.isPending}
               />
             </FilaFormulario>

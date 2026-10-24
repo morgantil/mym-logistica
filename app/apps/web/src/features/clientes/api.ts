@@ -18,6 +18,11 @@ export interface DatosCliente {
   nombre: string;
   tipoServicio: TipoServicioCliente;
   facturaPorCordon?: boolean;
+  // Reunión 2026-10-23 — se preguntan al crear el cliente.
+  tipoVisitaSimpliRoute?: string;
+  notaSimpliRoute?: string;
+  sellerSimpliRoute?: string;
+  remitoHabilitado?: boolean;
 }
 
 export async function crearCliente(datos: DatosCliente): Promise<Cliente> {

@@ -15,4 +15,10 @@ export interface Cliente {
   // Decisión 2026-10-04: "Carga 3" al enviar a SimpliRoute, solo para
   // pedidos de este cliente (ej. SACEIP SOLIS) — ver PedidosService.
   usaCarga3: boolean;
+  // Reunión 2026-10-23 — texto libre fijo por cliente, se pregunta al crear.
+  // Ver comentario en schema.prisma (backend).
+  tipoVisitaSimpliRoute: string | null;
+  notaSimpliRoute: string | null;
+  sellerSimpliRoute: string | null;
+  remitoHabilitado: boolean;
 }

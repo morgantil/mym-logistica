@@ -15,4 +15,11 @@ export interface Cliente {
   // Decisión 2026-10-04: "Carga 3" (load_3) al enviar a SimpliRoute, solo
   // para pedidos de este cliente — ver comentario en schema.prisma.
   usaCarga3: boolean;
+  // Reunión 2026-10-23 — texto libre fijo por cliente, mapea a
+  // visit_type/notes/seller del Visit Object de SimpliRoute. Ver comentario
+  // en schema.prisma.
+  tipoVisitaSimpliRoute: string | null;
+  notaSimpliRoute: string | null;
+  sellerSimpliRoute: string | null;
+  remitoHabilitado: boolean;
 }

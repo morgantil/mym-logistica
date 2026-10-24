@@ -26,4 +26,22 @@ export class ActualizarClienteDto {
   @IsOptional()
   @IsBoolean()
   usaCarga3?: boolean;
+
+  // Reunión 2026-10-23 — ver comentario en schema.prisma. Null explícito =
+  // borrar el valor cargado.
+  @IsOptional()
+  @IsString()
+  tipoVisitaSimpliRoute?: string | null;
+
+  @IsOptional()
+  @IsString()
+  notaSimpliRoute?: string | null;
+
+  @IsOptional()
+  @IsString()
+  sellerSimpliRoute?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  remitoHabilitado?: boolean;
 }

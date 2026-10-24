@@ -25,7 +25,15 @@ export class ClientesService {
     return this.repositorio.buscarPorId(id);
   }
 
-  crear(datos: { nombre: string; tipoServicio: TipoServicioCliente; facturaPorCordon?: boolean }): Promise<Cliente> {
+  crear(datos: {
+    nombre: string;
+    tipoServicio: TipoServicioCliente;
+    facturaPorCordon?: boolean;
+    tipoVisitaSimpliRoute?: string;
+    notaSimpliRoute?: string;
+    sellerSimpliRoute?: string;
+    remitoHabilitado?: boolean;
+  }): Promise<Cliente> {
     return this.repositorio.crear({
       ...datos,
       facturaPorCordon: datos.facturaPorCordon ?? false,
@@ -33,6 +41,10 @@ export class ClientesService {
       // una vez que se consigue/confirma el papel real de ese cliente.
       formatoRemito: null,
       usaCarga3: false,
+      tipoVisitaSimpliRoute: datos.tipoVisitaSimpliRoute ?? null,
+      notaSimpliRoute: datos.notaSimpliRoute ?? null,
+      sellerSimpliRoute: datos.sellerSimpliRoute ?? null,
+      remitoHabilitado: datos.remitoHabilitado ?? false,
     });
   }
 

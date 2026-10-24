@@ -326,6 +326,24 @@ model Cliente {
   // PedidosService.enviarASimpliRoute.
   usaCarga3         Boolean             @default(false)
 
+  // Campos nuevos de la reunión 2026-10-23 (Pablo Renzo) para la estructura
+  // de datos que SimpliRoute necesita — texto libre, fijo por cliente (se
+  // cargan una sola vez acá, no vienen del Excel de pedidos). Mapean a
+  // `visit_type`/`notes`/`seller` del Visit Object de SimpliRoute — ver
+  // SimplirouteHttpAdapter.enviarPedido.
+  tipoVisitaSimpliRoute String?
+  notaSimpliRoute       String?
+  // Nombre/alias del Seller tal cual figura en SimpliRoute (GET /v1/sellers/)
+  // — se resuelve a su UUID real al enviar, no se guarda el UUID acá porque
+  // Sellers requiere habilitación de cuenta vía Customer Success y puede no
+  // estar disponible; si no se encuentra una coincidencia, simplemente no
+  // se manda ese campo (no bloquea el envío).
+  sellerSimpliRoute     String?
+  // Decisión reunión 2026-10-23: el remito (`reference` en SimpliRoute) solo
+  // se manda para los clientes que lo tengan habilitado acá — no todos los
+  // clientes traen remito en su Excel.
+  remitoHabilitado      Boolean  @default(false)
+
   creadoEn         DateTime  @default(now())
   actualizadoEn    DateTime  @updatedAt
   creadoPorId      String?

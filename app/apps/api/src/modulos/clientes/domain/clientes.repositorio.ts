@@ -8,6 +8,10 @@ export interface DatosActualizarCliente {
   facturaPorCordon?: boolean;
   formatoRemito?: FormatoRemito | null;
   usaCarga3?: boolean;
+  tipoVisitaSimpliRoute?: string | null;
+  notaSimpliRoute?: string | null;
+  sellerSimpliRoute?: string | null;
+  remitoHabilitado?: boolean;
 }
 
 export interface ClientesRepositorio {

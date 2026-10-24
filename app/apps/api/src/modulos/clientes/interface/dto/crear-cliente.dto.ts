@@ -12,4 +12,21 @@ export class CrearClienteDto {
   @IsOptional()
   @IsBoolean()
   facturaPorCordon?: boolean;
+
+  // Reunión 2026-10-23 — ver comentario en schema.prisma.
+  @IsOptional()
+  @IsString()
+  tipoVisitaSimpliRoute?: string;
+
+  @IsOptional()
+  @IsString()
+  notaSimpliRoute?: string;
+
+  @IsOptional()
+  @IsString()
+  sellerSimpliRoute?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  remitoHabilitado?: boolean;
 }
