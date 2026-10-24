@@ -1,7 +1,8 @@
 # TEMAS PENDIENTES — vista consolidada de todo lo que falta
 
-Última actualización: **2026-09-04**. Documento vivo, separado de `PENDIENTES.md`
-(ese sigue con el detalle histórico de despliegue/credenciales). Este junta
+Última actualización: **2026-10-24**. Documento vivo — **la única fuente de
+pendientes** del proyecto (hasta el 2026-10-24 existía un `PENDIENTES.md`
+separado y más acotado; se unificó acá para no mantener dos listas). Junta
 **todo** lo que queda para terminar el proyecto — técnico, de negocio y de
 assets — en un solo lugar.
 
@@ -236,3 +237,97 @@ guía junta.
 | # | Pendiente | Dueño | Detalle |
 |---|---|---|---|
 | 15.1 | ~~Elegir la contraseña al dar de alta un usuario~~ | ✅ Construido 2026-10-09 | Reportado por Leonardo: el alta de usuario no dejaba elegir la contraseña, siempre salía una generada al azar (mostrada una sola vez en pantalla). Campo "Contraseña" nuevo en el formulario de alta, **opcional** — si se completa, se usa esa; si se deja vacío, sigue el comportamiento de siempre (temporal generada + pantalla para copiarla). Si se eligió una propia, esa pantalla ya no aparece (quien la creó ya la sabe). Mínimo 8 caracteres, validado en el backend (`CrearUsuarioDto`) y como atributo HTML en el input. Probado contra la API real: alta con contraseña elegida, login exitoso con esa contraseña, confirmado que `passwordTemporal` vuelve `null` en ese caso. |
+
+## 16. Seguridad y robustez para producción — ✅ construido y desplegado 2026-10-10/11
+
+Leonardo pidió una auditoría de seguridad/robustez antes de salir a
+producción real (riesgo evaluado en 5/10 antes de aplicar esto). Construido
+en rama aparte (`mejoras-seguridad-robustez`), mergeada a `develop` el
+2026-10-11.
+
+Resumen de lo construido: rate limiting (`@nestjs/throttler`, 5 intentos/min
+en login), helmet (headers de seguridad HTTP), límite de tamaño de archivo
+Excel (20MB), axios actualizado (CVEs resueltos), rotación de la password
+QA que había quedado recuperable en el historial de git, logger global de
+errores no manejados (5xx con stack, 4xx sin), topes de rango de fecha
+editables por Administración en los 3 reportes Excel (default 32 días,
+máximo 100 — antes el de Pedidos no tenía tope alguno), índices nuevos en
+`Pedido` para que la base no se degrade con 3-4 años de carga (incluidos
+índices GIN trigram para la búsqueda de texto libre).
+
+## 17. Migración de producción a cuentas propias del cliente — ✅ hecho 2026-10-11/13
+
+Decisión de Leonardo: la app tiene que facturarse del lado del cliente, no
+de la cuenta personal de Leonardo. Se armó un ambiente nuevo completo en
+cuentas de Arbet/Pablo (Render + Vercel + Postgres propio de Render, no
+Neon) — deploy manual sin integración git (el GitHub App de Render/Vercel
+de un tercero no puede ver un repo que no es de su cuenta, ni siquiera
+público). Detalle paso a paso, comandos de redeploy y los 16 gotchas reales
+encontrados en el camino: `DEPLOY.md`.
+
+| # | Pendiente | Dueño | Detalle |
+|---|---|---|---|
+| 17.1 | ~~Postgres del cliente en plan Free, expiraba a los 30 días~~ | ✅ Resuelto 2026-10-13 | Pasado a plan pago (`0.1c-256mb`, $6/mes) — sin expiración, con backups/point-in-time recovery activos (confirmado por API). |
+| 17.2 | ~~Backend del cliente en plan Free, se dormía a los 15 min~~ | ✅ Resuelto 2026-10-13 | Pasado a Starter (`0.5c-512mb`). |
+| 17.3 | ~~Bug real — CORS roto en el ambiente del cliente, login nunca funcionaba~~ | ✅ Corregido 2026-10-11 | El backend nunca devolvía `Access-Control-Allow-Origin` pese a tener `CORS_ORIGIN` bien configurado — el contenedor había quedado corriendo con env vars viejas de un deploy anterior. Un redeploy manual (forzado por API de Render) lo resolvió. Lección: cambiar una env var en Render no siempre dispara un redeploy real del contenedor — si algo no toma un cambio de config, probar forzando un redeploy explícito antes de asumir que es un bug de código. |
+| 17.4 | ~~Activar SimpliRoute real en el ambiente del cliente~~ | ✅ Hecho 2026-10-13 | Mismas credenciales reales que ya se usaban en el ambiente de test (misma cuenta `MYM LOGISTICA Y DISTRIBUCION SRL`) — confirmado trayendo las 11 zonas/18 choferes/12 vehículos reales. |
+| 17.5 | 🔲 Borrar el ambiente de Leonardo (Render/Vercel/Neon) una vez confirmado el del cliente | Leonardo decide cuándo | Sigue vivo en paralelo — ver advertencia en `ESTADO_DEL_PROYECTO.md` sobre no operar los dos a la vez (mismo SimpliRoute real de fondo). |
+
+## 18. Bug real — Importación de Farmaet fallaba el 100% de las filas en la base del cliente — ✅ Corregido 2026-10-20
+
+Reportado por Pablo/Sandra probando en el ambiente nuevo: toda fila del
+Excel real de Farmaet (268 filas) fallaba con "No se pudo determinar Bolsa
+o Bulto para esta línea". Causa real: el Excel de Farmaet no trae fila de
+títulos (la fila 1 ya es el primer paciente — caso conocido, ver §13.29),
+pero el perfil de mapeo guardado para ese cliente en la base NUEVA había
+quedado con `sinEncabezado=false` y, para 4 campos obligatorios, mapeado
+contra **datos de un paciente** en vez de contra nombres de columna reales
+(alguien lo completó a mano sin tildar "Sin fila de títulos", eligiendo de
+un desplegable que por el bug mostraba datos en vez de encabezados).
+Corregido remapeando las columnas por posición (ya que el archivo no tiene
+títulos) y guardando el perfil correcto — probado con el archivo real:
+**127 pedidos creados, 0 errores**, datos verificados fila por fila contra
+el Excel original. Reproducido además con un segundo archivo (uno **con**
+fila de títulos normal) para confirmar que el camino con encabezados reales
+también funciona bien — 0 errores ahí también.
+
+**Para que lo maneje el cliente de ahora en más**: desde la pantalla
+"Importar Excel", el selector "Sin fila de títulos" resuelve los 4 campos
+obligatorios a mano si hiciera falta en un cliente nuevo con un Excel sin
+encabezados. **Límite real, sin resolver todavía**: campos opcionales como
+Bolsa/Bulto NO tienen ninguna pantalla para mapearlos a mano — si un
+cliente nuevo sin encabezados falla justo por un campo opcional, hoy no
+hay forma de arreglarlo sin pasar por código. Candidato a construir si
+vuelve a pasar.
+
+## 19. Rama `mejoras-21-10` — reunión 2026-10-21 con Pablo, 3 de 6 puntos construidos
+
+Seis puntos de la reunión, ordenados por los que se pudieron avanzar sin
+necesitar más información:
+
+| # | Pendiente | Dueño | Detalle |
+|---|---|---|---|
+| 19.1 | ~~Agrupar los pedidos del día en un solo Plan de SimpliRoute~~ | ✅ Construido, sin mergear a `develop` | Causa real encontrada: al crear la primera Ruta de un chofer en un día, el sistema siempre creaba un Plan nuevo en vez de buscar si YA había uno de ese día (de otro chofer) para reusarlo — un día con 3 choferes distintos salía con 3 Planes en SimpliRoute en vez de 1 con 3 rutas adentro. Corregido en `SimplirouteHttpAdapter.obtenerOCrearRuta`. 3 tests unitarios nuevos simulando la secuencia real de llamadas. |
+| 19.2 | ~~Impresión masiva de etiquetas/remitos, agrupada por cliente~~ | ✅ Construido, sin mergear | Nuevos botones "Imprimir etiquetas (N)"/"Imprimir remitos (N)" en la grilla de Pedidos, aparecen con la selección múltiple que ya existía. Backend rechaza si se mezclan clientes distintos (`PedidosService.generarEtiquetasMasivo`/`generarRemitoMasivo`), con mensaje de error específico. 7 tests unitarios nuevos. |
+| 19.3 | ~~Alta manual de pedidos~~ | ✅ Construido, sin mergear | Nuevo botón "Alta manual" en Pedidos — formulario que cambia según tipo de cliente (Pañales pide lista de productos; Medicamentos pide Bulto/Bolsa + campos propios). Decisión de arquitectura: arma el pedido como una "fila de Excel sintética" (mapeo identidad) y la pasa por el mismo pipeline que una importación real (`ImportarExcelService.crearPedidoManual`) — reusa automáticamente destinatario/geocodificación/zona/chofer/zona tarifaria, sin reimplementar esa lógica. Verificado en vivo (API + navegador) con Pañales y Medicamentos. |
+| 19.4 | 🔲 Enviar pedidos sin zona/chofer para completarlos después | Pablo — consultar con SimpliRoute | Hoy `validarPedidoParaEnvio` bloquea el envío si falta zona o chofer (pasa con direcciones que SimpliRoute interpreta mal, ej. zona de Caridad Villarrosa/Mirasoles cerca de Escobar). Falta confirmar con SimpliRoute si se puede crear una Visit sin esos datos y completarlos después, y si esa asignación posterior se hace desde SimpliRoute directo o tiene que volver a nuestro sistema. **No tocar esta regla sin esa confirmación** — se desactivó a propósito en 2026-09-16. |
+| 19.5 | 🔲 Actualización automática de chofer/ruta cuando cambian en SimpliRoute | Pablo/cliente — definir comportamiento esperado | Marcado "requiere más debate" en la propia reunión. Falta definir: ¿se actualiza solo en silencio, o queda marcado para que alguien confirme? ¿Pasa en pleno reparto o siempre antes de salir? |
+| 19.6 | 🔲 "ID de Flota" / habilidades / otros campos de la grilla manual de SimpliRoute, sin cubrir todavía | Nosotros, baja prioridad | Mencionado al pasar en la reunión del 21/10, retomado con más detalle en la del 23/10 (ver §20) — no se tocó código todavía. |
+
+## 20. Reunión 2026-10-23 con Pablo — estructura de datos para SimpliRoute + modal de etiquetas
+
+Pablo compartió `Visitas_Consolidadas_Campos_Prioritarios.xlsx` (8 filas de
+ejemplo, una por archivo real de cliente) — es la estructura que los
+clientes cargan hoy a mano en la pantalla de carga manual de SimpliRoute.
+Confirma los campos reales del lado de SimpliRoute: `ID de Cliente,
+Nombre, Habilidades Requeridas/Opcionales, Etiquetas, Carga 1/2/3, Hora
+Inicio/Final (×2), Tiempo de Servicio, Prioridad, ID de Flota` — y agrega 4
+columnas nuevas a enviar: `Tipo de Visita, Notas, ID de Referencia, Seller`.
+
+| # | Pendiente | Dueño | Detalle |
+|---|---|---|---|
+| 20.1 | 🔲 Agregar 4 campos nuevos de texto libre al envío a SimpliRoute (Tipo de Visita, Nota, ID de Referencia, Seller) | Nosotros — ya decidido, no requiere pregunta | Tipo de Visita, Nota y Seller son valores **fijos por cliente** (se cargan una vez al crear/editar el Cliente, campo nuevo en esa pantalla) — no cambian pedido a pedido. ID de Referencia = el remito del pedido. |
+| 20.2 | 🔲 ID de Referencia (remito) condicional por cliente | Nosotros — ya decidido | Se extrae y manda el remito del Excel solo para los clientes que tengan remito configurado — hace falta un flag nuevo en `Cliente` para esto (a definir el nombre exacto al construirlo). |
+| 20.3 | 🔲 Modal de detalle de pedido al tocar la celda de etiqueta, en vez de texto plano | Nosotros — ya decidido | Hoy el campo "Etiquetas" de SimpliRoute manda todo el texto junto en una línea (ej. "farmaet, bolsa, fisica"), difícil de leer para el chofer en el celular. Se va a mandar solo el ID interno del pedido ahí, y construir un modal propio (en nuestra pantalla, no en SimpliRoute) que muestre el detalle completo en formato tarjeta al hacer clic. Leonardo tiene pendiente investigar si existe una consulta de etiquetas en la API de SimpliRoute como parte de esto. |
+| 20.4 | 🔲 ¿El campo de etiqueta de SimpliRoute permite tocar/copiar contenido en el celular del chofer? | Pablo — consultar con el equipo de SimpliRoute | Necesario para que el ID interno corto le sirva de algo al chofer (poder copiarlo/buscarlo) — si el campo es de solo lectura fija, puede no alcanzar con mandar solo un ID. |
+| 20.5 | 🔲 ¿Un ID corto sin descripción le sirve de verdad a las choferas? | Pablo/cliente — validar con las usuarias | Marcado explícitamente "requiere más debate" en la reunión — todavía sin validar con quienes usan la app todos los días si alcanza con un ID corto (sabiendo que el detalle está a un clic en el modal nuevo) o si necesitan seguir viendo algo de texto reconocible de un vistazo. |

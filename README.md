@@ -13,7 +13,7 @@ dónde está todo, qué falta y qué está bloqueado. Se reescribe en cada sesi�
 que confiá en ese antes que en tu memoria de la última vez.
 
 **¿Necesitás saber qué falta y de quién depende** (cuentas, credenciales,
-decisiones de negocio, deploy)? Ese es **[`PENDIENTES.md`](./PENDIENTES.md)**.
+decisiones de negocio, deploy)? Ese es **[`TEMAS_PENDIENTES.md`](./TEMAS_PENDIENTES.md)**.
 
 **¿Buscás las URLs desplegadas o cómo volver a desplegar?** Ese es
 **[`DEPLOY.md`](./DEPLOY.md)** — ambiente de test ya funcionando en Render + Vercel.
@@ -41,7 +41,7 @@ MYM/
 ├── DOCUMENTO FUNCIONAL.md   ← qué hace el sistema (negocio)
 ├── DOCUMENTO TECNICO.md     ← cómo se construye (arquitectura, decisiones, estado)
 ├── ESTADO_DEL_PROYECTO.md  ← foto rápida de dónde está todo ahora
-├── PENDIENTES.md            ← qué falta y de quién depende
+├── TEMAS_PENDIENTES.md      ← qué falta y de quién depende
 ├── DEPLOY.md                 ← URLs desplegadas y cómo volver a desplegar
 ├── IMAGENES/                ← capturas del sistema actual, solo de referencia
 └── app/                     ← todo el código
@@ -52,29 +52,6 @@ MYM/
     │   └── shared-types/     ← enums de dominio compartidos entre api y web
     └── README.md             ← cómo levantar el entorno local
 ```
-
-## Estado actual del proyecto
-
-Resumen rápido — para el detalle real y actualizado, siempre confiar en
-`ESTADO_DEL_PROYECTO.md` antes que en esta lista, que se desactualiza fácil:
-
-- **Stack**: TypeScript en todo — NestJS (backend), React + Vite + Tailwind +
-  shadcn/ui (frontend), PostgreSQL + Prisma.
-- **Backend**: completo salvo la pregunta de negocio pendiente de Facturación
-  (ver `PENDIENTES.md`) — auth (login propio + Google), roles combinables,
-  permisos por cliente, borrado lógico y auditoría universal, importador de
-  Excel genérico, pedidos/zonas/choferes/dashboard, motor de facturación
-  completo con reporte mensual exportable a Excel, e integración con
-  SimpliRoute (adapter real construido, activo en modo mock hasta tener un
-  token real).
-- **Frontend**: las 8 pantallas del nav construidas y probadas end-to-end,
-  PWA instalable.
-- **Base de datos**: Neon Postgres, usada desde desarrollo y desde el
-  ambiente de test desplegado (ver abajo) — separar una branch dedicada para
-  test queda pendiente antes de producción real.
-- **Despliegue**: ambiente de **test ya desplegado** (Render + Vercel, free
-  tier) — ver `DEPLOY.md` para URLs y cómo volver a hacerlo. Producción real
-  todavía no arrancó, es una decisión de negocio pendiente.
 
 ## Quick start
 
