@@ -262,15 +262,31 @@ export class SimplirouteHttpAdapter implements LogisticaProviderPort {
   // real. Los errores se propagan a propósito: PedidosService.enviarASimpliRoute
   // ya los captura por pedido individual sin frenar al resto (§18).
   async enviarPedido(pedido: PedidoParaEnviar): Promise<ResultadoEnvio> {
+    // Reunión 2026-10-23: antes `notes` era solo observaciones, ahora
+    // arranca con el N.º de pedido interno (para que el chofer identifique
+    // el pedido de un vistazo en el celular, sin leer todo el texto largo)
+    // — SIN sacar observaciones todavía: el reemplazo total por un ID corto
+    // quedó "requiere más debate" en la reunión, pendiente de validar con
+    // las choferas (ver TEMAS_PENDIENTES.md §20.5). La nota fija del cliente
+    // (Cliente.notaSimpliRoute) va en el medio.
+    const notas = [`#${pedido.numero}`, pedido.notaCliente, pedido.observaciones]
+      .filter((parte): parte is string => Boolean(parte))
+      .join(" · ");
+
+    const sellerUuid = pedido.seller ? await this.resolverSellerUuid(pedido.seller) : null;
+
     const body = [
       {
         title: pedido.destinatarioNombre,
         address: pedido.direccion,
         planned_date: pedido.fechaProgramada.toISOString().slice(0, 10),
-        reference: pedido.pedidoId,
+        // Reunión 2026-10-23: el remito real cuando el cliente lo tiene
+        // habilitado — si no, se mantiene el comportamiento de siempre
+        // (nuestro propio id de pedido como referencia).
+        reference: pedido.referencia ?? pedido.pedidoId,
         contact_name: pedido.destinatarioNombre,
         contact_phone: pedido.destinatarioTelefono ?? "",
-        notes: pedido.observaciones ?? "",
+        notes: notas,
         // Tiempo de Servicio confirmado por el cliente (reunión 02/10/2026,
         // Pablo Renzo): fijo 2 minutos para todos los envíos.
         duration: DURACION_SERVICIO_FIJA,
@@ -279,6 +295,8 @@ export class SimplirouteHttpAdapter implements LogisticaProviderPort {
         // anterior de `load` para la cantidad de bultos.
         ...(pedido.cargaPanal ? { load: 1 } : {}),
         ...(pedido.cargaEspecial ? { load_3: 1 } : {}),
+        ...(pedido.tipoVisita ? { visit_type: pedido.tipoVisita } : {}),
+        ...(sellerUuid ? { seller: sellerUuid } : {}),
       },
     ];
 
@@ -294,6 +312,34 @@ export class SimplirouteHttpAdapter implements LogisticaProviderPort {
       longitud: aNumero(visita.longitude),
       geocodeAlert: visita.geocode_alert ?? null,
     };
+  }
+
+  // Reunión 2026-10-23: `seller` en SimpliRoute es un UUID que referencia un
+  // Seller ya existente (GET /v1/sellers/), no texto libre — pero Pablo pide
+  // cargarlo como texto libre por cliente. Se resuelve acá por nombre/alias
+  // (sin distinguir mayúsculas). Sellers requiere habilitación de cuenta vía
+  // Customer Success (documentado oficialmente) — si la cuenta no lo tiene
+  // habilitado, o no hay coincidencia, se devuelve null y el envío sigue
+  // igual sin ese campo (nunca bloquea el pedido por esto).
+  private async resolverSellerUuid(nombreOAlias: string): Promise<string | null> {
+    try {
+      const sellers = await this.solicitar<{ id: string; name: string; alias: string }[]>(
+        "GET",
+        "/v1/sellers/",
+      );
+      const buscado = nombreOAlias.trim().toLowerCase();
+      const encontrado = sellers.find(
+        (s) => s.name?.toLowerCase() === buscado || s.alias?.toLowerCase() === buscado,
+      );
+      return encontrado?.id ?? null;
+    } catch (error) {
+      this.logger.warn(
+        `No se pudo resolver el seller "${nombreOAlias}" (¿Sellers habilitado en la cuenta?): ${
+          error instanceof Error ? error.message : "error desconocido"
+        }`,
+      );
+      return null;
+    }
   }
 
   // Bug real 2026-10-07 (reunión, confirmado contra la cuenta real):
@@ -319,10 +365,20 @@ export class SimplirouteHttpAdapter implements LogisticaProviderPort {
   // ya tiene ese día (`routes: [{id, plan_id}]`) — se reusa la primera si
   // existe (un chofer puede tener varios pedidos el mismo día, todos van a
   // la misma Route) en vez de crear una nueva cada vez. Si no existe
-  // ninguna, se crea un Plan mínimo (nombre único por timestamp, recomendado
-  // por la documentación oficial) y una Route dentro — SimpliRoute exige
-  // punto de inicio/fin para crear una Route aunque no tengamos un depósito
-  // real configurado (ver simpliroute.depositoDireccion/Latitud/Longitud).
+  // ninguna, se crea una Route nueva — pero DENTRO del Plan del día si ya
+  // hay uno (de CUALQUIER otro vehículo), no uno nuevo por vehículo. Bug
+  // real reportado 2026-10-21 (reunión, Pablo Renzo): antes esta función
+  // creaba un Plan nuevo cada vez que un vehículo distinto necesitaba su
+  // primera Route del día, así que un día con pedidos para 3 choferes
+  // terminaba con 3 Planes separados en SimpliRoute en vez de 1 solo Plan
+  // con 3 Rutas adentro (el requerimiento real: "como la grilla 21 del día
+  // 10", un único plan diario con todos los envíos). Solo se crea un Plan
+  // mínimo (nombre único por timestamp, recomendado por la documentación
+  // oficial) la PRIMERA vez que se necesita una Route ese día — después,
+  // cualquier otro vehículo que necesite Route ese mismo día se agrega
+  // dentro del mismo Plan ya existente. SimpliRoute exige punto de
+  // inicio/fin para crear una Route aunque no tengamos un depósito real
+  // configurado (ver simpliroute.depositoDireccion/Latitud/Longitud).
   private async obtenerOCrearRuta(choferIdExterno: number, vehiculoIdExterno: number, fecha: Date): Promise<string> {
     const fechaStr = fecha.toISOString().slice(0, 10);
 
@@ -333,16 +389,25 @@ export class SimplirouteHttpAdapter implements LogisticaProviderPort {
     const rutaExistente = vehiculos.find((v) => v.id === vehiculoIdExterno)?.routes?.[0];
     if (rutaExistente) return rutaExistente.id;
 
-    const plan = await this.solicitar<{ id: string }>("POST", "/v1/plans/create-plan/", {
-      name: `Plan MyM ${fechaStr} ${Date.now()}`,
-      start_date: fechaStr,
-      end_date: fechaStr,
-    });
+    // Plan de CUALQUIER vehículo que ya tenga una Route ese día — se reusa
+    // en vez de crear uno nuevo, así todas las Rutas del día quedan juntas
+    // en un único Plan.
+    const planIdExistente = vehiculos.find((v) => v.routes?.[0])?.routes[0].plan_id;
+    const planId =
+      planIdExistente ??
+      (
+        await this.solicitar<{ id: string }>("POST", "/v1/plans/create-plan/", {
+          name: `Plan MyM ${fechaStr} ${Date.now()}`,
+          start_date: fechaStr,
+          end_date: fechaStr,
+        })
+      ).id;
+
     const ruta = await this.solicitar<{ id: string }>("POST", "/v1/routes/routes/", {
       vehicle: vehiculoIdExterno,
       driver: choferIdExterno,
       planned_date: fechaStr,
-      plan: plan.id,
+      plan: planId,
       estimated_time_start: "08:00:00",
       estimated_time_end: "18:00:00",
       location_start_address: this.depositoDireccion,

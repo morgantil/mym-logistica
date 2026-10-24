@@ -30,6 +30,18 @@ export interface PedidoParaEnviar {
   // "Carga 3" (campo `load_3`) — true solo si el Cliente del pedido tiene
   // Cliente.usaCarga3 activado (hoy: SACEIP SOLIS, ver schema.prisma).
   cargaEspecial: boolean;
+  // N.º de pedido interno — reunión 2026-10-23: se manda en `notes` (antes
+  // del texto de observaciones) para que el chofer pueda identificar el
+  // pedido de un vistazo en su celular sin leer todo el texto largo.
+  numero: number;
+  // Campos nuevos de la reunión 2026-10-23, todos opcionales — valores
+  // fijos por cliente (Cliente.tipoVisitaSimpliRoute/notaSimpliRoute/
+  // sellerSimpliRoute), más `referencia` (el remito, solo si
+  // Cliente.remitoHabilitado — ver PedidosService.enviarASimpliRoute).
+  tipoVisita: string | null;
+  notaCliente: string | null;
+  seller: string | null;
+  referencia: string | null;
 }
 
 export interface ResultadoEnvio {

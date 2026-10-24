@@ -74,4 +74,33 @@ describe("SimplirouteHttpAdapter.asignarChoferVehiculo", () => {
     });
     expect(llamadas[3].body).toEqual({ route: "ruta-nueva" });
   });
+
+  it("si OTRO vehículo ya tiene Plan ese día, reusa ese Plan en vez de crear uno nuevo", async () => {
+    const llamadas = mockFetchSecuencial([
+      // El vehículo pedido (678190) no tiene Route todavía, pero otro
+      // vehículo (111) ya tiene una Route ese día, con su propio Plan.
+      {
+        status: 200,
+        body: [
+          { id: 111, routes: [{ id: "ruta-otro-chofer", plan_id: "plan-del-dia" }] },
+          { id: 678190, routes: [] },
+        ],
+      },
+      { status: 201, body: { id: "ruta-nueva" } }, // POST routes — sin POST create-plan antes
+      { status: 200, body: {} }, // PATCH visit.route
+    ]);
+    const adapter = new SimplirouteHttpAdapter(armarConfig());
+
+    await adapter.asignarChoferVehiculo("938760987", 514751, 678190, new Date("2026-10-09T00:00:00.000Z"));
+
+    expect(llamadas).toHaveLength(3);
+    expect(llamadas[1].url).toContain("/v1/routes/routes/");
+    expect(llamadas[1].body).toMatchObject({
+      vehicle: 678190,
+      driver: 514751,
+      planned_date: "2026-10-09",
+      plan: "plan-del-dia",
+    });
+    expect(llamadas[2].body).toEqual({ route: "ruta-nueva" });
+  });
 });

@@ -18,6 +18,7 @@ function pedidoListoParaEnviar(overrides: Partial<Pedido> = {}): Pedido {
     estado: EstadoPedido.SIN_ASIGNAR,
     estadoValidacion: EstadoValidacion.VALIDO,
     estadoSimpliroute: EstadoSimpliroute.NO_ENVIADO,
+    simplirouteId: null,
     zonaId: "z1",
     zonaNombre: "Zona de prueba",
     choferId: "ch1",
@@ -69,12 +70,11 @@ describe("validarPedidoParaEnvio", () => {
     expect(errores).toContain("Afiliado no encontrado en SimpliRoute.");
   });
 
-  it("marca zona sin identificar y chofer sin asignar por separado", () => {
+  it("zona/chofer sin identificar NO bloquea el envío (decisión 2026-10-21) — se envía sin ruta asignada", () => {
     const errores = validarPedidoParaEnvio(
       pedidoListoParaEnviar({ zonaId: null, choferId: null }),
     );
-    expect(errores).toContain("Zona sin identificar.");
-    expect(errores).toContain("Chofer sin asignar.");
+    expect(errores).toEqual([]);
   });
 
   it("marca dirección distinta al padrón como bloqueante hasta que se resuelva", () => {
@@ -89,7 +89,7 @@ describe("validarPedidoParaEnvio", () => {
 
   it("acumula todos los errores a la vez, no se corta en el primero", () => {
     const errores = validarPedidoParaEnvio(
-      pedidoListoParaEnviar({ zonaId: null, choferId: null }),
+      pedidoListoParaEnviar({ estadoSimpliroute: EstadoSimpliroute.NO_ENCONTRADO, alertaDireccionPendiente: true }),
     );
     expect(errores).toHaveLength(2);
   });
