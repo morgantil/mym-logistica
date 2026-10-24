@@ -10,9 +10,9 @@ import {
 } from "../../geografia/domain/normalizador-direcciones.port";
 import { LimitesReporteService } from "../../limites-reporte/application/limites-reporte.service";
 import { ZonasChoferesService } from "../../zonas-choferes/application/zonas-choferes.service";
-import { generarEtiquetasPdf } from "../infrastructure/etiqueta-pdf.generador";
+import { generarEtiquetasMultiplesPdf, generarEtiquetasPdf } from "../infrastructure/etiqueta-pdf.generador";
 import { generarPedidosExcel } from "../infrastructure/pedidos-excel.generador";
-import { generarRemitoPdf } from "../infrastructure/remito-pdf.generador";
+import { generarRemitoPdf, generarRemitosPdf } from "../infrastructure/remito-pdf.generador";
 import { mapearEstadoSimpliRoute } from "../domain/mapear-estado-simpliroute";
 import { estaDentroDeBuenosAires } from "../domain/validar-coordenada-buenos-aires";
 import { armarDireccionParaSimpliRoute } from "../domain/armar-direccion-para-simpliroute";
@@ -219,6 +219,51 @@ export class PedidosService {
     return this.repositorio.resolverAlertaDireccion(pedidoId, direccionAUsar, version);
   }
 
+  // Reasignación manual de chofer (reunión 2026-10-21, Pablo Renzo): el
+  // usuario la dispara a mano para un imprevisto real (chofer enfermo,
+  // vehículo roto) — reusa la misma resolución chofer→vehículo→zona que ya
+  // usa la sincronización automática de estados (ZonasChoferesService.
+  // resolverZonaPorChofer), así los dos caminos quedan consistentes entre
+  // sí. Si el pedido ya se había mandado a SimpliRoute, también empuja el
+  // cambio allá (misma función que usa el envío inicial) — si no se hiciera
+  // esto, el chofer real nunca se enteraría del cambio en su celular.
+  async reasignarChofer(pedidoId: string, choferIdExterno: number, version: number) {
+    const pedido = await this.repositorio.obtenerPorId(pedidoId);
+    if (!pedido) {
+      throw new NotFoundException(`Pedido ${pedidoId} no encontrado.`);
+    }
+
+    const resuelto = await this.zonasChoferesService.resolverZonaPorChofer(choferIdExterno);
+    if (!resuelto.choferNombre) {
+      throw new BadRequestException("Chofer no encontrado.");
+    }
+
+    if (pedido.simplirouteId) {
+      if (!resuelto.vehiculoId) {
+        throw new BadRequestException(
+          `${resuelto.choferNombre} no tiene un vehículo asociado en SimpliRoute — no se puede reasignar.`,
+        );
+      }
+      await this.logisticaProvider.asignarChoferVehiculo(
+        pedido.simplirouteId,
+        Number(resuelto.choferId),
+        Number(resuelto.vehiculoId),
+        pedido.fechaProgramada,
+      );
+    }
+
+    return this.repositorio.reasignarChofer(
+      pedidoId,
+      {
+        zonaId: resuelto.zonaId,
+        zonaNombre: resuelto.zonaNombre,
+        choferId: resuelto.choferId,
+        choferNombre: resuelto.choferNombre,
+      },
+      version,
+    );
+  }
+
   // §8.2 funcional v6: etiquetas de bulto. `numeroBulto` ausente = todas las
   // del pedido (1..bultos); presente = una puntual (reimpresión de una sola).
   // Exige que ya se haya cargado la cantidad de bultos — no tiene sentido
@@ -259,6 +304,71 @@ export class PedidosService {
       );
     }
     return generarRemitoPdf(pedido, pedido.clienteFormatoRemito);
+  }
+
+  // Impresión masiva (reunión 2026-10-21, Pablo Renzo): selección de varios
+  // pedidos para imprimir sus etiquetas juntas en un solo PDF. Obligatorio
+  // que sean del MISMO cliente — cada uno puede traer datos de etiqueta
+  // distintos (bulto/bolsa/retiro de receta) y mezclar clientes en un mismo
+  // lote de embalaje es justo lo que se quiere evitar. Se valida todo ANTES
+  // de generar nada — o se imprimen todos, o ninguno (nada de PDFs a medias
+  // con algunos pedidos salteados en silencio).
+  async generarEtiquetasMasivo(pedidoIds: string[]): Promise<Buffer> {
+    const pedidos = await this.obtenerPedidosListadoOFallar(pedidoIds);
+    this.validarMismoCliente(pedidos);
+
+    const sinBultos = pedidos.filter((p) => !p.bultos || p.bultos < 1);
+    if (sinBultos.length > 0) {
+      throw new BadRequestException(
+        `Cargá la cantidad de bultos antes de imprimir etiquetas — falta en el/los pedido(s) N.º ${sinBultos
+          .map((p) => p.numero)
+          .join(", ")}.`,
+      );
+    }
+
+    const pdf = await generarEtiquetasMultiplesPdf(
+      pedidos.map((pedido) => ({
+        pedido,
+        numerosBulto: Array.from({ length: pedido.bultos! }, (_, i) => i + 1),
+      })),
+    );
+    await Promise.all(pedidoIds.map((id) => this.repositorio.marcarEtiquetaImpresa(id)));
+    return pdf;
+  }
+
+  // Mismo criterio que generarEtiquetasMasivo: todo o nada, mismo cliente
+  // obligatorio (acá además define en qué coordenadas/tamaño de papel
+  // imprimir — mezclar clientes mezclaría formatos de remito incompatibles).
+  async generarRemitoMasivo(pedidoIds: string[]): Promise<Buffer> {
+    const pedidos = await this.obtenerPedidosListadoOFallar(pedidoIds);
+    this.validarMismoCliente(pedidos);
+
+    const formato = pedidos[0].clienteFormatoRemito;
+    if (!formato) {
+      throw new BadRequestException(
+        `${pedidos[0].clienteNombre} todavía no tiene un formato de remito configurado (pantalla Clientes).`,
+      );
+    }
+    return generarRemitosPdf(pedidos, formato);
+  }
+
+  private async obtenerPedidosListadoOFallar(pedidoIds: string[]) {
+    const pedidos = await Promise.all(pedidoIds.map((id) => this.repositorio.obtenerListadoPorId(id)));
+    const faltantes = pedidoIds.filter((_, indice) => !pedidos[indice]);
+    if (faltantes.length > 0) {
+      throw new NotFoundException(`Pedido(s) no encontrado(s): ${faltantes.join(", ")}.`);
+    }
+    return pedidos as NonNullable<(typeof pedidos)[number]>[];
+  }
+
+  private validarMismoCliente(pedidos: { clienteId: string; clienteNombre: string }[]) {
+    const clientesDistintos = new Set(pedidos.map((p) => p.clienteId));
+    if (clientesDistintos.size > 1) {
+      const nombres = [...new Set(pedidos.map((p) => p.clienteNombre))].join(", ");
+      throw new BadRequestException(
+        `La impresión masiva solo admite pedidos de un mismo cliente — hay seleccionados de: ${nombres}.`,
+      );
+    }
   }
 
   // §18 funcional: el usuario selecciona pedidos y el sistema intenta enviarlos.
@@ -310,6 +420,16 @@ export class PedidosService {
           observaciones: pedido.observaciones,
           cargaPanal: pedido.tipoServicio === TipoServicio.PANAL,
           cargaEspecial: cliente?.usaCarga3 ?? false,
+          numero: pedido.numero,
+          tipoVisita: cliente?.tipoVisitaSimpliRoute ?? null,
+          notaCliente: cliente?.notaSimpliRoute ?? null,
+          seller: cliente?.sellerSimpliRoute ?? null,
+          // Remito real solo si el cliente lo tiene habilitado — ver
+          // comentario en Cliente.remitoHabilitado (schema.prisma). `remito`
+          // es null en Pañales (vive en observaciones, sin estructurar) —
+          // en ese caso SimpliRoute sigue recibiendo nuestro propio id como
+          // referencia, mismo comportamiento que antes de esta reunión.
+          referencia: cliente?.remitoHabilitado ? pedido.remito : null,
         });
 
         // El cliente confirmó que ninguna entrega sale nunca de Buenos Aires

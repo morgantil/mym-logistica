@@ -32,6 +32,31 @@ import { PerfilGuardado } from "../domain/perfil-importacion.repositorio";
 import { ReglaImportacionService } from "./regla-importacion.service";
 import { SinonimoRecetaService } from "./sinonimo-receta.service";
 
+// Forma de entrada de crearPedidoManual — a propósito un tipo plano acá (no
+// se importa el DTO de la capa interface, que tiene decoradores de
+// class-validator: la capa application no depende de interface, al revés
+// sí). El controller pasa el DTO tal cual — coincide estructuralmente.
+export interface DatosPedidoManual {
+  clienteId: string;
+  tipoServicio: TipoServicio;
+  fechaEntrega: string;
+  numeroAfiliado: string;
+  destinatario: string;
+  direccion: string;
+  localidad: string;
+  telefono?: string;
+  ticket?: string;
+  productos?: { codigoProducto?: string; descripcionProducto: string; cantidad: number }[];
+  entreCalles?: string;
+  receta?: string;
+  tipoPedido?: string;
+  retiroDeReceta?: string;
+  tiempoDeEntrega?: string;
+  horarioEntrega?: string;
+  cantidadBulto?: number;
+  cantidadBolsa?: number;
+}
+
 export interface ResultadoImportacionCompleta {
   estado: "completada";
   importacionId: string;
@@ -187,6 +212,75 @@ export class ImportarExcelService {
       params.fechaEntrega,
       tipoServicio,
       opciones.sinEncabezado ? 1 : 2,
+    );
+  }
+
+  // Alta manual (reunión 2026-10-21, Pablo Renzo): arma una "fila de Excel"
+  // sintética (una por producto en Pañales, una sola en Medicamentos — igual
+  // que vendría de un archivo real) con un mapeo identidad (cada campo
+  // canónico apunta a una clave con su propio nombre) y la hace pasar por el
+  // MISMO pipeline que una importación real — reusa destinatario/padrón,
+  // sincronización con SimpliRoute, resolución de zona/chofer y zona
+  // tarifaria, en vez de reimplementar esa lógica para el alta manual.
+  async crearPedidoManual(datos: DatosPedidoManual, usuarioId: string): Promise<ResultadoImportacionCompleta> {
+    await this.validarTipoServicioDeCliente(datos.clienteId, datos.tipoServicio);
+
+    const base: Record<string, unknown> = {
+      numeroAfiliado: datos.numeroAfiliado,
+      destinatario: datos.destinatario,
+      direccion: datos.direccion,
+      localidad: datos.localidad,
+      telefono: datos.telefono ?? null,
+      ticket: datos.ticket ?? null,
+    };
+
+    if (datos.tipoServicio === TipoServicio.MEDICAMENTO) {
+      if (!datos.cantidadBulto && !datos.cantidadBolsa) {
+        throw new BadRequestException("Indicá la cantidad de Bulto y/o Bolsa.");
+      }
+      const fila: Record<string, unknown> = {
+        ...base,
+        entreCalles: datos.entreCalles ?? null,
+        receta: datos.receta ?? null,
+        tipoPedido: datos.tipoPedido ?? null,
+        retiroDeReceta: datos.retiroDeReceta ?? null,
+        tiempoDeEntrega: datos.tiempoDeEntrega ?? null,
+        horarioEntrega: datos.horarioEntrega ?? null,
+        cantidadBulto: datos.cantidadBulto ?? null,
+        cantidadBolsa: datos.cantidadBolsa ?? null,
+      };
+      const mapeoIdentidad = Object.fromEntries(Object.keys(fila).map((campo) => [campo, campo])) as MapeoColumnas;
+      return this.ejecutarPipeline(
+        datos.clienteId,
+        [fila],
+        mapeoIdentidad,
+        "Alta manual",
+        usuarioId,
+        datos.fechaEntrega,
+        TipoServicio.MEDICAMENTO,
+        1,
+      );
+    }
+
+    if (!datos.productos || datos.productos.length === 0) {
+      throw new BadRequestException("Cargá al menos un producto.");
+    }
+    const filas: Record<string, unknown>[] = datos.productos.map((producto) => ({
+      ...base,
+      codigoProducto: producto.codigoProducto ?? null,
+      descripcionProducto: producto.descripcionProducto,
+      cantidad: producto.cantidad,
+    }));
+    const mapeoIdentidad = Object.fromEntries(Object.keys(filas[0]).map((campo) => [campo, campo])) as MapeoColumnas;
+    return this.ejecutarPipeline(
+      datos.clienteId,
+      filas,
+      mapeoIdentidad,
+      "Alta manual",
+      usuarioId,
+      datos.fechaEntrega,
+      TipoServicio.PANAL,
+      1,
     );
   }
 

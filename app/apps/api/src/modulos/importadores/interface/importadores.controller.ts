@@ -15,6 +15,7 @@ import { Roles } from "../../../common/decorators/roles.decorator";
 import { UsuarioActual, UsuarioAutenticado } from "../../../common/decorators/usuario-actual.decorator";
 import { ImportarExcelService } from "../application/importar-excel.service";
 import { MapeoColumnas } from "../domain/campo-canonico";
+import { CrearPedidoManualDto } from "./dto/crear-pedido-manual.dto";
 
 // Sin DTO de class-validator a propósito: los campos de texto llegan mezclados
 // con el archivo en un multipart/form-data, y la validación fina de cada uno
@@ -124,5 +125,16 @@ export class ImportadoresController {
       // "true"/"false" del formulario; sin informar = lo guardado en el perfil.
       sinEncabezado: sinEncabezado === undefined || sinEncabezado === "" ? undefined : sinEncabezado === "true",
     });
+  }
+
+  // Alta manual (reunión 2026-10-21, Pablo Renzo): "agregar un pedido a
+  // mano, sin Excel" — mismos roles que pueden importar un archivo. La
+  // validación de fondo (campos obligatorios por tipo de cliente,
+  // geocodificación, zona/chofer) la hace el mismo pipeline que una
+  // importación real — ver ImportarExcelService.crearPedidoManual.
+  @Roles(Rol.OPERACIONES, Rol.ADMINISTRACION)
+  @Post("manual")
+  crearManual(@Body() dto: CrearPedidoManualDto, @UsuarioActual() usuario: UsuarioAutenticado) {
+    return this.importarExcelService.crearPedidoManual(dto, usuario.id);
   }
 }

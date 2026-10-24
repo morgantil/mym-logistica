@@ -30,9 +30,14 @@ import { useAuth } from "@/features/auth/auth-context";
 import { listarClientesActivos } from "@/features/clientes/api";
 import { listarUsuariosImportadores } from "@/features/importar/api";
 import { listarChoferes, listarZonas } from "@/features/zonas-choferes/api";
+import { AxiosError } from "axios";
+import { imprimirPdf } from "@/lib/imprimir-pdf";
+import { crearPedidoManual } from "@/features/importar/api";
 import {
   actualizarColumnasPedidos,
   actualizarPrioridad,
+  descargarEtiquetasMasivo,
+  descargarRemitosMasivo,
   eliminarPedido,
   eliminarPedidos,
   exportarPedidos,
@@ -40,10 +45,31 @@ import {
   listarPedidos,
   obtenerColumnasPedidos,
 } from "./api";
+
+// El backend manda el mensaje de error como JSON incluso cuando el request
+// pidió `responseType: "blob"` (es lo único que puede devolver ante un 400,
+// no hay PDF que generar) — axios igual lo entrega como Blob porque eso es
+// lo que configuramos, hay que leerlo a mano para mostrar el motivo real
+// ("mezclan más de un cliente", "falta cargar bultos", etc.) en vez de un
+// mensaje genérico.
+async function mensajeErrorImpresionMasiva(error: unknown): Promise<string> {
+  if (error instanceof AxiosError && error.response?.data instanceof Blob) {
+    try {
+      const texto = await error.response.data.text();
+      const cuerpo = JSON.parse(texto) as { message?: string | string[] };
+      if (cuerpo.message) return Array.isArray(cuerpo.message) ? cuerpo.message.join(" ") : cuerpo.message;
+    } catch {
+      // sigue al genérico de abajo
+    }
+  }
+  return "No se pudo generar el PDF. Probá de nuevo en unos segundos.";
+}
 import { BultosCelda } from "./bultos-celda";
+import { ChoferCelda } from "./chofer-celda";
 import { ComentarioCelda } from "./comentario-celda";
 import { OPCIONES_RUTA, RutaCelda } from "./ruta-celda";
 import { DetallePedidoSheet } from "./detalle-pedido-sheet";
+import { PedidoManualFormSheet } from "./pedido-manual-form-sheet";
 import { ordenarColumnas } from "./orden-columnas";
 import {
   BadgeEstadoPedido,
@@ -179,11 +205,23 @@ export function PedidosTabla() {
   const puedeEditarRuta = Boolean(
     usuario?.roles.some((rol) => rol === "OPERACIONES" || rol === "LOGISTICA" || rol === "ADMINISTRACION"),
   );
+  // Reasignación manual de chofer — mismos roles que ruta/comentario
+  // (decisión 2026-10-21).
+  const puedeReasignarChofer = Boolean(
+    usuario?.roles.some((rol) => rol === "OPERACIONES" || rol === "LOGISTICA" || rol === "ADMINISTRACION"),
+  );
   // Borrado lógico — decisión 2026-09-11, ver validar-eliminacion.ts (solo
   // pedidos que todavía no se mandaron a SimpliRoute).
   const puedeEliminar = Boolean(
     usuario?.roles.some((rol) => rol === "OPERACIONES" || rol === "LOGISTICA" || rol === "ADMINISTRACION"),
   );
+  // Impresión masiva — mismos roles que ya imprimen uno por uno en Embalaje
+  // y Despacho (decisión 2026-10-21).
+  const puedeImprimir = Boolean(usuario?.roles.some((rol) => rol === "LOGISTICA" || rol === "ADMINISTRACION"));
+  // Alta manual — mismos roles que pueden importar un Excel (backend:
+  // ImportadoresController.crearManual).
+  const puedeAltaManual = Boolean(usuario?.roles.some((rol) => rol === "OPERACIONES" || rol === "ADMINISTRACION"));
+  const [altaManualAbierta, setAltaManualAbierta] = useState(false);
 
   const [pagina, setPagina] = useState(1);
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState<PedidoListado | null>(null);
@@ -429,6 +467,25 @@ export function PedidosTabla() {
     onError: () => toast.error("No se pudo cambiar la prioridad. Probá de nuevo en unos segundos."),
   });
 
+  // Impresión masiva (reunión 2026-10-21, Pablo Renzo): selección de varios
+  // pedidos de un mismo cliente, un solo PDF con todas las etiquetas o
+  // todos los remitos. El backend valida "mismo cliente" — acá solo se
+  // muestra el error que mande (mezcla de clientes, falta de bultos, etc.).
+  const mutacionEtiquetasMasivo = useMutation({
+    mutationFn: descargarEtiquetasMasivo,
+    onSuccess: (blob) => {
+      imprimirPdf(blob);
+      queryClient.invalidateQueries({ queryKey: ["pedidos"] });
+    },
+    onError: async (error) => toast.error(await mensajeErrorImpresionMasiva(error)),
+  });
+
+  const mutacionRemitosMasivo = useMutation({
+    mutationFn: descargarRemitosMasivo,
+    onSuccess: (blob) => imprimirPdf(blob),
+    onError: async (error) => toast.error(await mensajeErrorImpresionMasiva(error)),
+  });
+
   const definicionesColumna: Record<(typeof IDS_COLUMNAS_DEFAULT)[number], LegacyColumnDef<PedidoListado>> = useMemo(
     () => ({
       cliente: { id: "cliente", header: "Cliente", cell: ({ row }) => row.original.clienteNombre },
@@ -468,7 +525,23 @@ export function PedidosTabla() {
             <BadgePrioridad prioridad={row.original.prioridad} />
           ),
       },
-      numero: { id: "numero", header: "Nº Pedido", cell: ({ row }) => row.original.numero },
+      numero: {
+        id: "numero",
+        header: "Nº Pedido",
+        // Reunión 2026-10-23: "modal interactivo al hacer clic en la celda"
+        // para ver el detalle completo — reusa el mismo DetallePedidoSheet
+        // que ya abre el botón "Ver detalle" (acá va el mismo pedido que
+        // SimpliRoute identifica por este número en la etiqueta/nota).
+        cell: ({ row }) => (
+          <button
+            type="button"
+            className="underline-offset-2 hover:underline"
+            onClick={() => setPedidoSeleccionado(row.original)}
+          >
+            {row.original.numero}
+          </button>
+        ),
+      },
       remito: { id: "remito", header: "Remito", cell: ({ row }) => row.original.remito ?? "—" },
       receta: {
         id: "receta",
@@ -528,7 +601,11 @@ export function PedidosTabla() {
         cell: ({ row }) => <BultosCelda pedido={row.original} puedeEditar={puedeEditarBultos} />,
       },
       zona: { id: "zona", header: "Zona", cell: ({ row }) => row.original.zonaNombre ?? "—" },
-      chofer: { id: "chofer", header: "Chofer", cell: ({ row }) => row.original.choferNombre ?? "—" },
+      chofer: {
+        id: "chofer",
+        header: "Chofer",
+        cell: ({ row }) => <ChoferCelda pedido={row.original} puedeEditar={puedeReasignarChofer} />,
+      },
       validacion: {
         id: "validacion",
         header: "Validación",
@@ -560,7 +637,15 @@ export function PedidosTabla() {
         cell: ({ row }) => row.original.importadoPorNombre ?? "—",
       },
     }),
-    [puedeEditarBultos, puedeEditarComentario, puedeEditarRuta, puedeEliminar, mutacionPrioridad],
+    [
+      puedeEditarBultos,
+      puedeEditarComentario,
+      puedeEditarRuta,
+      puedeReasignarChofer,
+      puedeEliminar,
+      mutacionPrioridad,
+      setPedidoSeleccionado,
+    ],
   );
 
   const columnas = useMemo<LegacyColumnDef<PedidoListado>[]>(() => {
@@ -968,6 +1053,11 @@ export function PedidosTabla() {
             >
               {mutacionExportar.isPending ? "Exportando…" : "Exportar a Excel"}
             </Button>
+            {puedeAltaManual && (
+              <Button type="button" variant="outline" size="sm" onClick={() => setAltaManualAbierta(true)}>
+                Alta manual
+              </Button>
+            )}
           </div>
           {puedeEliminar && seleccionados.size > 0 && (
             <div className="flex flex-wrap items-center gap-2">
@@ -1010,6 +1100,30 @@ export function PedidosTabla() {
                     : `Borrar seleccionados (${idsBorrablesSeleccionados.length})`}
                 </Button>
               )}
+            </div>
+          )}
+          {puedeImprimir && seleccionados.size > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={mutacionEtiquetasMasivo.isPending}
+                onClick={() => mutacionEtiquetasMasivo.mutate(Array.from(seleccionados))}
+              >
+                {mutacionEtiquetasMasivo.isPending
+                  ? "Generando…"
+                  : `Imprimir etiquetas (${seleccionados.size})`}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={mutacionRemitosMasivo.isPending}
+                onClick={() => mutacionRemitosMasivo.mutate(Array.from(seleccionados))}
+              >
+                {mutacionRemitosMasivo.isPending ? "Generando…" : `Imprimir remitos (${seleccionados.size})`}
+              </Button>
             </div>
           )}
         </div>
@@ -1124,6 +1238,17 @@ export function PedidosTabla() {
       <DetallePedidoSheet
         pedido={pedidoSeleccionado}
         onOpenChange={(abierto) => !abierto && setPedidoSeleccionado(null)}
+      />
+
+      <PedidoManualFormSheet
+        abierto={altaManualAbierta}
+        clientes={clientesDisponibles}
+        onCrear={async (datos) => {
+          const resultado = await crearPedidoManual(datos);
+          queryClient.invalidateQueries({ queryKey: ["pedidos"] });
+          return resultado;
+        }}
+        onOpenChange={setAltaManualAbierta}
       />
     </div>
   );

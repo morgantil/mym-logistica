@@ -103,3 +103,33 @@ export async function generarEtiquetasPdf(
     doc.end();
   });
 }
+
+// Impresión masiva (reunión 2026-10-21, Pablo Renzo): varios pedidos
+// seleccionados de un mismo cliente, todas sus etiquetas en un solo PDF
+// — una página por bulto de cada pedido, en el orden en que vienen los
+// pedidos. Reusa exactamente la misma `dibujarEtiqueta` que la impresión
+// individual, solo cambia el bucle externo (ahora también sobre pedidos).
+export async function generarEtiquetasMultiplesPdf(
+  pedidos: { pedido: PedidoListado; numerosBulto: number[] }[],
+): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ size: [ANCHO_PT, ALTO_PT], margin: MARGEN_PT });
+    const partes: Buffer[] = [];
+    doc.on("data", (parte) => partes.push(parte));
+    doc.on("end", () => resolve(Buffer.concat(partes)));
+    doc.on("error", reject);
+
+    let esPrimeraPagina = true;
+    for (const { pedido, numerosBulto } of pedidos) {
+      const totalBultos = pedido.bultos ?? 0;
+      const tipos = tiposEnvasePorEtiqueta(pedido.productos, totalBultos);
+      for (const numeroBulto of numerosBulto) {
+        if (!esPrimeraPagina) doc.addPage({ size: [ANCHO_PT, ALTO_PT], margin: MARGEN_PT });
+        esPrimeraPagina = false;
+        dibujarEtiqueta(doc, pedido, numeroBulto, totalBultos, tipos?.[numeroBulto - 1] ?? null);
+      }
+    }
+
+    doc.end();
+  });
+}

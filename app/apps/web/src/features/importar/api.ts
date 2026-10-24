@@ -1,9 +1,11 @@
 import type { TipoServicio } from "@mym/shared-types";
 import { apiClient } from "@/lib/api-client";
 import type {
+  DatosPedidoManual,
   DatosReglaImportacion,
   MapeoColumnas,
   ReglaImportacion,
+  ResultadoImportacionCompleta,
   ResultadoImportacion,
   SinonimoReceta,
   TipoCoincidencia,
@@ -101,6 +103,13 @@ export async function crearSinonimoReceta(datos: {
 
 export async function eliminarSinonimoReceta(id: string): Promise<void> {
   await apiClient.delete(`/sinonimos-receta/${id}`);
+}
+
+// Alta manual (reunión 2026-10-21, Pablo Renzo) — mismo pipeline de
+// validación/resolución que una importación real, ver ImportarExcelService.
+export async function crearPedidoManual(datos: DatosPedidoManual): Promise<ResultadoImportacionCompleta> {
+  const { data } = await apiClient.post<ResultadoImportacionCompleta>("/importaciones/manual", datos);
+  return data;
 }
 
 // Item: filtro "Importado por" en Pedidos (reunión 2026-10-09) — solo

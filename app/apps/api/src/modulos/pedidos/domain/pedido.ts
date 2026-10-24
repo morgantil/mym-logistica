@@ -23,6 +23,11 @@ export interface Pedido {
   estado: EstadoPedido;
   estadoValidacion: EstadoValidacion;
   estadoSimpliroute: EstadoSimpliroute;
+  // ID de la Visit en SimpliRoute — null hasta que se envía. Agregado
+  // 2026-10-25 (antes solo vivía en PedidoParaSincronizar/PedidoListado,
+  // pese a ya estar en la base) para poder empujar cambios post-envío
+  // (ver PedidosService.reasignarChofer).
+  simplirouteId: string | null;
   zonaId: string | null;
   zonaNombre: string | null;
   choferId: string | null;

@@ -159,3 +159,26 @@ export async function generarRemitoPdf(pedido: PedidoListado, formato: FormatoRe
     doc.end();
   });
 }
+
+// Impresión masiva (reunión 2026-10-21, Pablo Renzo): varios pedidos del
+// MISMO cliente (mismo `formato`, validado antes de llamar acá — ver
+// PedidosService.generarRemitoMasivo) en un solo PDF, una página por
+// pedido. Reusa la misma función de dibujo que la impresión individual.
+export async function generarRemitosPdf(pedidos: PedidoListado[], formato: FormatoRemito): Promise<Buffer> {
+  const papel = PAPEL[formato];
+
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ size: [cm(papel.anchoCm), cm(papel.altoCm)], margin: 0 });
+    const partes: Buffer[] = [];
+    doc.on("data", (parte) => partes.push(parte));
+    doc.on("end", () => resolve(Buffer.concat(partes)));
+    doc.on("error", reject);
+
+    pedidos.forEach((pedido, indice) => {
+      if (indice > 0) doc.addPage({ size: [cm(papel.anchoCm), cm(papel.altoCm)], margin: 0 });
+      papel.dibujar(doc, pedido);
+    });
+
+    doc.end();
+  });
+}

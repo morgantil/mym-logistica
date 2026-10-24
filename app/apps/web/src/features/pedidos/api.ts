@@ -67,6 +67,27 @@ export async function descargarRemito(pedidoId: string): Promise<Blob> {
   return data;
 }
 
+// Impresión masiva (reunión 2026-10-21, Pablo Renzo) — mismo criterio que
+// descargarRemito, pero varios pedidos en un solo PDF. El backend rechaza
+// con 400 si la selección mezcla más de un cliente.
+export async function descargarRemitosMasivo(pedidoIds: string[]): Promise<Blob> {
+  const { data } = await apiClient.post<Blob>(
+    "/pedidos/remitos-masivo",
+    { pedidoIds },
+    { responseType: "blob" },
+  );
+  return data;
+}
+
+export async function descargarEtiquetasMasivo(pedidoIds: string[]): Promise<Blob> {
+  const { data } = await apiClient.post<Blob>(
+    "/pedidos/etiquetas-masivo",
+    { pedidoIds },
+    { responseType: "blob" },
+  );
+  return data;
+}
+
 // Dropdown del filtro de Localidad — valores reales ya cargados.
 export async function listarLocalidadesPedidos(): Promise<string[]> {
   const { data } = await apiClient.get<string[]>("/pedidos/localidades");
@@ -107,6 +128,21 @@ export async function actualizarComentario(
 // cargada a mano — ver comentario en RutaCelda.
 export async function actualizarRuta(pedidoId: string, ruta: string, version: number): Promise<PedidoListado> {
   const { data } = await apiClient.patch<PedidoListado>(`/pedidos/${pedidoId}/ruta`, { ruta, version });
+  return data;
+}
+
+// Reasignación manual de chofer (reunión 2026-10-21, Pablo Renzo) — para
+// imprevistos reales (chofer enfermo, vehículo roto). Si el pedido ya se
+// había mandado a SimpliRoute, el backend también empuja el cambio allá.
+export async function reasignarChofer(
+  pedidoId: string,
+  choferIdExterno: number,
+  version: number,
+): Promise<PedidoListado> {
+  const { data } = await apiClient.patch<PedidoListado>(`/pedidos/${pedidoId}/chofer`, {
+    choferIdExterno,
+    version,
+  });
   return data;
 }
 

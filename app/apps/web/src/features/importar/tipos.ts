@@ -44,6 +44,29 @@ export interface ResultadoRequiereMapeoManual {
 
 export type ResultadoImportacion = ResultadoImportacionCompleta | ResultadoRequiereMapeoManual;
 
+// Alta manual (reunión 2026-10-21, Pablo Renzo) — espejo de
+// CrearPedidoManualDto en el backend.
+export interface DatosPedidoManual {
+  clienteId: string;
+  tipoServicio: "PANAL" | "MEDICAMENTO";
+  fechaEntrega: string;
+  numeroAfiliado: string;
+  destinatario: string;
+  direccion: string;
+  localidad: string;
+  telefono?: string;
+  ticket?: string;
+  productos?: { codigoProducto?: string; descripcionProducto: string; cantidad: number }[];
+  entreCalles?: string;
+  receta?: string;
+  tipoPedido?: string;
+  retiroDeReceta?: string;
+  tiempoDeEntrega?: string;
+  horarioEntrega?: string;
+  cantidadBulto?: number;
+  cantidadBolsa?: number;
+}
+
 // --- Reglas de importación y sinónimos de receta (decisión 2026-09-24) ---
 // Espejo de apps/api/src/modulos/importadores/domain/reglas-importacion.ts.
 export type TipoCoincidencia = "IGUAL" | "EMPIEZA_CON" | "CONTIENE";

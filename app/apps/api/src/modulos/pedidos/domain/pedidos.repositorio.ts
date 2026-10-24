@@ -200,6 +200,15 @@ export interface PedidosRepositorio {
   actualizarComentario(id: string, comentario: string | null, version: number): Promise<Pedido>;
   // Igual criterio que comentario — campo libre, mismo bloqueo optimista.
   actualizarRuta(id: string, ruta: string | null, version: number): Promise<Pedido>;
+  // Reasignación manual de chofer/zona (reunión 2026-10-21, Pablo Renzo): el
+  // usuario la dispara a mano (chofer enfermo, vehículo roto) — distinto de
+  // `actualizarEstadoDesdeProveedor`, que es la sincronización automática
+  // cuando SimpliRoute ya tiene un chofer distinto. Mismo bloqueo optimista.
+  reasignarChofer(
+    id: string,
+    datos: { zonaId: string | null; zonaNombre: string | null; choferId: string | null; choferNombre: string | null },
+    version: number,
+  ): Promise<Pedido>;
   // Decisión 2026-09-16: aplica la resolución elegida por el usuario para una
   // "dirección distinta al padrón" — actualiza `direccionUsada` (según lo que
   // haya decidido resolverDiferenciaDireccion) y apaga `alertaDireccionPendiente`,

@@ -10,9 +10,13 @@ import type { ResultadoImportacionCompleta } from "./tipos";
 export function ResumenImportacion({
   resultado,
   onImportarOtro,
+  textoBoton = "Importar otro archivo",
 }: {
   resultado: ResultadoImportacionCompleta;
   onImportarOtro: () => void;
+  // Reusado también en el alta manual (pedido-manual-form-sheet.tsx) —
+  // mismo resultado/estructura, pero "otro archivo" no aplica ahí.
+  textoBoton?: string;
 }) {
   const tieneErrores = resultado.filasConError.length > 0;
 
@@ -55,7 +59,7 @@ export function ResumenImportacion({
       )}
 
       <Button type="button" onClick={onImportarOtro} className="self-start">
-        Importar otro archivo
+        {textoBoton}
       </Button>
     </div>
   );

@@ -363,6 +363,21 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
     return this.obtenerPorId(id) as Promise<Pedido>;
   }
 
+  async reasignarChofer(
+    id: string,
+    datos: { zonaId: string | null; zonaNombre: string | null; choferId: string | null; choferNombre: string | null },
+    version: number,
+  ): Promise<Pedido> {
+    const resultado = await this.prisma.pedido.updateMany({
+      where: { id, version },
+      data: { ...datos, version: { increment: 1 } },
+    });
+    if (resultado.count === 0) {
+      return this.fallarSiNoExiste(id);
+    }
+    return this.obtenerPorId(id) as Promise<Pedido>;
+  }
+
   async resolverAlertaDireccion(id: string, direccionUsada: string, version: number): Promise<Pedido> {
     const resultado = await this.prisma.pedido.updateMany({
       where: { id, version },

@@ -18,6 +18,7 @@ function pedido(overrides: Partial<Pedido> = {}): Pedido {
     estado: EstadoPedido.SIN_ASIGNAR,
     estadoValidacion: EstadoValidacion.VALIDO,
     estadoSimpliroute: EstadoSimpliroute.NO_ENVIADO,
+    simplirouteId: null,
     zonaId: null,
     zonaNombre: null,
     choferId: null,

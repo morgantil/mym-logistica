@@ -19,8 +19,10 @@ import { ActualizarPrioridadDto } from "./dto/actualizar-prioridad.dto";
 import { ActualizarBultosDto } from "./dto/actualizar-bultos.dto";
 import { ActualizarComentarioDto } from "./dto/actualizar-comentario.dto";
 import { ActualizarRutaDto } from "./dto/actualizar-ruta.dto";
+import { ReasignarChoferDto } from "./dto/reasignar-chofer.dto";
 import { EliminarPedidosDto } from "./dto/eliminar-pedidos.dto";
 import { EnviarSimpliRouteDto } from "./dto/enviar-simpliroute.dto";
+import { ImprimirMasivoDto } from "./dto/imprimir-masivo.dto";
 import { ListarPedidosDto } from "./dto/listar-pedidos.dto";
 import { ResolverAlertaDireccionDto } from "./dto/resolver-alerta-direccion.dto";
 
@@ -133,6 +135,15 @@ export class PedidosController {
     return this.pedidosService.actualizarRuta(id, dto.ruta ?? null, dto.version);
   }
 
+  // Reasignación manual de chofer (reunión 2026-10-21, Pablo Renzo): para
+  // imprevistos reales (chofer enfermo, vehículo roto) — mismos roles que
+  // ya reasignan ruta/comentario día a día.
+  @Roles(Rol.OPERACIONES, Rol.LOGISTICA, Rol.ADMINISTRACION)
+  @Patch(":id/chofer")
+  reasignarChofer(@Param("id") id: string, @Body() dto: ReasignarChoferDto) {
+    return this.pedidosService.reasignarChofer(id, dto.choferIdExterno, dto.version);
+  }
+
   // Decisión 2026-09-16: resuelve una "dirección distinta a la registrada en
   // el padrón" y desbloquea el envío — mismos roles que ya operan pedidos
   // día a día (ver validar-envio.ts).
@@ -193,6 +204,26 @@ export class PedidosController {
   async remito(@Param("id") id: string): Promise<StreamableFile> {
     const pdf = await this.pedidosService.generarRemito(id);
     return new StreamableFile(pdf, { disposition: `inline; filename="remito-pedido-${id}.pdf"` });
+  }
+
+  // Impresión masiva (reunión 2026-10-21, Pablo Renzo): varios pedidos
+  // seleccionados en la grilla, un solo PDF — obligatorio que sean de un
+  // mismo cliente (validado en el service). POST porque la lista de ids va
+  // en el body, mismo criterio que enviar-simpliroute/eliminar.
+  @Roles(Rol.LOGISTICA, Rol.ADMINISTRACION)
+  @Post("etiquetas-masivo")
+  @Header("Content-Type", "application/pdf")
+  async etiquetasMasivo(@Body() dto: ImprimirMasivoDto): Promise<StreamableFile> {
+    const pdf = await this.pedidosService.generarEtiquetasMasivo(dto.pedidoIds);
+    return new StreamableFile(pdf, { disposition: 'inline; filename="etiquetas.pdf"' });
+  }
+
+  @Roles(Rol.LOGISTICA, Rol.ADMINISTRACION)
+  @Post("remitos-masivo")
+  @Header("Content-Type", "application/pdf")
+  async remitosMasivo(@Body() dto: ImprimirMasivoDto): Promise<StreamableFile> {
+    const pdf = await this.pedidosService.generarRemitoMasivo(dto.pedidoIds);
+    return new StreamableFile(pdf, { disposition: 'inline; filename="remitos.pdf"' });
   }
 
   // Borrado lógico — solo pedidos que todavía no se mandaron a SimpliRoute
