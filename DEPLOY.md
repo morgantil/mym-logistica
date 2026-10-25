@@ -278,6 +278,18 @@ efecto práctico en el deploy en sí, solo cambió la visibilidad del código.
     `createdAt`). Si este ambiente sigue vivo para cuando se cumplan 30
     días desde 2026-10-11, hay que migrar a un plan pago o recrear la base
     (con su `pg_dump`/`pg_restore` correspondiente) antes de que expire.
+17. **Un token de Vercel con scope de PROYECTO funciona para `vercel --prod`
+    aunque `vercel whoami`/`vercel teams ls` lo rechacen.** Al pedirle un
+    token al cliente (2026-10-25) varios intentos fallaron: uno con scope
+    de cuenta personal (sin acceso al team del proyecto), uno de otra
+    cuenta/team por completo, uno inválido de entrada — hasta que generó
+    uno con **scope = el nombre del proyecto** (`mym-logistica-web`), que
+    Vercel muestra como una fila aparte en la lista de tokens, distinta de
+    "Personal Account" o un team. Ese SÍ funcionó para desplegar, pese a
+    que los comandos de diagnóstico (`whoami`, `teams ls`) seguían
+    devolviendo error — no usar esos comandos para "validar" un token antes
+    de probarlo con el deploy real, dan falso negativo con un token de
+    proyecto.
 
 ## Pendiente antes de que esto sea "producción" de verdad
 
