@@ -596,12 +596,22 @@ export class PedidosService {
           continue;
         }
 
-        let actualizacionChofer: Awaited<ReturnType<typeof this.zonasChoferesService.resolverZonaPorChofer>> | undefined;
+        let actualizacionChofer:
+          | { zonaId: string | null; zonaNombre: string | null; choferId: string | null; choferNombre: string | null }
+          | undefined;
         if (choferIdExterno !== null) {
-          const resuelto = await this.zonasChoferesService.resolverZonaPorChofer(choferIdExterno);
+          // Bug real encontrado 2026-10-26 corriendo sincronizarEstados contra
+          // la cuenta real: resolverZonaPorChofer también devuelve
+          // `vehiculoId` (lo usa reasignarChofer), pero actualizarEstadoDesdeProveedor
+          // solo acepta estos 4 campos — mandar el objeto completo rompía
+          // `prisma.pedido.updateMany` con "Unknown argument `vehiculoId`"
+          // (no da error de compilación: TS no chequea exceso de propiedades
+          // en una asignación entre variables, solo en literales).
+          const { zonaId, zonaNombre, choferId, choferNombre } =
+            await this.zonasChoferesService.resolverZonaPorChofer(choferIdExterno);
           const mismoChofer = String(choferIdExterno) === pedido.choferId;
-          if (!mismoChofer || resuelto.choferNombre !== pedido.choferNombre) {
-            actualizacionChofer = resuelto;
+          if (!mismoChofer || choferNombre !== pedido.choferNombre) {
+            actualizacionChofer = { zonaId, zonaNombre, choferId, choferNombre };
           }
         }
 
