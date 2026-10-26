@@ -535,7 +535,13 @@ export function PedidosTabla() {
         cell: ({ row }) => (
           <button
             type="button"
-            className="underline-offset-2 hover:underline"
+            // `select-none`: sin esto, un click con el más mínimo arrastre
+            // (muy común clickeando rápido en una celda angosta) lo toma el
+            // navegador como selección de texto en vez de click, y el botón
+            // nunca dispara el onClick — bug real encontrado 2026-10-25
+            // (reportado con captura: el número quedaba resaltado en azul,
+            // el panel nunca se abría).
+            className="cursor-pointer select-none font-medium text-primary underline-offset-2 hover:underline"
             onClick={() => setPedidoSeleccionado(row.original)}
           >
             {row.original.numero}
