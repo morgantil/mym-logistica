@@ -77,6 +77,12 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
               { numeroAfiliado: { contains: filtro.busqueda, mode: "insensitive" } },
               { direccionUsada: { contains: filtro.busqueda, mode: "insensitive" } },
               { destinatario: { nombre: { contains: filtro.busqueda, mode: "insensitive" } } },
+              // Decisión 2026-10-26 (Leonardo): también buscar por Nº de
+              // Pedido — "numero" es Int, no soporta `contains`, así que acá
+              // va exacto. Acepta "309" o "#309" (lo que se ve en la grilla).
+              ...(/^#?\d+$/.test(filtro.busqueda.trim())
+                ? [{ numero: Number(filtro.busqueda.trim().replace("#", "")) }]
+                : []),
             ],
           }
         : {}),

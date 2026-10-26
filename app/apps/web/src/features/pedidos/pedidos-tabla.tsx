@@ -751,7 +751,7 @@ export function PedidosTabla() {
             </Label>
             <Input
               id="busqueda-pedidos"
-              placeholder="Destinatario, dirección o Nº de afiliado…"
+              placeholder="Destinatario, dirección, Nº de afiliado o Nº de pedido…"
               value={busquedaInput}
               onChange={(e) => setBusquedaInput(e.target.value)}
             />
