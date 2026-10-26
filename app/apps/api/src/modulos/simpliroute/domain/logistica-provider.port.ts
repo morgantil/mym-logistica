@@ -170,7 +170,10 @@ export interface LogisticaProviderPort {
 
   // §19 funcional — el mapeo a EstadoPedido propio se hace en el módulo de pedidos,
   // no acá: este puerto solo devuelve el estado crudo tal cual lo informa el proveedor.
-  consultarEstado(idExterno: string): Promise<EstadoVisita>;
+  // `null` = la Visit ya no existe en SimpliRoute (404 — típicamente porque se
+  // borró la ruta/plan que la contenía) — ver PedidosService.sincronizarEstados,
+  // que en ese caso revierte el pedido a NO_ENVIADO en vez de tratarlo como error.
+  consultarEstado(idExterno: string): Promise<EstadoVisita | null>;
 
   // §12-§13 funcional — catálogos que ZonasChoferesService cachea localmente
   // y refresca periódicamente (nunca se consultan en vivo en cada request).

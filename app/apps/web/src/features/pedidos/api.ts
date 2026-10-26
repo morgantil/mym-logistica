@@ -189,6 +189,9 @@ export async function eliminarPedidos(pedidoIds: string[]): Promise<ResultadoEli
 export interface ResultadoSincronizacion {
   actualizados: number;
   sinCambios: number;
+  // Pedidos cuya Visit ya no existe en SimpliRoute (se borró la ruta allá) y
+  // por eso volvieron solos a "Sin asignar" acá.
+  revertidos: number;
   errores: { pedidoId: string; errores: string[] }[];
 }
 

@@ -28,12 +28,15 @@ export function PedidosPage() {
     mutationFn: sincronizarEstados,
     onSuccess: (resultado) => {
       queryClient.invalidateQueries({ queryKey: ["pedidos"] });
+      const partes = [`Sincronizados ${resultado.actualizados}`];
+      if (resultado.revertidos > 0) {
+        partes.push(`${resultado.revertidos} volvieron a "Sin asignar" (ya no existían en SimpliRoute)`);
+      }
       if (resultado.errores.length > 0) {
-        toast.warning(
-          `Sincronizados ${resultado.actualizados}. ${resultado.errores.length} pedido(s) con error.`,
-        );
+        partes.push(`${resultado.errores.length} pedido(s) con error`);
+        toast.warning(partes.join(". ") + ".");
       } else {
-        toast.success(`Sincronizados ${resultado.actualizados} pedido(s).`);
+        toast.success(partes.join(". ") + ".");
       }
     },
     onError: () => toast.error("No se pudo sincronizar. Probá de nuevo en unos segundos."),

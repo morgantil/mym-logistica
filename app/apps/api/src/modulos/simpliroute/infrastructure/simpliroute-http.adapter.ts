@@ -422,17 +422,24 @@ export class SimplirouteHttpAdapter implements LogisticaProviderPort {
 
   // §19 funcional — devuelve el estado crudo tal cual lo informa SimpliRoute;
   // el mapeo a EstadoPedido propio vive en el módulo de pedidos (ver puerto).
-  async consultarEstado(idExterno: string): Promise<EstadoVisita> {
-    const respuesta = await this.solicitar<VisitaSimpliRoute | VisitaSimpliRoute[]>(
-      "GET",
-      `/v1/routes/visits/${encodeURIComponent(idExterno)}/`,
-    );
-    const visita = primerElemento(respuesta);
-    return {
-      estado: visita.status,
-      fechaEntrega: visita.checkout_time ? new Date(visita.checkout_time) : null,
-      choferIdExterno: visita.driver ?? null,
-    };
+  async consultarEstado(idExterno: string): Promise<EstadoVisita | null> {
+    try {
+      const respuesta = await this.solicitar<VisitaSimpliRoute | VisitaSimpliRoute[]>(
+        "GET",
+        `/v1/routes/visits/${encodeURIComponent(idExterno)}/`,
+      );
+      const visita = primerElemento(respuesta);
+      return {
+        estado: visita.status,
+        fechaEntrega: visita.checkout_time ? new Date(visita.checkout_time) : null,
+        choferIdExterno: visita.driver ?? null,
+      };
+    } catch (error) {
+      if (error instanceof SimplirouteHttpError && error.status === 404) {
+        return null;
+      }
+      throw error;
+    }
   }
 
   // §12 funcional. Solo lectura pública (Documentacion simpliroute/04 §65-71) —

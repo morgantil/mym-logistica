@@ -279,6 +279,17 @@ export interface PedidosRepositorio {
     },
   ): Promise<Pedido>;
 
+  // Decisión 2026-10-26 (caso real de Leonardo probando en el cliente): la
+  // Visit ya no existe en SimpliRoute (consultarEstado devolvió null, 404 —
+  // típicamente porque se borró la ruta allá) pero el pedido acá seguía
+  // "enviado"/coordinado para siempre, sin forma de borrarlo ni reenviarlo
+  // (ver validar-eliminacion.ts, que bloquea el borrado de todo lo que no sea
+  // NO_ENVIADO/NO_ENCONTRADO). Esto lo revierte a NO_ENVIADO: limpia
+  // simplirouteId (ya no hay Visit que referenciar) pero deja zonaId/choferId
+  // tal cual, para no perder la coordinación previa al reenviar. Mismo
+  // bloqueo optimista que el resto.
+  resetearEnvioSimpliroute(id: string, version: number): Promise<Pedido>;
+
   // Sin bloqueo optimista a propósito: es solo informativo ("¿ya se imprimió
   // alguna etiqueta?"), no hay dato de negocio en juego que se pueda pisar.
   marcarEtiquetaImpresa(id: string): Promise<void>;

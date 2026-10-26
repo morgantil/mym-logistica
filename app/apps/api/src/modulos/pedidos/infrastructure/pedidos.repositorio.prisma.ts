@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
-import { EstadoPedido, PrioridadPedido } from "@mym/shared-types";
+import { EstadoPedido, EstadoSimpliroute, PrioridadPedido } from "@mym/shared-types";
 import { PrismaService } from "../../../common/prisma/prisma.service";
 import { ConflictoVersionError } from "../domain/conflicto-version.error";
 import { Pedido, PedidoFacturable, PedidoListado } from "../domain/pedido";
@@ -515,6 +515,22 @@ export class PedidosRepositorioPrisma implements PedidosRepositorio {
         estado: datos.estado,
         fechaEntregaEfectiva: datos.fechaEntregaEfectiva,
         ...(datos.actualizacionChofer ?? {}),
+        version: { increment: 1 },
+      },
+    });
+    if (resultado.count === 0) {
+      return this.fallarSiNoExiste(id);
+    }
+    return this.obtenerPorId(id) as Promise<Pedido>;
+  }
+
+  async resetearEnvioSimpliroute(id: string, version: number): Promise<Pedido> {
+    const resultado = await this.prisma.pedido.updateMany({
+      where: { id, version },
+      data: {
+        estado: EstadoPedido.SIN_ASIGNAR,
+        estadoSimpliroute: EstadoSimpliroute.NO_ENVIADO,
+        simplirouteId: null,
         version: { increment: 1 },
       },
     });

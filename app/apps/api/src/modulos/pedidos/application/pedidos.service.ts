@@ -40,6 +40,10 @@ export interface ResultadoEnvioMasivo {
 export interface ResultadoSincronizacion {
   actualizados: number;
   sinCambios: number;
+  // Pedidos cuya Visit ya no existe en SimpliRoute (404 — se borró la ruta
+  // allá) y por eso se revirtieron a NO_ENVIADO acá — ver
+  // PedidosRepositorio.resetearEnvioSimpliroute.
+  revertidos: number;
   errores: PedidoConErrores[];
 }
 
@@ -558,13 +562,19 @@ export class PedidosService {
   // (barato, sin pegarle a la API de SimpliRoute por cada pedido).
   async sincronizarEstados(): Promise<ResultadoSincronizacion> {
     const pendientes = await this.repositorio.listarPendientesDeSincronizar();
-    const resultado: ResultadoSincronizacion = { actualizados: 0, sinCambios: 0, errores: [] };
+    const resultado: ResultadoSincronizacion = { actualizados: 0, sinCambios: 0, revertidos: 0, errores: [] };
 
     for (const pedido of pendientes) {
       try {
-        const { estado: estadoCrudo, fechaEntrega, choferIdExterno } = await this.logisticaProvider.consultarEstado(
-          pedido.simplirouteId,
-        );
+        const estadoVisita = await this.logisticaProvider.consultarEstado(pedido.simplirouteId);
+        if (estadoVisita === null) {
+          // La Visit ya no existe en SimpliRoute (se borró la ruta allá) —
+          // ver comentario en PedidosRepositorio.resetearEnvioSimpliroute.
+          await this.repositorio.resetearEnvioSimpliroute(pedido.id, pedido.version);
+          resultado.revertidos++;
+          continue;
+        }
+        const { estado: estadoCrudo, fechaEntrega, choferIdExterno } = estadoVisita;
         const estadoMapeado = mapearEstadoSimpliRoute(estadoCrudo);
         if (estadoMapeado === null) {
           resultado.sinCambios++;

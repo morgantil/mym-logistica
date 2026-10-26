@@ -14,18 +14,21 @@ function armarServicio(datos: {
   pendientes: { id: string; simplirouteId: string; choferId: string | null; choferNombre: string | null; version: number }[];
   choferIdExternoDevuelto: number | null;
   choferResuelto?: { zonaId: string | null; zonaNombre: string | null; choferId: string | null; choferNombre: string | null };
+  estadoVisita?: { estado: string; fechaEntrega: Date | null; choferIdExterno: number | null } | null;
 }) {
   const actualizarEstadoDesdeProveedor = jest.fn().mockResolvedValue({});
+  const resetearEnvioSimpliroute = jest.fn().mockResolvedValue({});
   const repositorio = {
     listarPendientesDeSincronizar: jest.fn().mockResolvedValue(datos.pendientes),
     actualizarEstadoDesdeProveedor,
+    resetearEnvioSimpliroute,
   };
   const logisticaProvider = {
-    consultarEstado: jest.fn().mockResolvedValue({
-      estado: "entered",
-      fechaEntrega: null,
-      choferIdExterno: datos.choferIdExternoDevuelto,
-    }),
+    consultarEstado: jest.fn().mockResolvedValue(
+      datos.estadoVisita !== undefined
+        ? datos.estadoVisita
+        : { estado: "entered", fechaEntrega: null, choferIdExterno: datos.choferIdExternoDevuelto },
+    ),
   };
   const resolverZonaPorChofer = jest.fn().mockResolvedValue(
     datos.choferResuelto ?? {
@@ -46,7 +49,7 @@ function armarServicio(datos: {
     {} as never,
     {} as never,
   );
-  return { servicio, actualizarEstadoDesdeProveedor, resolverZonaPorChofer };
+  return { servicio, actualizarEstadoDesdeProveedor, resetearEnvioSimpliroute, resolverZonaPorChofer };
 }
 
 describe("PedidosService.sincronizarEstados — reasignación/renombre de chofer en SimpliRoute", () => {
@@ -115,5 +118,25 @@ describe("PedidosService.sincronizarEstados — reasignación/renombre de chofer
     await servicio.sincronizarEstados();
 
     expect(resolverZonaPorChofer).not.toHaveBeenCalled();
+  });
+});
+
+// Caso real 2026-10-26 (Leonardo probando en el cliente): borrar una ruta en
+// SimpliRoute no avisa a mym — el pedido quedaba "coordinado" para siempre,
+// sin forma de borrarlo ni reenviarlo. Ver SimplirouteHttpAdapter.consultarEstado
+// (devuelve null en 404) y PedidosRepositorio.resetearEnvioSimpliroute.
+describe("PedidosService.sincronizarEstados — Visit borrada en SimpliRoute", () => {
+  it("si la Visit ya no existe (404 → null), revierte el pedido a NO_ENVIADO en vez de marcarlo como error", async () => {
+    const { servicio, resetearEnvioSimpliroute, actualizarEstadoDesdeProveedor } = armarServicio({
+      pendientes: [{ id: "p1", simplirouteId: "999", choferId: "42", choferNombre: "Lucia", version: 3 }],
+      choferIdExternoDevuelto: null,
+      estadoVisita: null,
+    });
+
+    const resultado = await servicio.sincronizarEstados();
+
+    expect(resetearEnvioSimpliroute).toHaveBeenCalledWith("p1", 3);
+    expect(actualizarEstadoDesdeProveedor).not.toHaveBeenCalled();
+    expect(resultado).toEqual({ actualizados: 0, sinCambios: 0, revertidos: 1, errores: [] });
   });
 });
