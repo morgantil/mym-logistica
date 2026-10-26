@@ -76,6 +76,17 @@ export interface EstadoVisita {
   // grilla sola, sin tener que borrar el pedido. Null si la Visit todavía no
   // tiene chofer asignado.
   choferIdExterno: number | null;
+  // Campo `route` de la Visit (UUID de la Route, o null) — confirmado
+  // empíricamente 2026-10-26 contra la cuenta real: borrar una Route en
+  // SimpliRoute NO borra ni devuelve 404 en sus Visits, las deja existiendo
+  // con `route: null` y `status` sin cambiar (sigue "pending" para siempre).
+  // `DELETE /v1/routes/routes/{id}/` está marcado NOT_DOCUMENTED en la
+  // documentación oficial — no asumir qué hace sin verificarlo, como pasó acá
+  // (el primer intento asumía 404, que nunca ocurre en este caso real). Ver
+  // PedidosService.sincronizarEstados: "pending" + sin ruta = la Visit se
+  // cayó de su ruta, hay que revertir el pedido, no tratarlo como "pendiente
+  // sin cambios".
+  tieneRuta: boolean;
 }
 
 // §12 funcional (Zona): "deberá poder consultarse desde la información

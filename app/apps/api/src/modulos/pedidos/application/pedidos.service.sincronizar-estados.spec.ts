@@ -14,7 +14,7 @@ function armarServicio(datos: {
   pendientes: { id: string; simplirouteId: string; choferId: string | null; choferNombre: string | null; version: number }[];
   choferIdExternoDevuelto: number | null;
   choferResuelto?: { zonaId: string | null; zonaNombre: string | null; choferId: string | null; choferNombre: string | null };
-  estadoVisita?: { estado: string; fechaEntrega: Date | null; choferIdExterno: number | null } | null;
+  estadoVisita?: { estado: string; fechaEntrega: Date | null; choferIdExterno: number | null; tieneRuta?: boolean } | null;
 }) {
   const actualizarEstadoDesdeProveedor = jest.fn().mockResolvedValue({});
   const resetearEnvioSimpliroute = jest.fn().mockResolvedValue({});
@@ -27,7 +27,7 @@ function armarServicio(datos: {
     consultarEstado: jest.fn().mockResolvedValue(
       datos.estadoVisita !== undefined
         ? datos.estadoVisita
-        : { estado: "entered", fechaEntrega: null, choferIdExterno: datos.choferIdExternoDevuelto },
+        : { estado: "entered", fechaEntrega: null, choferIdExterno: datos.choferIdExternoDevuelto, tieneRuta: true },
     ),
   };
   const resolverZonaPorChofer = jest.fn().mockResolvedValue(
@@ -121,11 +121,9 @@ describe("PedidosService.sincronizarEstados — reasignación/renombre de chofer
   });
 });
 
-// Caso real 2026-10-26 (Leonardo probando en el cliente): borrar una ruta en
-// SimpliRoute no avisa a mym — el pedido quedaba "coordinado" para siempre,
-// sin forma de borrarlo ni reenviarlo. Ver SimplirouteHttpAdapter.consultarEstado
-// (devuelve null en 404) y PedidosRepositorio.resetearEnvioSimpliroute.
-describe("PedidosService.sincronizarEstados — Visit borrada en SimpliRoute", () => {
+// Caso defensivo (404 → null), no confirmado contra la cuenta real — ver el
+// describe de abajo para el caso que SÍ se confirmó.
+describe("PedidosService.sincronizarEstados — Visit inexistente en SimpliRoute (404)", () => {
   it("si la Visit ya no existe (404 → null), revierte el pedido a NO_ENVIADO en vez de marcarlo como error", async () => {
     const { servicio, resetearEnvioSimpliroute, actualizarEstadoDesdeProveedor } = armarServicio({
       pendientes: [{ id: "p1", simplirouteId: "999", choferId: "42", choferNombre: "Lucia", version: 3 }],
@@ -138,5 +136,52 @@ describe("PedidosService.sincronizarEstados — Visit borrada en SimpliRoute", (
     expect(resetearEnvioSimpliroute).toHaveBeenCalledWith("p1", 3);
     expect(actualizarEstadoDesdeProveedor).not.toHaveBeenCalled();
     expect(resultado).toEqual({ actualizados: 0, sinCambios: 0, revertidos: 1, errores: [] });
+  });
+});
+
+// Caso real CONFIRMADO 2026-10-26 (Leonardo probando en el cliente, 3 Visits
+// reales verificadas contra la API de SimpliRoute): borrar una Route no borra
+// la Visit ni da 404 — queda "pending" con `route: null` para siempre, y el
+// primer intento de fix (basado en 404) no detectaba nada acá, el pedido
+// seguía "coordinado". Este es el caso que de verdad ocurre.
+describe("PedidosService.sincronizarEstados — Visit sin ruta (se borró la Route en SimpliRoute)", () => {
+  it('"pending" + sin ruta: revierte el pedido a NO_ENVIADO (se cayó de su ruta)', async () => {
+    const { servicio, resetearEnvioSimpliroute, actualizarEstadoDesdeProveedor } = armarServicio({
+      pendientes: [{ id: "p1", simplirouteId: "999", choferId: "42", choferNombre: "Lucia", version: 1 }],
+      choferIdExternoDevuelto: null,
+      estadoVisita: { estado: "pending", fechaEntrega: null, choferIdExterno: null, tieneRuta: false },
+    });
+
+    const resultado = await servicio.sincronizarEstados();
+
+    expect(resetearEnvioSimpliroute).toHaveBeenCalledWith("p1", 1);
+    expect(actualizarEstadoDesdeProveedor).not.toHaveBeenCalled();
+    expect(resultado).toEqual({ actualizados: 0, sinCambios: 0, revertidos: 1, errores: [] });
+  });
+
+  it('"pending" CON ruta: sigue el flujo normal (no la confunde con una Visit caída)', async () => {
+    const { servicio, resetearEnvioSimpliroute, actualizarEstadoDesdeProveedor } = armarServicio({
+      pendientes: [{ id: "p1", simplirouteId: "999", choferId: "42", choferNombre: "Lucia", version: 1 }],
+      choferIdExternoDevuelto: 42,
+      estadoVisita: { estado: "pending", fechaEntrega: null, choferIdExterno: 42, tieneRuta: true },
+    });
+
+    await servicio.sincronizarEstados();
+
+    expect(resetearEnvioSimpliroute).not.toHaveBeenCalled();
+    expect(actualizarEstadoDesdeProveedor).toHaveBeenCalled();
+  });
+
+  it('"entered" sin ruta (Visit ya en curso): NO la revierte, confía en el status real por sobre `route`', async () => {
+    const { servicio, resetearEnvioSimpliroute, actualizarEstadoDesdeProveedor } = armarServicio({
+      pendientes: [{ id: "p1", simplirouteId: "999", choferId: "42", choferNombre: "Lucia", version: 1 }],
+      choferIdExternoDevuelto: 42,
+      estadoVisita: { estado: "entered", fechaEntrega: null, choferIdExterno: 42, tieneRuta: false },
+    });
+
+    await servicio.sincronizarEstados();
+
+    expect(resetearEnvioSimpliroute).not.toHaveBeenCalled();
+    expect(actualizarEstadoDesdeProveedor).toHaveBeenCalled();
   });
 });

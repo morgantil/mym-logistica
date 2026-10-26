@@ -568,13 +568,28 @@ export class PedidosService {
       try {
         const estadoVisita = await this.logisticaProvider.consultarEstado(pedido.simplirouteId);
         if (estadoVisita === null) {
-          // La Visit ya no existe en SimpliRoute (se borró la ruta allá) —
-          // ver comentario en PedidosRepositorio.resetearEnvioSimpliroute.
+          // La Visit ya no existe en SimpliRoute (404) — caso defensivo, no
+          // confirmado contra la cuenta real (ver el caso de abajo, que sí lo
+          // es). Ver comentario en PedidosRepositorio.resetearEnvioSimpliroute.
           await this.repositorio.resetearEnvioSimpliroute(pedido.id, pedido.version);
           resultado.revertidos++;
           continue;
         }
-        const { estado: estadoCrudo, fechaEntrega, choferIdExterno } = estadoVisita;
+        const { estado: estadoCrudo, fechaEntrega, choferIdExterno, tieneRuta } = estadoVisita;
+
+        // Caso real confirmado 2026-10-26 (Leonardo probando en el cliente,
+        // 3 Visits reales verificadas contra la API): borrar una Route en
+        // SimpliRoute NO borra la Visit ni devuelve 404 — la deja "pending"
+        // con `route: null` para siempre. Sin este chequeo, el pedido se
+        // reescribía cada sync con el mismo estado (COORDINADO) sin que nada
+        // cambiara — exactamente el bug reportado. "pending" + sin ruta =
+        // se cayó de su ruta, mismo tratamiento que la Visit borrada.
+        if (estadoCrudo === "pending" && !tieneRuta) {
+          await this.repositorio.resetearEnvioSimpliroute(pedido.id, pedido.version);
+          resultado.revertidos++;
+          continue;
+        }
+
         const estadoMapeado = mapearEstadoSimpliRoute(estadoCrudo);
         if (estadoMapeado === null) {
           resultado.sinCambios++;

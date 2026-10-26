@@ -74,6 +74,10 @@ interface VisitaSimpliRoute {
   // ID del conductor asignado — confirmado en la tabla de campos del Visit
   // Object (Documentacion simpliroute/02).
   driver?: number | null;
+  // UUID de la Route a la que pertenece, o null si no está en ninguna
+  // (incluye el caso real de "se borró la Route" — confirmado 2026-10-26
+  // contra la cuenta real: la Visit queda viva con esto en null, nunca 404).
+  route?: string | null;
 }
 
 // GET /v1/zones/ — Documentacion simpliroute/04 §65-71. Solo lectura pública
@@ -433,6 +437,7 @@ export class SimplirouteHttpAdapter implements LogisticaProviderPort {
         estado: visita.status,
         fechaEntrega: visita.checkout_time ? new Date(visita.checkout_time) : null,
         choferIdExterno: visita.driver ?? null,
+        tieneRuta: visita.route != null,
       };
     } catch (error) {
       if (error instanceof SimplirouteHttpError && error.status === 404) {

@@ -1,11 +1,11 @@
 import { ConfigService } from "@nestjs/config";
 import { SimplirouteHttpAdapter } from "./simpliroute-http.adapter";
 
-// Caso real 2026-10-26 (Leonardo probando en el cliente): borrar una ruta en
-// SimpliRoute no avisa a mym — sincronizarEstados le pegaba por el
-// simplirouteId guardado y recibía un 404, que se trataba como error genérico
-// y dejaba el pedido "coordinado" para siempre. Acá se confirma que
-// consultarEstado distingue ese caso (null) de un error real (lo propaga).
+// Borrar una Route en SimpliRoute no avisa a mym — sincronizarEstados le
+// pegaba a la Visit por el simplirouteId guardado. Dos casos verificados acá:
+// un 404 genérico (defensivo, no confirmado contra la cuenta real) y el caso
+// REAL confirmado 2026-10-26 contra la cuenta real (3 Visits verificadas):
+// la Visit sigue viva, 200, "pending", con `route: null` — nunca 404.
 function armarConfig() {
   const valores: Record<string, unknown> = {
     "simpliroute.apiUrl": "https://api.simpliroute.test",
@@ -39,12 +39,21 @@ describe("SimplirouteHttpAdapter.consultarEstado — Visit borrada en SimpliRout
     await expect(adapter.consultarEstado("999")).rejects.toThrow();
   });
 
-  it("si la Visit existe, devuelve el estado mapeado normalmente", async () => {
-    mockFetch(200, { status: "entered", checkout_time: null, driver: 7 });
+  it("si la Visit existe y tiene ruta asignada, tieneRuta: true", async () => {
+    mockFetch(200, { status: "entered", checkout_time: null, driver: 7, route: "da28fc2e-24ea-4d0e-8f20-b76e7517ee21" });
     const adapter = new SimplirouteHttpAdapter(armarConfig());
 
     const resultado = await adapter.consultarEstado("999");
 
-    expect(resultado).toEqual({ estado: "entered", fechaEntrega: null, choferIdExterno: 7 });
+    expect(resultado).toEqual({ estado: "entered", fechaEntrega: null, choferIdExterno: 7, tieneRuta: true });
+  });
+
+  it('caso real confirmado: Route borrada → la Visit sigue viva (200, "pending") pero con route: null → tieneRuta: false', async () => {
+    mockFetch(200, { status: "pending", checkout_time: null, driver: undefined, route: null });
+    const adapter = new SimplirouteHttpAdapter(armarConfig());
+
+    const resultado = await adapter.consultarEstado("999");
+
+    expect(resultado).toEqual({ estado: "pending", fechaEntrega: null, choferIdExterno: null, tieneRuta: false });
   });
 });

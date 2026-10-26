@@ -46,7 +46,7 @@ export class SimplirouteMockAdapter implements LogisticaProviderPort {
 
   async consultarEstado(idExterno: string): Promise<EstadoVisita> {
     this.logger.warn(`[MOCK] consultarEstado(${idExterno}) — sin API real configurada.`);
-    return { estado: "pending", fechaEntrega: null, choferIdExterno: null };
+    return { estado: "pending", fechaEntrega: null, choferIdExterno: null, tieneRuta: true };
   }
 
   // Una zona de ejemplo con un polígono real (mismo formato que devuelve
